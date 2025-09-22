@@ -5,6 +5,18 @@
   }
 
   document.addEventListener('DOMContentLoaded', () => {
+    const titleLink = document.querySelector('.topbar__title');
+    const isHomePage = document.querySelector('.portfolio') !== null;
+
+    if (titleLink) {
+      titleLink.addEventListener('click', (event) => {
+        if (isHomePage) {
+          event.preventDefault();
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+      });
+    }
+
     const projectList = document.querySelector('.projects');
     if (!projectList) {
       return;
@@ -28,7 +40,7 @@
       });
       track.appendChild(duplicateSet);
 
-      const duration = 12 + (index % 5) * 1.5;
+      const duration = 4 + (index % 5) * 0.6;
       track.style.setProperty('--scroll-duration', `${duration}s`);
     });
 
