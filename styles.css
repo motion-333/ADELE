@@ -158,10 +158,93 @@ a {
 }
 
 .placeholder {
-  flex: 0 0 clamp(330px, 42vw, 540px);
-  height: clamp(210px, 30vw, 360px);
+  position: relative;
+  display: block;
+  text-decoration: none;
   border-radius: 0;
   box-shadow: 0 20px 40px rgba(15, 15, 15, 0.08);
+  cursor: pointer;
+}
+
+.placeholder:focus-visible {
+  outline: 3px solid rgba(29, 29, 29, 0.85);
+  outline-offset: 4px;
+}
+
+.media-track .placeholder {
+  flex: 0 0 clamp(330px, 42vw, 540px);
+  height: clamp(210px, 30vw, 360px);
+}
+
+.placeholder--sunset {
+  background: linear-gradient(135deg, #ff9f6e, #ff5f6d);
+}
+
+.placeholder--ocean {
+  background: linear-gradient(135deg, #6fa6ff, #367bff);
+}
+
+.placeholder--emerald {
+  background: linear-gradient(135deg, #6be5b0, #3cb37e);
+}
+
+.placeholder--coral {
+  background: linear-gradient(135deg, #f6d365, #fda085);
+}
+
+.placeholder--lavender {
+  background: linear-gradient(135deg, #c8b5ff, #8a6eff);
+}
+
+.placeholder--rose {
+  background: linear-gradient(135deg, #ff8ac9, #ff5ea6);
+}
+
+.placeholder--amber {
+  background: linear-gradient(135deg, #ffd36e, #ff9e4f);
+}
+
+.placeholder--teal {
+  background: linear-gradient(135deg, #64f2ff, #2ca6b5);
+}
+
+.placeholder--slate {
+  background: linear-gradient(135deg, #a3b9ff, #5c6cff);
+}
+
+.placeholder--forest {
+  background: linear-gradient(135deg, #8cd17a, #3c9d4b);
+}
+
+.placeholder--berry {
+  background: linear-gradient(135deg, #d06bff, #8c3bd9);
+}
+
+.placeholder--mocha {
+  background: linear-gradient(135deg, #d7b39b, #a3745b);
+}
+
+.transition-overlay {
+  position: fixed;
+  inset: 0;
+  background: #ffffff;
+  opacity: 0;
+  transition: opacity 0.55s ease;
+  pointer-events: none;
+  z-index: 180;
+}
+
+.transition-overlay.is-active {
+  opacity: 1;
+}
+
+.placeholder--transition {
+  pointer-events: none;
+  z-index: 220;
+}
+
+body.is-transitioning {
+  overflow: hidden;
 }
 
 .media-strip__control {
@@ -237,24 +320,87 @@ a {
   }
 }
 
-.media-track .placeholder:nth-child(5n + 1) {
-  background: linear-gradient(135deg, #ff9f6e, #ff5f6d);
+.project-detail-page {
+  background: #ffffff;
 }
 
-.media-track .placeholder:nth-child(5n + 2) {
-  background: linear-gradient(135deg, #6fa6ff, #367bff);
+.project-detail {
+  --project-media-height: clamp(240px, 60vh, 460px);
+  padding: clamp(5rem, 12vw, 8rem) 0 6rem;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(3rem, 10vw, 5rem);
 }
 
-.media-track .placeholder:nth-child(5n + 3) {
-  background: linear-gradient(135deg, #6be5b0, #3cb37e);
+.project-hero {
+  display: flex;
+  justify-content: center;
+  width: 100%;
 }
 
-.media-track .placeholder:nth-child(5n + 4) {
-  background: linear-gradient(135deg, #f6d365, #fda085);
+.project-hero__media {
+  width: min(95vw, 1200px);
+  aspect-ratio: var(--hero-aspect, 1.5);
+  margin: 0 auto;
+  transform: translateZ(0);
 }
 
-.media-track .placeholder:nth-child(5n) {
-  background: linear-gradient(135deg, #c8b5ff, #8a6eff);
+.project-detail__body {
+  max-width: min(95vw, 900px);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  text-align: left;
+}
+
+.project-detail__title {
+  font-size: clamp(1.8rem, 4vw, 3.2rem);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.project-detail__meta {
+  font-size: clamp(1rem, 2.2vw, 1.4rem);
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.project-detail__description {
+  font-size: clamp(1rem, 2.6vw, 1.35rem);
+  max-width: 65ch;
+  color: rgba(29, 29, 29, 0.85);
+}
+
+.project-detail__gallery {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(2.5rem, 8vw, 4rem);
+  align-items: center;
+}
+
+.project-detail__item {
+  width: min(95vw, calc(var(--project-media-height) * var(--item-aspect, 1)));
+  aspect-ratio: var(--item-aspect, 1);
+  height: auto;
+  box-shadow: 0 20px 40px rgba(15, 15, 15, 0.08);
+}
+
+@media (max-width: 768px) {
+  .project-detail {
+    padding-top: clamp(4.5rem, 14vw, 6rem);
+  }
+
+  .project-detail__body {
+    gap: 1.25rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .transition-overlay {
+    transition: none;
+  }
 }
 
 .project-heading {
