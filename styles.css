@@ -95,7 +95,7 @@ a {
 
 .topbar__about {
   position: absolute;
-  right: 2rem;
+  right: clamp(0.85rem, 3vw, 1.75rem);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -265,9 +265,9 @@ a {
   display: flex;
   align-items: baseline;
   justify-content: flex-start;
-  gap: clamp(0.65rem, 2vw, 1.5rem);
+  gap: clamp(0.35rem, 1.25vw, 0.9rem);
   flex-wrap: wrap;
-  row-gap: 0.5rem;
+  row-gap: 0.45rem;
 }
 
 .project-title {
@@ -281,7 +281,7 @@ a {
   font-weight: 400;
   color: rgba(0, 0, 0, 0.45);
   white-space: nowrap;
-  margin-left: clamp(0.4rem, 1.5vw, 1rem);
+  margin-left: clamp(0.15rem, 0.75vw, 0.45rem);
 }
 
 .about-page {

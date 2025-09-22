@@ -198,6 +198,9 @@
 
     const FAST_MULTIPLIER = 0.45;
     const MIN_FAST_DURATION = 0.7;
+    const EDGE_ZONE_RATIO = 0.16;
+    const EDGE_ZONE_MIN = 80;
+    const EDGE_ZONE_MAX = 240;
 
     const trackStates = [];
     const trackStateMap = new WeakMap();
@@ -323,6 +326,69 @@
       if (!state) {
         return;
       }
+
+      const updateEdgeMode = (mode) => {
+        if (state.mode === mode) {
+          return;
+        }
+        applyMode(state, mode);
+      };
+
+      let edgePointerActive = false;
+
+      const handleEdgePointerMove = (event) => {
+        if (shouldReduceMotion) {
+          if (edgePointerActive) {
+            edgePointerActive = false;
+            updateEdgeMode('base-left');
+          }
+          return;
+        }
+
+        const pointerType = event.pointerType || 'mouse';
+        if (pointerType === 'touch') {
+          if (edgePointerActive) {
+            edgePointerActive = false;
+            updateEdgeMode('base-left');
+          }
+          return;
+        }
+
+        const rect = strip.getBoundingClientRect();
+        if (!rect || rect.width === 0) {
+          return;
+        }
+
+        const edgeWidth = Math.min(
+          Math.max(rect.width * EDGE_ZONE_RATIO, EDGE_ZONE_MIN),
+          EDGE_ZONE_MAX
+        );
+        const x = event.clientX;
+
+        if (Number.isFinite(x)) {
+          edgePointerActive = true;
+          if (x <= rect.left + edgeWidth) {
+            updateEdgeMode('fast-right');
+          } else if (x >= rect.right - edgeWidth) {
+            updateEdgeMode('fast-left');
+          } else if (state.mode !== 'base-left') {
+            updateEdgeMode('base-left');
+          }
+        }
+      };
+
+      const resetEdgeHover = () => {
+        if (!edgePointerActive) {
+          return;
+        }
+        edgePointerActive = false;
+        updateEdgeMode('base-left');
+      };
+
+      strip.addEventListener('pointerenter', handleEdgePointerMove);
+      strip.addEventListener('pointermove', handleEdgePointerMove);
+      strip.addEventListener('pointerleave', resetEdgeHover);
+      strip.addEventListener('pointercancel', resetEdgeHover);
 
       const createControl = (direction) => {
         const control = document.createElement('button');
