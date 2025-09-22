@@ -78,7 +78,7 @@ a {
 .topbar__inner {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 1.5rem 2rem;
+  padding: 1.5rem 20px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -95,7 +95,7 @@ a {
 
 .topbar__about {
   position: absolute;
-  right: clamp(0.35rem, 1.6vw, 0.9rem);
+  right: 20px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -353,21 +353,21 @@ body.is-transitioning {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.75rem;
-  height: 2.75rem;
-  border-radius: 50%;
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  background: rgba(255, 255, 255, 0.82);
-  color: rgba(24, 24, 24, 0.88);
-  backdrop-filter: blur(12px);
-  transition: background 0.3s ease, transform 0.3s ease, border-color 0.3s ease,
-    box-shadow 0.3s ease;
+  padding: 0.35rem;
+  color: rgba(24, 24, 24, 0.8);
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  text-decoration: none;
+  line-height: 0;
+  cursor: pointer;
+  transition: color 0.2s ease, opacity 0.2s ease;
   z-index: 12;
 }
 
 .project-detail__back svg {
-  width: 1.35rem;
-  height: 1.35rem;
+  width: 1.5rem;
+  height: 1.5rem;
   stroke: currentColor;
   fill: none;
   stroke-width: 1.75;
@@ -377,15 +377,12 @@ body.is-transitioning {
 
 .project-detail__back:hover,
 .project-detail__back:focus-visible {
-  transform: translateY(-2px);
-  background: rgba(255, 255, 255, 0.97);
-  border-color: rgba(0, 0, 0, 0.24);
-  box-shadow: 0 14px 28px rgba(15, 15, 15, 0.14);
+  color: rgba(24, 24, 24, 0.5);
 }
 
 .project-detail__back:focus-visible {
-  outline: 3px solid rgba(0, 0, 0, 0.45);
-  outline-offset: 2px;
+  outline: 2px solid rgba(24, 24, 24, 0.45);
+  outline-offset: 4px;
 }
 
 .project-detail__body {
@@ -393,8 +390,16 @@ body.is-transitioning {
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: clamp(1.25rem, 3vw, 1.75rem);
   text-align: left;
+}
+
+.project-detail__heading {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: clamp(0.35rem, 1.2vw, 0.9rem);
+  row-gap: 0.35rem;
 }
 
 .project-detail__title {
@@ -407,6 +412,10 @@ body.is-transitioning {
 .project-detail__meta {
   font-size: clamp(1rem, 2.2vw, 1.4rem);
   color: rgba(0, 0, 0, 0.45);
+  display: inline-flex;
+  white-space: nowrap;
+  align-items: center;
+  margin-left: clamp(0.1rem, 0.6vw, 0.45rem);
 }
 
 .project-detail__description {
@@ -420,7 +429,9 @@ body.is-transitioning {
   margin: 0 auto;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(clamp(160px, 22vw, 280px), 1fr));
-  gap: 5px;
+  column-gap: 5px;
+  row-gap: 5px;
+  align-items: start;
 }
 
 .project-detail__item {
@@ -438,13 +449,12 @@ body.is-transitioning {
   .project-detail__back {
     top: clamp(1.75rem, 10vw, 3rem);
     left: clamp(1rem, 6vw, 2rem);
-    width: 2.5rem;
-    height: 2.5rem;
+    padding: 0.25rem;
   }
 
   .project-detail__back svg {
-    width: 1.2rem;
-    height: 1.2rem;
+    width: 1.35rem;
+    height: 1.35rem;
   }
 
   .project-detail__body {
