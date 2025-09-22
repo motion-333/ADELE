@@ -22,6 +22,10 @@
     const ACTION_KEYS = new Set(['Enter', ' ']);
 
     const placeholderSelector = '.placeholder[data-project][data-hero-class]';
+    const HERO_WIDTH_RATIO = 0.95;
+    const HERO_MAX_WIDTH = 1200;
+    const HERO_ASPECT = 16 / 9;
+    const RETURN_SCROLL_KEY = 'adele:return-scroll';
 
     const collectPlaceholderVariants = (element) =>
       element
@@ -308,6 +312,47 @@
           trackStateMap.set(track, state);
         });
 
+        const readStoredScrollPosition = () => {
+          if (!canUseHeroStorage) {
+            return null;
+          }
+
+          try {
+            const raw = window.sessionStorage.getItem(RETURN_SCROLL_KEY);
+            if (raw === null) {
+              return null;
+            }
+
+            const value = parseFloat(raw);
+            if (!Number.isFinite(value) || value < 0) {
+              try {
+                window.sessionStorage.removeItem(RETURN_SCROLL_KEY);
+              } catch (error) {
+                /* no-op */
+              }
+              return null;
+            }
+
+            return value;
+          } catch (error) {
+            return null;
+          }
+        };
+
+        const clearStoredScrollPosition = () => {
+          if (!canUseHeroStorage) {
+            return;
+          }
+
+          try {
+            window.sessionStorage.removeItem(RETURN_SCROLL_KEY);
+          } catch (error) {
+            /* no-op */
+          }
+        };
+
+        let pendingReturnScroll = readStoredScrollPosition();
+
         const wrapOffset = (state) => {
           const width = state.contentWidth;
           if (!width) {
@@ -389,17 +434,6 @@
           }
         };
 
-        const measurePlaceholderRatio = (element) => {
-          if (!element) {
-            return null;
-          }
-          const rect = element.getBoundingClientRect();
-          if (!rect || rect.width === 0) {
-            return null;
-          }
-          return rect.height / rect.width;
-        };
-
         let isProjectNavigationActive = false;
 
         const beginProjectNavigation = (anchor) => {
@@ -414,12 +448,18 @@
 
           const projectId = anchor.getAttribute('data-project');
           const heroClass = anchor.getAttribute('data-hero-class');
-          const ratio = measurePlaceholderRatio(anchor);
-          const clampedRatio =
-            Number.isFinite(ratio) && ratio > 0 ? Math.min(Math.max(ratio, 0.25), 3) : null;
 
           if (projectId || heroClass) {
-            storeHeroData(projectId, heroClass, clampedRatio);
+            storeHeroData(projectId, heroClass, HERO_ASPECT);
+          }
+
+          if (canUseHeroStorage) {
+            try {
+              const currentScroll = window.scrollY || window.pageYOffset || 0;
+              window.sessionStorage.setItem(RETURN_SCROLL_KEY, `${currentScroll}`);
+            } catch (error) {
+              /* no-op */
+            }
           }
 
           if (shouldReduceMotion) {
@@ -455,18 +495,25 @@
             window.innerWidth || document.documentElement.clientWidth || rect.width;
           const viewportHeight =
             window.innerHeight || document.documentElement.clientHeight || rect.height;
-          const heroRatioValue = clampedRatio !== null ? clampedRatio : 0.6;
 
-          let targetWidth = Math.min(viewportWidth * 0.95, 1400);
-          let targetHeight = targetWidth * heroRatioValue;
+          let targetWidth = Math.min(viewportWidth * HERO_WIDTH_RATIO, HERO_MAX_WIDTH);
+          let targetHeight = targetWidth / HERO_ASPECT;
           const maxHeight = viewportHeight * 0.9;
           if (targetHeight > maxHeight) {
             targetHeight = maxHeight;
-            targetWidth = targetHeight / Math.max(heroRatioValue, 0.0001);
+            targetWidth = targetHeight * HERO_ASPECT;
           }
 
           const targetLeft = scrollX + (viewportWidth - targetWidth) / 2;
-          const targetTop = scrollY + Math.max((viewportHeight - targetHeight) / 2, 0);
+          const topbar = document.querySelector('.topbar');
+          const topbarHeight = topbar ? topbar.getBoundingClientRect().height : 0;
+          const rootFontSize =
+            parseFloat(window.getComputedStyle(document.documentElement).fontSize) || 16;
+          const minPadding = 5 * rootFontSize;
+          const preferredPadding = viewportWidth * 0.12;
+          const maxPadding = 8 * rootFontSize;
+          const detailOffset = Math.min(Math.max(minPadding, preferredPadding), maxPadding);
+          const targetTop = scrollY + topbarHeight + detailOffset;
 
           requestAnimationFrame(() => {
             overlay.classList.add('is-active');
@@ -736,6 +783,20 @@
         const runResizeTasks = () => {
           computeTrackMetrics();
           updateLoopHeight();
+          if (pendingReturnScroll !== null) {
+            const viewportHeight =
+              window.innerHeight || document.documentElement.clientHeight || 0;
+            const maxScroll = Math.max(projectList.scrollHeight - viewportHeight, 0);
+            let target = Math.max(Math.min(pendingReturnScroll, maxScroll), 0);
+            if (loopHeight > 0 && target >= loopHeight) {
+              const normalized = target % loopHeight;
+              target = Number.isFinite(normalized) ? normalized : 0;
+            }
+            adjustLoopScroll(target);
+            pendingReturnScroll = null;
+            clearStoredScrollPosition();
+            return;
+          }
           const currentY = window.scrollY || window.pageYOffset || 0;
           if (loopHeight > 0 && currentY >= loopHeight) {
             let normalized = currentY % loopHeight;
@@ -853,24 +914,16 @@
       const heroDefaults = heroFrame
         ? {
             className: heroFrame.getAttribute('data-default-hero') || null,
-            aspect: parseFloat(heroFrame.getAttribute('data-default-aspect') || '0'),
           }
-        : { className: null, aspect: null };
+        : { className: null };
 
       const storedHero = readHeroData(projectId);
       const heroClassToUse =
         (storedHero && storedHero.heroClass) || heroDefaults.className || null;
-      const ratioCandidate =
-        storedHero && Number.isFinite(storedHero.ratio)
-          ? storedHero.ratio
-          : Number.isFinite(heroDefaults.aspect) && heroDefaults.aspect > 0
-          ? heroDefaults.aspect
-          : 0.65;
-      const heroRatio = Math.min(Math.max(ratioCandidate, 0.25), 3);
 
       if (heroFrame) {
         swapPlaceholderVariant(heroFrame, heroClassToUse);
-        heroFrame.style.setProperty('--hero-aspect', `${heroRatio}`);
+        heroFrame.style.setProperty('--hero-aspect', `${HERO_ASPECT}`);
       }
 
       const gallery = projectDetail.querySelector('.project-detail__gallery');
