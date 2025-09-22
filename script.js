@@ -17,6 +17,85 @@
       });
     }
 
+    const reduceMotionMedia =
+      typeof window.matchMedia === 'function'
+        ? window.matchMedia('(prefers-reduced-motion: reduce)')
+        : { matches: false, addEventListener: null, addListener: null };
+    let shouldReduceMotion = reduceMotionMedia.matches;
+
+    const intro = document.querySelector('.intro');
+    const introTitle = intro ? intro.querySelector('.intro__title') : null;
+
+    const hideIntroElement = () => {
+      if (intro && !intro.classList.contains('intro--hidden')) {
+        intro.classList.add('intro--hidden');
+      }
+    };
+
+    if (intro) {
+      if (!introTitle || !titleLink) {
+        hideIntroElement();
+      } else if (shouldReduceMotion) {
+        hideIntroElement();
+      } else {
+        let introSequenceStarted = false;
+
+        const startIntro = () => {
+          if (introSequenceStarted || !intro || intro.classList.contains('intro--hidden')) {
+            return;
+          }
+          introSequenceStarted = true;
+
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              if (!intro || intro.classList.contains('intro--hidden')) {
+                return;
+              }
+
+              const introRect = introTitle.getBoundingClientRect();
+              const targetRect = titleLink.getBoundingClientRect();
+
+              const introCenterX = introRect.left + introRect.width / 2;
+              const introCenterY = introRect.top + introRect.height / 2;
+              const targetCenterX = targetRect.left + targetRect.width / 2;
+              const targetCenterY = targetRect.top + targetRect.height / 2;
+
+              const deltaX = targetCenterX - introCenterX;
+              const deltaY = targetCenterY - introCenterY;
+              const scale = introRect.height > 0 ? targetRect.height / introRect.height : 1;
+
+              intro.style.setProperty('--intro-translate-x', `${deltaX}px`);
+              intro.style.setProperty('--intro-translate-y', `${deltaY}px`);
+              intro.style.setProperty('--intro-scale', `${scale}`);
+
+              intro.classList.add('intro--running');
+
+              window.setTimeout(() => {
+                if (intro && !intro.classList.contains('intro--hidden')) {
+                  intro.classList.add('intro--fade');
+                }
+              }, 720);
+            });
+          });
+        };
+
+        intro.addEventListener('transitionend', (event) => {
+          if (event.target === intro && event.propertyName === 'opacity') {
+            hideIntroElement();
+          }
+        });
+
+        const fontsReady = document.fonts && document.fonts.ready;
+        if (fontsReady && typeof fontsReady.then === 'function') {
+          fontsReady.then(startIntro).catch(startIntro);
+        } else if (document.readyState === 'complete') {
+          startIntro();
+        } else {
+          window.addEventListener('load', startIntro, { once: true });
+        }
+      }
+    }
+
     const projectList = document.querySelector('.projects');
     if (!projectList) {
       return;
@@ -27,8 +106,8 @@
       return;
     }
 
-    const baseDurationStart = 1.8;
-    const durationStep = 0.25;
+    const baseDurationStart = 7.2;
+    const durationStep = 1;
 
     originalProjects.forEach((project, index) => {
       const track = project.querySelector('.media-track');
@@ -52,9 +131,6 @@
       afterFragment.appendChild(project.cloneNode(true));
     });
     projectList.appendChild(afterFragment);
-
-    const reduceMotionMedia = window.matchMedia('(prefers-reduced-motion: reduce)');
-    let shouldReduceMotion = reduceMotionMedia.matches;
 
     const FAST_MULTIPLIER = 0.45;
     const MIN_FAST_DURATION = 0.7;
@@ -194,12 +270,12 @@
 
       const resetMode = () => applyMode(state, 'base-left');
 
-      leftHotspot.addEventListener('pointerenter', () => applyMode(state, 'fast-left'));
+      leftHotspot.addEventListener('pointerenter', () => applyMode(state, 'fast-right'));
       leftHotspot.addEventListener('pointerleave', resetMode);
       leftHotspot.addEventListener('pointercancel', resetMode);
       leftHotspot.addEventListener('pointerup', resetMode);
 
-      rightHotspot.addEventListener('pointerenter', () => applyMode(state, 'fast-right'));
+      rightHotspot.addEventListener('pointerenter', () => applyMode(state, 'fast-left'));
       rightHotspot.addEventListener('pointerleave', resetMode);
       rightHotspot.addEventListener('pointercancel', resetMode);
       rightHotspot.addEventListener('pointerup', resetMode);
@@ -253,6 +329,7 @@
       shouldReduceMotion = event.matches;
 
       if (shouldReduceMotion) {
+        hideIntroElement();
         trackStates.forEach((state) => {
           state.offset = 0;
           state.speed = 0;
