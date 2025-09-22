@@ -28,47 +28,28 @@
       });
       track.appendChild(duplicateSet);
 
-      const duration = 18 + (index % 5) * 2;
+      const duration = 12 + (index % 5) * 1.5;
       track.style.setProperty('--scroll-duration', `${duration}s`);
     });
 
-    const beforeFragment = document.createDocumentFragment();
     const afterFragment = document.createDocumentFragment();
-
-    originalProjects.forEach((project) => {
-      beforeFragment.appendChild(project.cloneNode(true));
-    });
-
     originalProjects.forEach((project) => {
       afterFragment.appendChild(project.cloneNode(true));
     });
-
-    projectList.insertBefore(beforeFragment, projectList.firstChild);
     projectList.appendChild(afterFragment);
 
-    let cycleHeight = projectList.scrollHeight / 3;
+    let cycleHeight = projectList.scrollHeight / 2;
 
     const normalizeScrollPosition = () => {
       if (!cycleHeight) {
         return;
       }
       const scrollY = window.scrollY;
-      const lowerBound = cycleHeight;
-      const upperBound = cycleHeight * 2;
-
-      if (scrollY < lowerBound) {
-        isAdjusting = true;
-        window.scrollTo(0, scrollY + cycleHeight);
-      } else if (scrollY >= upperBound) {
+      if (scrollY >= cycleHeight) {
         isAdjusting = true;
         window.scrollTo(0, scrollY - cycleHeight);
       }
     };
-
-    window.scrollTo(0, cycleHeight);
-    requestAnimationFrame(() => {
-      window.scrollTo(0, cycleHeight);
-    });
 
     let isAdjusting = false;
 
@@ -83,7 +64,7 @@
     window.addEventListener('scroll', onScroll, { passive: true });
 
     const recalcCycleHeight = () => {
-      cycleHeight = projectList.scrollHeight / 3;
+      cycleHeight = projectList.scrollHeight / 2;
       normalizeScrollPosition();
     };
 
