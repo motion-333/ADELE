@@ -7,12 +7,6 @@
   document.addEventListener('DOMContentLoaded', () => {
     const titleLink = document.querySelector('.topbar__title');
     const isHomePage = document.querySelector('.portfolio') !== null;
-    const topbar = document.querySelector('.topbar');
-    let topOffset = topbar ? topbar.getBoundingClientRect().height : 0;
-
-    const updateTopOffset = () => {
-      topOffset = topbar ? topbar.getBoundingClientRect().height : 0;
-    };
 
     const reduceMotionMedia =
       typeof window.matchMedia === 'function'
@@ -171,15 +165,15 @@
       return;
     }
 
-    const originalProjects = Array.from(projectList.children);
-    if (!originalProjects.length) {
+    const baseProjects = Array.from(projectList.children);
+    if (!baseProjects.length) {
       return;
     }
 
-    const baseDurationStart = 7.2;
-    const durationStep = 1;
+    const baseDurationStart = 12;
+    const durationStep = 1.5;
 
-    originalProjects.forEach((project, index) => {
+    baseProjects.forEach((project, index) => {
       const track = project.querySelector('.media-track');
       if (!track) {
         return;
@@ -195,6 +189,12 @@
       const duration = baseDurationStart + (index % 5) * durationStep;
       track.dataset.baseDuration = duration.toString();
     });
+
+    const loopFragment = document.createDocumentFragment();
+    baseProjects.forEach((project) => {
+      loopFragment.appendChild(project.cloneNode(true));
+    });
+    projectList.appendChild(loopFragment);
 
     const FAST_MULTIPLIER = 0.45;
     const MIN_FAST_DURATION = 0.7;
@@ -432,142 +432,67 @@
     const strips = Array.from(projectList.querySelectorAll('.media-strip'));
     strips.forEach((strip) => setupControls(strip));
 
-    const recycledStack = [];
-    let recycledHeight = 0;
+    let loopHeight = 0;
+    let isLoopAdjusting = false;
     let lastKnownScrollY = window.scrollY || window.pageYOffset || 0;
-    let scrollProcessFrame = null;
-    const MAX_REORDER_ATTEMPTS = Math.max(originalProjects.length, 1);
-    const SCROLL_BUFFER = 24;
 
-    const processScroll = () => {
-      let currentY = window.scrollY || window.pageYOffset || 0;
-
-      if (currentY > lastKnownScrollY) {
-        let attempts = 0;
-        while (attempts < MAX_REORDER_ATTEMPTS) {
-          const firstProject = projectList.firstElementChild;
-          if (!firstProject) {
-            break;
-          }
-
-          const rect = firstProject.getBoundingClientRect();
-          if (rect.bottom > topOffset + SCROLL_BUFFER) {
-            break;
-          }
-
-          const secondProject = firstProject.nextElementSibling;
-          if (!secondProject) {
-            break;
-          }
-
-          const beforeTop = secondProject.getBoundingClientRect().top;
-          projectList.appendChild(firstProject);
-          const afterTop = secondProject.getBoundingClientRect().top;
-
-          let shift = beforeTop - afterTop;
-          if (!Number.isFinite(shift) || shift <= 0) {
-            const listStyles = window.getComputedStyle(projectList);
-            const gapValue = parseFloat(listStyles.rowGap || listStyles.gap || '0') || 0;
-            shift = rect.height + gapValue;
-          }
-
-          recycledHeight += shift;
-          const threshold = recycledHeight;
-          recycledStack.push({ node: firstProject, shift, threshold });
-
-          if (shift) {
-            window.scrollBy(0, shift);
-            currentY = window.scrollY || window.pageYOffset || 0;
-          }
-
-          attempts += 1;
-        }
-      } else if (currentY < lastKnownScrollY) {
-        let attempts = 0;
-        while (attempts < MAX_REORDER_ATTEMPTS && recycledStack.length) {
-          const entry = recycledStack[recycledStack.length - 1];
-          if (!entry) {
-            break;
-          }
-
-          if (currentY > entry.threshold) {
-            break;
-          }
-
-          const firstProject = projectList.firstElementChild;
-          const beforeTop = firstProject ? firstProject.getBoundingClientRect().top : null;
-
-          projectList.insertBefore(entry.node, firstProject || null);
-
-          const afterTop = firstProject ? firstProject.getBoundingClientRect().top : null;
-          let delta = 0;
-
-          if (beforeTop !== null && afterTop !== null) {
-            delta = beforeTop - afterTop;
-          } else {
-            delta = -entry.shift;
-          }
-
-          if (delta !== 0) {
-            window.scrollBy(0, delta);
-            currentY = window.scrollY || window.pageYOffset || 0;
-          }
-
-          recycledStack.pop();
-          recycledHeight -= entry.shift;
-          if (recycledStack.length) {
-            recycledStack[recycledStack.length - 1].threshold = recycledHeight;
-          }
-
-          attempts += 1;
-        }
-      }
-
-      lastKnownScrollY = window.scrollY || window.pageYOffset || 0;
+    const updateLoopHeight = () => {
+      const totalHeight = projectList.scrollHeight;
+      loopHeight = totalHeight / 2;
     };
 
-    const scheduleScrollProcess = () => {
-      if (scrollProcessFrame !== null) {
-        return;
-      }
-
-      scrollProcessFrame = requestAnimationFrame(() => {
-        scrollProcessFrame = null;
-        processScroll();
+    const adjustLoopScroll = (targetY) => {
+      isLoopAdjusting = true;
+      window.scrollTo(0, targetY);
+      lastKnownScrollY = targetY;
+      window.requestAnimationFrame(() => {
+        isLoopAdjusting = false;
       });
     };
 
-    window.addEventListener('scroll', scheduleScrollProcess, { passive: true });
-
-    const resetVirtualization = () => {
-      if (!recycledStack.length) {
-        recycledHeight = 0;
+    const handleLoopScroll = () => {
+      if (isLoopAdjusting) {
         return;
       }
 
-      const totalShift = recycledHeight;
+      if (loopHeight <= 0) {
+        lastKnownScrollY = window.scrollY || window.pageYOffset || 0;
+        return;
+      }
 
-      while (recycledStack.length) {
-        const entry = recycledStack.pop();
-        if (entry && entry.node) {
-          projectList.insertBefore(entry.node, projectList.firstElementChild);
+      const currentY = window.scrollY || window.pageYOffset || 0;
+
+      if (currentY > lastKnownScrollY && currentY >= loopHeight) {
+        let normalized = currentY % loopHeight;
+        if (!Number.isFinite(normalized)) {
+          normalized = 0;
         }
+        adjustLoopScroll(normalized);
+        return;
       }
 
-      recycledHeight = 0;
-
-      if (totalShift) {
-        window.scrollBy(0, -totalShift);
-      }
-
-      lastKnownScrollY = window.scrollY || window.pageYOffset || 0;
+      lastKnownScrollY = currentY;
     };
 
+    window.addEventListener('scroll', handleLoopScroll, { passive: true });
+
     const runResizeTasks = () => {
-      updateTopOffset();
-      resetVirtualization();
       computeTrackMetrics();
-      lastKnownScrollY = window.scrollY || window.pageYOffset || 0;
+      updateLoopHeight();
+      const currentY = window.scrollY || window.pageYOffset || 0;
+      if (loopHeight > 0 && currentY >= loopHeight) {
+        let normalized = currentY % loopHeight;
+        if (!Number.isFinite(normalized)) {
+          normalized = 0;
+        }
+        if (!isLoopAdjusting && Math.abs(normalized - currentY) > 1) {
+          adjustLoopScroll(normalized);
+          return;
+        }
+        lastKnownScrollY = normalized;
+      } else {
+        lastKnownScrollY = currentY;
+      }
     };
 
     let resizeFrame = null;
@@ -629,16 +554,16 @@
       if (shouldReduceMotion) {
         cancelScrollAnimation();
         hideIntroElement();
-        resetVirtualization();
         trackStates.forEach((state) => {
           state.offset = 0;
           state.speed = 0;
           state.mode = 'base-left';
           state.track.style.transform = 'translateX(0)';
         });
+        lastKnownScrollY = window.scrollY || window.pageYOffset || 0;
       } else {
-        computeTrackMetrics();
         previousTime = undefined;
+        runResizeTasks();
       }
     };
 

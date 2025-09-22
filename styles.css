@@ -170,7 +170,7 @@ a {
   transform: translateY(-50%);
   width: clamp(2.75rem, 9vw, 3.75rem);
   height: clamp(2.75rem, 9vw, 3.75rem);
-  display: inline-flex;
+  display: none;
   align-items: center;
   justify-content: center;
   padding: 0;
@@ -213,6 +213,12 @@ a {
 .media-strip__control:focus-visible {
   outline: 2px solid rgba(29, 29, 29, 0.85);
   outline-offset: 3px;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .media-strip__control {
+    display: inline-flex;
+  }
 }
 
 @media (max-width: 600px) {
