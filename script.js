@@ -7,21 +7,87 @@
   document.addEventListener('DOMContentLoaded', () => {
     const titleLink = document.querySelector('.topbar__title');
     const isHomePage = document.querySelector('.portfolio') !== null;
+    const topbar = document.querySelector('.topbar');
+    let topOffset = topbar ? topbar.getBoundingClientRect().height : 0;
 
-    if (titleLink) {
-      titleLink.addEventListener('click', (event) => {
-        if (isHomePage) {
-          event.preventDefault();
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
-      });
-    }
+    const updateTopOffset = () => {
+      topOffset = topbar ? topbar.getBoundingClientRect().height : 0;
+    };
 
     const reduceMotionMedia =
       typeof window.matchMedia === 'function'
         ? window.matchMedia('(prefers-reduced-motion: reduce)')
         : { matches: false, addEventListener: null, addListener: null };
     let shouldReduceMotion = reduceMotionMedia.matches;
+
+    const fontsReadyPromise =
+      document.fonts && document.fonts.ready && typeof document.fonts.ready.then === 'function'
+        ? document.fonts.ready
+        : null;
+
+    let scrollAnimationFrame = null;
+    let scrollAnimationStart = null;
+
+    const easeInOutCubic = (t) =>
+      t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
+    const cancelScrollAnimation = () => {
+      if (scrollAnimationFrame !== null) {
+        cancelAnimationFrame(scrollAnimationFrame);
+        scrollAnimationFrame = null;
+      }
+      scrollAnimationStart = null;
+    };
+
+    const startScrollToTopAnimation = () => {
+      cancelScrollAnimation();
+
+      const startY = window.scrollY || window.pageYOffset || 0;
+      if (startY <= 0) {
+        return;
+      }
+
+      const duration = 2000;
+
+      const step = (timestamp) => {
+        if (scrollAnimationStart === null) {
+          scrollAnimationStart = timestamp;
+        }
+
+        const elapsed = timestamp - scrollAnimationStart;
+        const progress = Math.min(elapsed / duration, 1);
+        const eased = easeInOutCubic(progress);
+        const nextY = startY * (1 - eased);
+
+        window.scrollTo(0, nextY);
+
+        if (progress < 1) {
+          scrollAnimationFrame = requestAnimationFrame(step);
+        } else {
+          cancelScrollAnimation();
+        }
+      };
+
+      scrollAnimationFrame = requestAnimationFrame(step);
+    };
+
+    if (titleLink) {
+      titleLink.addEventListener('click', (event) => {
+        if (isHomePage) {
+          event.preventDefault();
+          if (shouldReduceMotion) {
+            window.scrollTo(0, 0);
+          } else {
+            startScrollToTopAnimation();
+          }
+        }
+      });
+    }
+
+    window.addEventListener('wheel', cancelScrollAnimation, { passive: true });
+    window.addEventListener('touchstart', cancelScrollAnimation, {
+      passive: true,
+    });
 
     const intro = document.querySelector('.intro');
     const introTitle = intro ? intro.querySelector('.intro__title') : null;
@@ -33,6 +99,10 @@
     };
 
     if (intro) {
+      const INTRO_HOLD_MS = 1000;
+      const INTRO_ANIM_MS = 1100;
+      const INTRO_FADE_DELAY_MS = INTRO_HOLD_MS + INTRO_ANIM_MS + 150;
+
       if (!introTitle || !titleLink) {
         hideIntroElement();
       } else if (shouldReduceMotion) {
@@ -62,7 +132,7 @@
 
               const deltaX = targetCenterX - introCenterX;
               const deltaY = targetCenterY - introCenterY;
-              const scale = introRect.height > 0 ? targetRect.height / introRect.height : 1;
+              const scale = introRect.width > 0 ? targetRect.width / introRect.width : 1;
 
               intro.style.setProperty('--intro-translate-x', `${deltaX}px`);
               intro.style.setProperty('--intro-translate-y', `${deltaY}px`);
@@ -74,7 +144,7 @@
                 if (intro && !intro.classList.contains('intro--hidden')) {
                   intro.classList.add('intro--fade');
                 }
-              }, 720);
+              }, INTRO_FADE_DELAY_MS);
             });
           });
         };
@@ -85,7 +155,7 @@
           }
         });
 
-        const fontsReady = document.fonts && document.fonts.ready;
+        const fontsReady = fontsReadyPromise;
         if (fontsReady && typeof fontsReady.then === 'function') {
           fontsReady.then(startIntro).catch(startIntro);
         } else if (document.readyState === 'complete') {
@@ -125,12 +195,6 @@
       const duration = baseDurationStart + (index % 5) * durationStep;
       track.dataset.baseDuration = duration.toString();
     });
-
-    const afterFragment = document.createDocumentFragment();
-    originalProjects.forEach((project) => {
-      afterFragment.appendChild(project.cloneNode(true));
-    });
-    projectList.appendChild(afterFragment);
 
     const FAST_MULTIPLIER = 0.45;
     const MIN_FAST_DURATION = 0.7;
@@ -243,8 +307,10 @@
       }
     };
 
-    const setupHotspots = (strip) => {
-      if (!strip || strip.querySelector('.media-strip__hotspot')) {
+    const ACTION_KEYS = new Set(['Enter', ' ']);
+
+    const setupControls = (strip) => {
+      if (!strip || strip.dataset.controlsReady === 'true') {
         return;
       }
 
@@ -258,35 +324,267 @@
         return;
       }
 
-      const createHotspot = (position) => {
-        const hotspot = document.createElement('span');
-        hotspot.className = `media-strip__hotspot media-strip__hotspot--${position}`;
-        hotspot.setAttribute('aria-hidden', 'true');
-        return hotspot;
+      const createControl = (direction) => {
+        const control = document.createElement('button');
+        control.type = 'button';
+        control.className = `media-strip__control media-strip__control--${direction}`;
+        const label =
+          direction === 'left'
+            ? 'Faire défiler les médias vers la droite'
+            : 'Faire défiler les médias vers la gauche';
+        control.setAttribute('aria-label', label);
+        control.innerHTML =
+          direction === 'left'
+            ?
+              '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><polyline points="14 6 8 12 14 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+            :
+              '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><polyline points="10 6 16 12 10 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        return control;
       };
 
-      const leftHotspot = createHotspot('left');
-      const rightHotspot = createHotspot('right');
+      const leftControl = createControl('left');
+      const rightControl = createControl('right');
 
-      const resetMode = () => applyMode(state, 'base-left');
+      const beginFastMode = (mode, control, pointerId) => {
+        applyMode(state, mode);
+        control.classList.add('is-active');
+        if (
+          typeof control.setPointerCapture === 'function' &&
+          pointerId !== undefined
+        ) {
+          try {
+            control.setPointerCapture(pointerId);
+          } catch (error) {
+            // no-op
+          }
+        }
+      };
 
-      leftHotspot.addEventListener('pointerenter', () => applyMode(state, 'fast-right'));
-      leftHotspot.addEventListener('pointerleave', resetMode);
-      leftHotspot.addEventListener('pointercancel', resetMode);
-      leftHotspot.addEventListener('pointerup', resetMode);
+      const endFastMode = (control, pointerId) => {
+        control.classList.remove('is-active');
+        applyMode(state, 'base-left');
+        if (
+          pointerId !== undefined &&
+          typeof control.releasePointerCapture === 'function' &&
+          typeof control.hasPointerCapture === 'function' &&
+          control.hasPointerCapture(pointerId)
+        ) {
+          control.releasePointerCapture(pointerId);
+        }
+      };
 
-      rightHotspot.addEventListener('pointerenter', () => applyMode(state, 'fast-left'));
-      rightHotspot.addEventListener('pointerleave', resetMode);
-      rightHotspot.addEventListener('pointercancel', resetMode);
-      rightHotspot.addEventListener('pointerup', resetMode);
+      const attachControlHandlers = (control, mode) => {
+        control.addEventListener('pointerdown', (event) => {
+          event.preventDefault();
+          beginFastMode(mode, control, event.pointerId);
+        });
 
-      strip.append(leftHotspot, rightHotspot);
+        const reset = (event) => {
+          endFastMode(control, event ? event.pointerId : undefined);
+        };
+
+        control.addEventListener('pointerup', reset);
+        control.addEventListener('pointercancel', reset);
+        control.addEventListener('lostpointercapture', () => {
+          control.classList.remove('is-active');
+          applyMode(state, 'base-left');
+        });
+        control.addEventListener('pointerleave', (event) => {
+          if (event.pointerType === 'mouse') {
+            control.classList.remove('is-active');
+            applyMode(state, 'base-left');
+          }
+        });
+
+        control.addEventListener('keydown', (event) => {
+          if (!ACTION_KEYS.has(event.key)) {
+            return;
+          }
+          event.preventDefault();
+          if (!control.classList.contains('is-active')) {
+            control.classList.add('is-active');
+            applyMode(state, mode);
+          }
+        });
+
+        control.addEventListener('keyup', (event) => {
+          if (!ACTION_KEYS.has(event.key)) {
+            return;
+          }
+          event.preventDefault();
+          control.classList.remove('is-active');
+          applyMode(state, 'base-left');
+        });
+
+        control.addEventListener('blur', () => {
+          control.classList.remove('is-active');
+          applyMode(state, 'base-left');
+        });
+      };
+
+      attachControlHandlers(leftControl, 'fast-right');
+      attachControlHandlers(rightControl, 'fast-left');
+
+      strip.append(leftControl, rightControl);
+      strip.dataset.controlsReady = 'true';
     };
 
     const strips = Array.from(projectList.querySelectorAll('.media-strip'));
-    strips.forEach((strip) => setupHotspots(strip));
+    strips.forEach((strip) => setupControls(strip));
 
-    computeTrackMetrics();
+    const recycledStack = [];
+    let recycledHeight = 0;
+    let lastKnownScrollY = window.scrollY || window.pageYOffset || 0;
+    let scrollProcessFrame = null;
+    const MAX_REORDER_ATTEMPTS = Math.max(originalProjects.length, 1);
+    const SCROLL_BUFFER = 24;
+
+    const processScroll = () => {
+      let currentY = window.scrollY || window.pageYOffset || 0;
+
+      if (currentY > lastKnownScrollY) {
+        let attempts = 0;
+        while (attempts < MAX_REORDER_ATTEMPTS) {
+          const firstProject = projectList.firstElementChild;
+          if (!firstProject) {
+            break;
+          }
+
+          const rect = firstProject.getBoundingClientRect();
+          if (rect.bottom > topOffset + SCROLL_BUFFER) {
+            break;
+          }
+
+          const secondProject = firstProject.nextElementSibling;
+          if (!secondProject) {
+            break;
+          }
+
+          const beforeTop = secondProject.getBoundingClientRect().top;
+          projectList.appendChild(firstProject);
+          const afterTop = secondProject.getBoundingClientRect().top;
+
+          let shift = beforeTop - afterTop;
+          if (!Number.isFinite(shift) || shift <= 0) {
+            const listStyles = window.getComputedStyle(projectList);
+            const gapValue = parseFloat(listStyles.rowGap || listStyles.gap || '0') || 0;
+            shift = rect.height + gapValue;
+          }
+
+          recycledHeight += shift;
+          const threshold = recycledHeight;
+          recycledStack.push({ node: firstProject, shift, threshold });
+
+          if (shift) {
+            window.scrollBy(0, shift);
+            currentY = window.scrollY || window.pageYOffset || 0;
+          }
+
+          attempts += 1;
+        }
+      } else if (currentY < lastKnownScrollY) {
+        let attempts = 0;
+        while (attempts < MAX_REORDER_ATTEMPTS && recycledStack.length) {
+          const entry = recycledStack[recycledStack.length - 1];
+          if (!entry) {
+            break;
+          }
+
+          if (currentY > entry.threshold) {
+            break;
+          }
+
+          const firstProject = projectList.firstElementChild;
+          const beforeTop = firstProject ? firstProject.getBoundingClientRect().top : null;
+
+          projectList.insertBefore(entry.node, firstProject || null);
+
+          const afterTop = firstProject ? firstProject.getBoundingClientRect().top : null;
+          let delta = 0;
+
+          if (beforeTop !== null && afterTop !== null) {
+            delta = beforeTop - afterTop;
+          } else {
+            delta = -entry.shift;
+          }
+
+          if (delta !== 0) {
+            window.scrollBy(0, delta);
+            currentY = window.scrollY || window.pageYOffset || 0;
+          }
+
+          recycledStack.pop();
+          recycledHeight -= entry.shift;
+          if (recycledStack.length) {
+            recycledStack[recycledStack.length - 1].threshold = recycledHeight;
+          }
+
+          attempts += 1;
+        }
+      }
+
+      lastKnownScrollY = window.scrollY || window.pageYOffset || 0;
+    };
+
+    const scheduleScrollProcess = () => {
+      if (scrollProcessFrame !== null) {
+        return;
+      }
+
+      scrollProcessFrame = requestAnimationFrame(() => {
+        scrollProcessFrame = null;
+        processScroll();
+      });
+    };
+
+    window.addEventListener('scroll', scheduleScrollProcess, { passive: true });
+
+    const resetVirtualization = () => {
+      if (!recycledStack.length) {
+        recycledHeight = 0;
+        return;
+      }
+
+      const totalShift = recycledHeight;
+
+      while (recycledStack.length) {
+        const entry = recycledStack.pop();
+        if (entry && entry.node) {
+          projectList.insertBefore(entry.node, projectList.firstElementChild);
+        }
+      }
+
+      recycledHeight = 0;
+
+      if (totalShift) {
+        window.scrollBy(0, -totalShift);
+      }
+
+      lastKnownScrollY = window.scrollY || window.pageYOffset || 0;
+    };
+
+    const runResizeTasks = () => {
+      updateTopOffset();
+      resetVirtualization();
+      computeTrackMetrics();
+      lastKnownScrollY = window.scrollY || window.pageYOffset || 0;
+    };
+
+    let resizeFrame = null;
+    const scheduleResizeTasks = () => {
+      if (resizeFrame !== null) {
+        return;
+      }
+
+      resizeFrame = requestAnimationFrame(() => {
+        resizeFrame = null;
+        runResizeTasks();
+      });
+    };
+
+    window.addEventListener('resize', scheduleResizeTasks);
+
+    runResizeTasks();
 
     let previousTime;
     const animateTracks = (timestamp) => {
@@ -329,7 +627,9 @@
       shouldReduceMotion = event.matches;
 
       if (shouldReduceMotion) {
+        cancelScrollAnimation();
         hideIntroElement();
+        resetVirtualization();
         trackStates.forEach((state) => {
           state.offset = 0;
           state.speed = 0;
@@ -348,44 +648,18 @@
       reduceMotionMedia.addListener(handleMotionPreferenceChange);
     }
 
-    let cycleHeight = projectList.scrollHeight / 2;
-
-    const normalizeScrollPosition = () => {
-      if (!cycleHeight) {
-        return;
-      }
-      const scrollY = window.scrollY;
-      if (scrollY >= cycleHeight) {
-        isAdjusting = true;
-        window.scrollTo(0, scrollY - cycleHeight);
-      }
-    };
-
-    let isAdjusting = false;
-
-    const onScroll = () => {
-      if (isAdjusting) {
-        isAdjusting = false;
-        return;
-      }
-      requestAnimationFrame(normalizeScrollPosition);
-    };
-
-    window.addEventListener('scroll', onScroll, { passive: true });
-
-    const recalcCycleHeight = () => {
-      cycleHeight = projectList.scrollHeight / 2;
-      normalizeScrollPosition();
-      computeTrackMetrics();
-    };
-
-    window.addEventListener('resize', recalcCycleHeight);
-
-    if ('ResizeObserver' in window) {
-      const observer = new ResizeObserver(recalcCycleHeight);
-      observer.observe(projectList);
+    if (fontsReadyPromise && typeof fontsReadyPromise.then === 'function') {
+      fontsReadyPromise
+        .then(() => {
+          scheduleResizeTasks();
+        })
+        .catch(() => {
+          scheduleResizeTasks();
+        });
     }
 
-    window.addEventListener('load', computeTrackMetrics);
+    window.addEventListener('load', () => {
+      scheduleResizeTasks();
+    });
   });
 })();
