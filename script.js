@@ -36,6 +36,99 @@
     const MEDIA_IMAGE_VAR = '--placeholder-image';
     const MEDIA_ANIMATED_VAR = '--placeholder-animated';
 
+    const dimensionCache = new Map();
+    const imageReadyCache = new Map();
+
+    const ensureImageReady = (src) => {
+      if (!src) {
+        return Promise.resolve();
+      }
+
+      if (imageReadyCache.has(src)) {
+        return imageReadyCache.get(src);
+      }
+
+      const promise = new Promise((resolve) => {
+        const image = new Image();
+        let settled = false;
+
+        const finalize = () => {
+          if (settled) {
+            return;
+          }
+          settled = true;
+          resolve(true);
+        };
+
+        const decodeOrResolve = () => {
+          if (typeof image.decode === 'function') {
+            image
+              .decode()
+              .then(finalize)
+              .catch(finalize);
+          } else {
+            finalize();
+          }
+        };
+
+        image.decoding = 'async';
+        image.addEventListener('load', decodeOrResolve, { once: true });
+        image.addEventListener(
+          'error',
+          () => {
+            finalize();
+          },
+          { once: true }
+        );
+        image.src = src;
+
+        if (image.complete) {
+          decodeOrResolve();
+        }
+      });
+
+      imageReadyCache.set(src, promise);
+      promise.catch(() => {
+        imageReadyCache.delete(src);
+      });
+
+      return promise;
+    };
+
+    const loadImageDimensions = (src) => {
+      if (!src) {
+        return Promise.resolve(null);
+      }
+      if (dimensionCache.has(src)) {
+        return dimensionCache.get(src);
+      }
+
+      const promise = new Promise((resolve) => {
+        const image = new Image();
+        image.decoding = 'async';
+        image.onload = () => {
+          const width = image.naturalWidth || image.width || 0;
+          const height = image.naturalHeight || image.height || 0;
+          if (!width || !height) {
+            resolve(null);
+          } else {
+            resolve({ width, height });
+          }
+        };
+        image.onerror = () => {
+          resolve(null);
+        };
+        image.src = src;
+      });
+
+      dimensionCache.set(src, promise);
+      promise.catch(() => {
+        dimensionCache.delete(src);
+      });
+
+      return promise;
+    };
+
     const parseNumeric = (value) => {
       if (value === null || value === undefined) {
         return null;
@@ -472,100 +565,6 @@
       });
 
       return inlineList;
-    };
-
-    const dimensionCache = new Map();
-
-    const imageReadyCache = new Map();
-
-    const ensureImageReady = (src) => {
-      if (!src) {
-        return Promise.resolve();
-      }
-
-      if (imageReadyCache.has(src)) {
-        return imageReadyCache.get(src);
-      }
-
-      const promise = new Promise((resolve) => {
-        const image = new Image();
-        let settled = false;
-
-        const finalize = () => {
-          if (settled) {
-            return;
-          }
-          settled = true;
-          resolve(true);
-        };
-
-        const decodeOrResolve = () => {
-          if (typeof image.decode === 'function') {
-            image
-              .decode()
-              .then(finalize)
-              .catch(finalize);
-          } else {
-            finalize();
-          }
-        };
-
-        image.decoding = 'async';
-        image.addEventListener('load', decodeOrResolve, { once: true });
-        image.addEventListener(
-          'error',
-          () => {
-            finalize();
-          },
-          { once: true }
-        );
-        image.src = src;
-
-        if (image.complete) {
-          decodeOrResolve();
-        }
-      });
-
-      imageReadyCache.set(src, promise);
-      promise.catch(() => {
-        imageReadyCache.delete(src);
-      });
-
-      return promise;
-    };
-
-    const loadImageDimensions = (src) => {
-      if (!src) {
-        return Promise.resolve(null);
-      }
-      if (dimensionCache.has(src)) {
-        return dimensionCache.get(src);
-      }
-
-      const promise = new Promise((resolve) => {
-        const image = new Image();
-        image.decoding = 'async';
-        image.onload = () => {
-          const width = image.naturalWidth || image.width || 0;
-          const height = image.naturalHeight || image.height || 0;
-          if (!width || !height) {
-            resolve(null);
-          } else {
-            resolve({ width, height });
-          }
-        };
-        image.onerror = () => {
-          resolve(null);
-        };
-        image.src = src;
-      });
-
-      dimensionCache.set(src, promise);
-      promise.catch(() => {
-        dimensionCache.delete(src);
-      });
-
-      return promise;
     };
 
     const assembleMediaEntries = async (directory, fileList) => {
