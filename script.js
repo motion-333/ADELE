@@ -27,6 +27,9 @@
     const HERO_ASPECT = 16 / 9;
     const RETURN_SCROLL_KEY = 'adele:return-scroll';
     const INTRO_PLAYED_KEY = 'adele:intro-played';
+    const MASONRY_GAP = 5;
+    const MASONRY_MIN_COLUMN_WIDTH = 220;
+    const MASONRY_MAX_COLUMN_WIDTH = 380;
 
     const collectPlaceholderVariants = (element) =>
       element
@@ -50,19 +53,26 @@
 
     const heroStorageKey = (projectId) => `adele:project-hero:${projectId}`;
 
-    const canUseHeroStorage = (() => {
+    const safeStorageAccess = (type) => {
       try {
-        const testKey = '__adeleHeroTest__';
-        window.sessionStorage.setItem(testKey, '1');
-        window.sessionStorage.removeItem(testKey);
-        return true;
+        const storage = window[type];
+        if (!storage) {
+          return null;
+        }
+        const testKey = `__adeleStorageTest__${type}`;
+        storage.setItem(testKey, '1');
+        storage.removeItem(testKey);
+        return storage;
       } catch (error) {
-        return false;
+        return null;
       }
-    })();
+    };
+
+    const sessionStore = safeStorageAccess('sessionStorage');
+    const persistentStore = safeStorageAccess('localStorage') || sessionStore;
 
     const storeHeroData = (projectId, heroClass, ratio) => {
-      if (!projectId || !canUseHeroStorage) {
+      if (!projectId || !sessionStore) {
         return;
       }
 
@@ -76,20 +86,20 @@
       }
 
       try {
-        window.sessionStorage.setItem(heroStorageKey(projectId), JSON.stringify(payload));
+        sessionStore.setItem(heroStorageKey(projectId), JSON.stringify(payload));
       } catch (error) {
         /* no-op */
       }
     };
 
     const readHeroData = (projectId) => {
-      if (!projectId || !canUseHeroStorage) {
+      if (!projectId || !sessionStore) {
         return null;
       }
 
       let raw;
       try {
-        raw = window.sessionStorage.getItem(heroStorageKey(projectId));
+        raw = sessionStore.getItem(heroStorageKey(projectId));
       } catch (error) {
         return null;
       }
@@ -110,24 +120,24 @@
     };
 
     const hasIntroPlayed = () => {
-      if (!canUseHeroStorage) {
+      if (!persistentStore) {
         return false;
       }
 
       try {
-        return window.sessionStorage.getItem(INTRO_PLAYED_KEY) === '1';
+        return persistentStore.getItem(INTRO_PLAYED_KEY) === '1';
       } catch (error) {
         return false;
       }
     };
 
     const rememberIntroPlayed = () => {
-      if (!canUseHeroStorage) {
+      if (!persistentStore) {
         return;
       }
 
       try {
-        window.sessionStorage.setItem(INTRO_PLAYED_KEY, '1');
+        persistentStore.setItem(INTRO_PLAYED_KEY, '1');
       } catch (error) {
         /* no-op */
       }
@@ -345,12 +355,12 @@
         });
 
         const readStoredScrollPosition = () => {
-          if (!canUseHeroStorage) {
+          if (!sessionStore) {
             return null;
           }
 
           try {
-            const raw = window.sessionStorage.getItem(RETURN_SCROLL_KEY);
+            const raw = sessionStore.getItem(RETURN_SCROLL_KEY);
             if (raw === null) {
               return null;
             }
@@ -358,7 +368,7 @@
             const value = parseFloat(raw);
             if (!Number.isFinite(value) || value < 0) {
               try {
-                window.sessionStorage.removeItem(RETURN_SCROLL_KEY);
+                sessionStore.removeItem(RETURN_SCROLL_KEY);
               } catch (error) {
                 /* no-op */
               }
@@ -372,12 +382,12 @@
         };
 
         const clearStoredScrollPosition = () => {
-          if (!canUseHeroStorage) {
+          if (!sessionStore) {
             return;
           }
 
           try {
-            window.sessionStorage.removeItem(RETURN_SCROLL_KEY);
+            sessionStore.removeItem(RETURN_SCROLL_KEY);
           } catch (error) {
             /* no-op */
           }
@@ -485,10 +495,10 @@
             storeHeroData(projectId, heroClass, HERO_ASPECT);
           }
 
-          if (canUseHeroStorage) {
+          if (sessionStore) {
             try {
               const currentScroll = window.scrollY || window.pageYOffset || 0;
-              window.sessionStorage.setItem(RETURN_SCROLL_KEY, `${currentScroll}`);
+              sessionStore.setItem(RETURN_SCROLL_KEY, `${currentScroll}`);
             } catch (error) {
               /* no-op */
             }
@@ -560,29 +570,42 @@
           }, 700);
         };
 
-        projectList.addEventListener('click', (event) => {
-          const target = event.target.closest(placeholderSelector);
-          if (!target) {
-            return;
-          }
-          if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
-            return;
-          }
-          event.preventDefault();
-          beginProjectNavigation(target);
-        });
+        const bindPlaceholderNavigation = () => {
+          const placeholders = Array.from(
+            projectList.querySelectorAll(placeholderSelector)
+          );
+          placeholders.forEach((placeholder) => {
+            if (placeholder.dataset.transitionBound === 'true') {
+              return;
+            }
 
-        projectList.addEventListener('keydown', (event) => {
-          if (!ACTION_KEYS.has(event.key)) {
-            return;
-          }
-          const target = event.target.closest(placeholderSelector);
-          if (!target) {
-            return;
-          }
-          event.preventDefault();
-          beginProjectNavigation(target);
-        });
+            placeholder.dataset.transitionBound = 'true';
+
+            placeholder.addEventListener('click', (event) => {
+              if (
+                event.button !== 0 ||
+                event.metaKey ||
+                event.ctrlKey ||
+                event.shiftKey ||
+                event.altKey
+              ) {
+                return;
+              }
+              event.preventDefault();
+              beginProjectNavigation(placeholder);
+            });
+
+            placeholder.addEventListener('keydown', (event) => {
+              if (!ACTION_KEYS.has(event.key)) {
+                return;
+              }
+              event.preventDefault();
+              beginProjectNavigation(placeholder);
+            });
+          });
+        };
+
+        bindPlaceholderNavigation();
 
         const setupControls = (strip) => {
           if (!strip || strip.dataset.controlsReady === 'true') {
@@ -959,13 +982,177 @@
       }
 
       const gallery = projectDetail.querySelector('.project-detail__gallery');
-      if (gallery && heroClassToUse) {
-        const duplicateHero = gallery.querySelector(
-          `[data-media-class="${heroClassToUse}"]`
-        );
-        if (duplicateHero) {
-          duplicateHero.remove();
+      if (gallery) {
+        if (heroClassToUse) {
+          const duplicateHero = gallery.querySelector(
+            `[data-media-class="${heroClassToUse}"]`
+          );
+          if (duplicateHero) {
+            duplicateHero.remove();
+          }
         }
+
+        const parseAspectValue = (raw) => {
+          if (raw === null || raw === undefined) {
+            return null;
+          }
+          const value = `${raw}`.trim();
+          if (!value) {
+            return null;
+          }
+          const parsed = parseFloat(value);
+          return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+        };
+
+        const readAspectRatio = (item) => {
+          if (!item) {
+            return 1;
+          }
+
+          const dataAttr = parseAspectValue(item.getAttribute('data-aspect'));
+          if (dataAttr) {
+            return dataAttr;
+          }
+
+          const inlineValue = parseAspectValue(item.style.getPropertyValue('--item-aspect'));
+          if (inlineValue) {
+            return inlineValue;
+          }
+
+          if (window.getComputedStyle) {
+            const computedValue = parseAspectValue(
+              window.getComputedStyle(item).getPropertyValue('--item-aspect')
+            );
+            if (computedValue) {
+              return computedValue;
+            }
+          }
+
+          return 1;
+        };
+
+        const applyMasonryLayout = () => {
+          const items = Array.from(gallery.querySelectorAll('.project-detail__item'));
+          gallery.classList.add('is-masonry');
+          gallery.classList.remove('is-ready');
+
+          if (!items.length) {
+            gallery.style.height = '0px';
+            return;
+          }
+
+          const containerWidth = gallery.clientWidth;
+          if (!Number.isFinite(containerWidth) || containerWidth <= 0) {
+            return;
+          }
+
+          const gap = MASONRY_GAP;
+          const tentativeColumns = Math.max(
+            1,
+            Math.floor((containerWidth + gap) / (MASONRY_MIN_COLUMN_WIDTH + gap))
+          );
+          let columnCount = Math.min(tentativeColumns, items.length);
+          columnCount = Math.max(columnCount, 1);
+
+          let columnWidth =
+            (containerWidth - gap * (columnCount - 1)) / Math.max(columnCount, 1);
+
+          if (columnWidth > MASONRY_MAX_COLUMN_WIDTH && items.length > columnCount) {
+            const adjustedColumns = Math.min(
+              items.length,
+              Math.max(
+                columnCount,
+                Math.floor((containerWidth + gap) / (MASONRY_MAX_COLUMN_WIDTH + gap))
+              )
+            );
+            if (adjustedColumns > columnCount) {
+              columnCount = adjustedColumns;
+              columnWidth =
+                (containerWidth - gap * (columnCount - 1)) / Math.max(columnCount, 1);
+            }
+          }
+
+          if (!Number.isFinite(columnWidth) || columnWidth <= 0) {
+            columnWidth = containerWidth;
+            columnCount = 1;
+          }
+
+          const columnHeights = new Array(columnCount).fill(0);
+
+          items.forEach((item) => {
+            const aspectRatio = readAspectRatio(item);
+            const itemHeight = columnWidth / (aspectRatio > 0 ? aspectRatio : 1);
+
+            let targetColumn = 0;
+            for (let index = 1; index < columnCount; index += 1) {
+              if (columnHeights[index] < columnHeights[targetColumn]) {
+                targetColumn = index;
+              }
+            }
+
+            const x = targetColumn * (columnWidth + gap);
+            const y = columnHeights[targetColumn];
+
+            item.style.width = `${columnWidth}px`;
+            item.style.height = `${itemHeight}px`;
+            item.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+            item.style.opacity = '1';
+
+            columnHeights[targetColumn] = y + itemHeight + gap;
+          });
+
+          const maxHeight = columnHeights.reduce(
+            (currentMax, height) => (height > currentMax ? height : currentMax),
+            0
+          );
+          const finalHeight = maxHeight > 0 ? maxHeight - gap : 0;
+          gallery.style.height = `${finalHeight > 0 ? finalHeight : 0}px`;
+          gallery.classList.add('is-ready');
+        };
+
+        let masonryFrame = null;
+        const scheduleMasonryLayout = () => {
+          if (masonryFrame !== null) {
+            cancelAnimationFrame(masonryFrame);
+          }
+          masonryFrame = requestAnimationFrame(() => {
+            masonryFrame = null;
+            applyMasonryLayout();
+          });
+        };
+
+        scheduleMasonryLayout();
+
+        if (typeof window.ResizeObserver === 'function') {
+          if (
+            gallery.__masonryObserver &&
+            typeof gallery.__masonryObserver.disconnect === 'function'
+          ) {
+            gallery.__masonryObserver.disconnect();
+          }
+
+          const resizeObserver = new ResizeObserver(() => {
+            scheduleMasonryLayout();
+          });
+          resizeObserver.observe(gallery);
+          gallery.__masonryObserver = resizeObserver;
+        }
+
+        window.addEventListener('resize', scheduleMasonryLayout);
+
+        if (fontsReadyPromise && typeof fontsReadyPromise.then === 'function') {
+          fontsReadyPromise
+            .then(() => {
+              scheduleMasonryLayout();
+            })
+            .catch(() => {
+              scheduleMasonryLayout();
+            });
+        }
+
+        window.addEventListener('load', () => {
+          scheduleMasonryLayout();
+        });
       }
     }
   });
