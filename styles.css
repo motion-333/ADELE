@@ -173,23 +173,13 @@ a {
 .gif-icon canvas {
   display: block;
   background: transparent;
-  transition: opacity 0.2s ease;
   filter: none;
-  opacity: 1;
 }
 
 .gif-icon img {
   opacity: 0;
-  transition: opacity 0.2s ease;
-  filter: url(#gif-icon-filter);
-}
-
-.gif-icon--active canvas {
-  opacity: 0;
-}
-
-.gif-icon--active img {
-  opacity: 1;
+  visibility: hidden;
+  filter: none;
 }
 
 .gif-icon--rotate canvas,

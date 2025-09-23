@@ -31,8 +31,6 @@
     const MASONRY_MIN_COLUMN_WIDTH = 220;
     const MASONRY_MAX_COLUMN_WIDTH = 380;
     const HOVER_GIF_SELECTOR = '[data-hover-gif]';
-    const GIF_ICON_ACTIVE_CLASS = 'gif-icon--active';
-
     const MEDIA_IMAGE_VAR = '--placeholder-image';
     const MEDIA_ANIMATED_VAR = '--placeholder-animated';
 
@@ -324,19 +322,106 @@
 
       ensureImageReady(gifSrc).catch(() => {});
 
-      const drawFirstFrame = () => {
-        const width = loader.naturalWidth || loader.width || 0;
-        const height = loader.naturalHeight || loader.height || 0;
+      const computeCanvasSizing = (sourceWidth, sourceHeight) => {
+        const bounds = container.getBoundingClientRect();
+        let displayWidth = Math.round(bounds.width);
+        let displayHeight = Math.round(bounds.height);
 
-        if (!width || !height) {
+        if (!displayWidth || !displayHeight) {
+          displayWidth = Math.round(container.offsetWidth || canvas.width || sourceWidth || 0);
+          displayHeight = Math.round(container.offsetHeight || canvas.height || sourceHeight || 0);
+        }
+
+        if (!displayWidth || !displayHeight) {
+          displayWidth = Math.max(1, Math.round(sourceWidth || 1));
+          displayHeight = Math.max(1, Math.round(sourceHeight || 1));
+        }
+
+        const pixelRatio = window.devicePixelRatio || 1;
+        const renderWidth = Math.max(1, Math.round(displayWidth * pixelRatio));
+        const renderHeight = Math.max(1, Math.round(displayHeight * pixelRatio));
+
+        return {
+          displayWidth,
+          displayHeight,
+          renderWidth,
+          renderHeight,
+          pixelRatio,
+        };
+      };
+
+      const fitImageWithin = (sourceWidth, sourceHeight, targetWidth, targetHeight) => {
+        if (!sourceWidth || !sourceHeight || !targetWidth || !targetHeight) {
+          return { x: 0, y: 0, width: targetWidth, height: targetHeight };
+        }
+
+        const sourceRatio = sourceWidth / sourceHeight;
+        const targetRatio = targetWidth / targetHeight;
+        let width = targetWidth;
+        let height = targetHeight;
+
+        if (sourceRatio > targetRatio) {
+          width = targetWidth;
+          height = targetWidth / sourceRatio;
+        } else {
+          height = targetHeight;
+          width = targetHeight * sourceRatio;
+        }
+
+        const x = (targetWidth - width) / 2;
+        const y = (targetHeight - height) / 2;
+
+        return { x, y, width, height };
+      };
+
+      const drawImageToCanvas = (image) => {
+        if (!image) {
+          return false;
+        }
+
+        const sourceWidth = image.naturalWidth || image.width || 0;
+        const sourceHeight = image.naturalHeight || image.height || 0;
+
+        if (!sourceWidth || !sourceHeight) {
+          return false;
+        }
+
+        const { displayWidth, displayHeight, renderWidth, renderHeight, pixelRatio } =
+          computeCanvasSizing(sourceWidth, sourceHeight);
+
+        if (!renderWidth || !renderHeight) {
+          return false;
+        }
+
+        if (canvas.width !== renderWidth || canvas.height !== renderHeight) {
+          canvas.width = renderWidth;
+          canvas.height = renderHeight;
+        }
+
+        context.setTransform(1, 0, 0, 1, 0, 0);
+        context.clearRect(0, 0, renderWidth, renderHeight);
+        context.imageSmoothingEnabled = true;
+        if (typeof context.imageSmoothingQuality === 'string') {
+          context.imageSmoothingQuality = 'high';
+        }
+
+        const fit = fitImageWithin(sourceWidth, sourceHeight, displayWidth, displayHeight);
+        const destX = fit.x * pixelRatio;
+        const destY = fit.y * pixelRatio;
+        const destWidth = fit.width * pixelRatio;
+        const destHeight = fit.height * pixelRatio;
+
+        context.drawImage(image, destX, destY, destWidth, destHeight);
+        tintCanvasFrame();
+        return true;
+      };
+
+      const drawFirstFrame = () => {
+        if (drawImageToCanvas(loader)) {
           return;
         }
 
-        canvas.width = width;
-        canvas.height = height;
-        context.clearRect(0, 0, width, height);
-        context.drawImage(loader, 0, 0, width, height);
-        tintCanvasFrame();
+        drawImageToCanvas(animatedImage);
       };
 
       if (loader.complete) {
@@ -349,30 +434,8 @@
       let isAnimating = false;
 
       const renderAnimatedFrame = () => {
-        const width =
-          animatedImage.naturalWidth ||
-          loader.naturalWidth ||
-          canvas.width ||
-          0;
-        const height =
-          animatedImage.naturalHeight ||
-          loader.naturalHeight ||
-          canvas.height ||
-          0;
-
-        if (!width || !height) {
-          return;
-        }
-
-        if (canvas.width !== width || canvas.height !== height) {
-          canvas.width = width;
-          canvas.height = height;
-        }
-
         try {
-          context.clearRect(0, 0, width, height);
-          context.drawImage(animatedImage, 0, 0, width, height);
-          tintCanvasFrame();
+          drawImageToCanvas(animatedImage);
         } catch (error) {
           /* ignore draw errors */
         }
@@ -409,8 +472,6 @@
         }
 
         isAnimating = true;
-        container.classList.add(GIF_ICON_ACTIVE_CLASS);
-
         const startPlayback = () => {
           if (!isAnimating) {
             return;
@@ -435,7 +496,6 @@
         }
 
         isAnimating = false;
-        container.classList.remove(GIF_ICON_ACTIVE_CLASS);
         stopAnimationLoop();
         animatedImage.removeAttribute('src');
         drawFirstFrame();
@@ -445,6 +505,21 @@
       container.addEventListener('mouseleave', deactivate);
       container.addEventListener('focusin', activate);
       container.addEventListener('focusout', deactivate);
+
+      const handleResize = () => {
+        if (!canvas.isConnected) {
+          window.removeEventListener('resize', handleResize);
+          return;
+        }
+
+        if (isAnimating) {
+          renderAnimatedFrame();
+        } else {
+          drawFirstFrame();
+        }
+      };
+
+      window.addEventListener('resize', handleResize);
 
       container.__hoverGifDeactivate = deactivate;
     };
@@ -1609,16 +1684,14 @@
 
           document.body.classList.add('is-transitioning');
 
-          const scrollX = window.scrollX || window.pageXOffset || 0;
-          const scrollY = window.scrollY || window.pageYOffset || 0;
           const rect = anchor.getBoundingClientRect();
 
           const clone = anchor.cloneNode(true);
           clone.classList.add('placeholder--transition');
           initializeMediaElement(clone);
           clone.style.position = 'fixed';
-          clone.style.left = `${rect.left + scrollX}px`;
-          clone.style.top = `${rect.top + scrollY}px`;
+          clone.style.left = `${rect.left}px`;
+          clone.style.top = `${rect.top}px`;
           clone.style.width = `${rect.width}px`;
           clone.style.height = `${rect.height}px`;
           clone.style.margin = '0';
@@ -1644,11 +1717,11 @@
             targetWidth = targetHeight * HERO_ASPECT;
           }
 
-          const targetLeft = scrollX + (viewportWidth - targetWidth) / 2;
+          const targetLeft = Math.max((viewportWidth - targetWidth) / 2, 0);
           const topbar = document.querySelector('.topbar');
           const topbarHeight = topbar ? topbar.getBoundingClientRect().height : 0;
           const detailOffset = 30;
-          const targetTop = scrollY + topbarHeight + detailOffset;
+          const targetTop = topbarHeight + detailOffset;
 
           requestAnimationFrame(() => {
             overlay.classList.add('is-active');
