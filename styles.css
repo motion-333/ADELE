@@ -145,9 +145,7 @@ a {
   height: 100%;
   object-fit: contain;
   pointer-events: none;
-  mix-blend-mode: screen;
-  filter: brightness(0) saturate(100%) invert(92%) sepia(8%) saturate(432%)
-    hue-rotate(321deg) brightness(104%) contrast(92%);
+  filter: url(#gif-icon-filter);
 }
 
 .gif-icon canvas {

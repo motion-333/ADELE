@@ -13,6 +13,28 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
+    <svg class="gif-icon-defs" width="0" height="0" focusable="false" aria-hidden="true">
+      <defs>
+        <filter id="gif-icon-filter" color-interpolation-filters="sRGB">
+          <feColorMatrix
+            type="matrix"
+            values="
+              0 0 0 0 0
+              0 0 0 0 0
+              0 0 0 0 0
+             -0.299 -0.587 -0.114 0 1
+            "
+            result="luminance"
+          />
+          <feComponentTransfer in="luminance" result="alpha">
+            <feFuncA type="table" tableValues="0 0 0.2 1" />
+          </feComponentTransfer>
+          <feFlood flood-color="#f0ead6" result="fill" />
+          <feComposite in="fill" in2="alpha" operator="in" />
+        </filter>
+      </defs>
+    </svg>
+
     <div class="intro" aria-hidden="true">
       <span class="intro__title">Adèle Farges</span>
     </div>
@@ -29,550 +51,90 @@
     </header>
     <main class="portfolio" aria-label="Portfolio d'Adèle Farges">
       <div class="projects">
-        <section class="project" data-project="project-01">
+        <section class="project" data-project="project-01" data-detail-link="project-01.html">
           <div class="media-strip">
-            <div class="media-track">
-              <a
-                class="placeholder"
-                href="project-01.html"
-                data-project="project-01"
-                data-still="project-01/images/frame-01.png"
-                data-animated="project-01/images/frame-01.gif"
-                data-aspect="1.6"
-                aria-label="Découvrir Titre de Projet"
-              ></a>
-              <a
-                class="placeholder"
-                href="project-01.html"
-                data-project="project-01"
-                data-still="project-01/images/frame-02.png"
-                data-animated="project-01/images/frame-02.gif"
-                data-aspect="1.5"
-                aria-label="Découvrir Titre de Projet"
-              ></a>
-              <a
-                class="placeholder"
-                href="project-01.html"
-                data-project="project-01"
-                data-still="project-01/images/frame-03.png"
-                data-animated="project-01/images/frame-03.gif"
-                data-aspect="1.4"
-                aria-label="Découvrir Titre de Projet"
-              ></a>
-              <a
-                class="placeholder"
-                href="project-01.html"
-                data-project="project-01"
-                data-still="project-01/images/frame-04.png"
-                data-animated="project-01/images/frame-04.gif"
-                data-aspect="1.55"
-                aria-label="Découvrir Titre de Projet"
-              ></a>
-              <a
-                class="placeholder"
-                href="project-01.html"
-                data-project="project-01"
-                data-still="project-01/images/frame-05.png"
-                data-animated="project-01/images/frame-05.gif"
-                data-aspect="1.7"
-                aria-label="Découvrir Titre de Projet"
-              ></a>
-            </div>
+            <div class="media-track" data-media-source="project-01/images/"></div>
           </div>
           <div class="project-heading">
             <h2 class="project-title">TITRE DE PROJET</h2>
             <span class="project-meta">Nom de Prod, 2025</span>
           </div>
         </section>
-        <section class="project" data-project="project-02">
+        <section class="project" data-project="project-02" data-detail-link="project-02.html">
           <div class="media-strip">
-            <div class="media-track">
-              <a
-                class="placeholder"
-                href="project-02.html"
-                data-project="project-02"
-                data-still="project-02/images/frame-01.png"
-                data-animated="project-02/images/frame-01.gif"
-                data-aspect="1.6"
-                aria-label="Découvrir Titre de Projet"
-              ></a>
-              <a
-                class="placeholder"
-                href="project-02.html"
-                data-project="project-02"
-                data-still="project-02/images/frame-02.png"
-                data-animated="project-02/images/frame-02.gif"
-                data-aspect="1.5"
-                aria-label="Découvrir Titre de Projet"
-              ></a>
-              <a
-                class="placeholder"
-                href="project-02.html"
-                data-project="project-02"
-                data-still="project-02/images/frame-03.png"
-                data-animated="project-02/images/frame-03.gif"
-                data-aspect="1.4"
-                aria-label="Découvrir Titre de Projet"
-              ></a>
-              <a
-                class="placeholder"
-                href="project-02.html"
-                data-project="project-02"
-                data-still="project-02/images/frame-04.png"
-                data-animated="project-02/images/frame-04.gif"
-                data-aspect="1.55"
-                aria-label="Découvrir Titre de Projet"
-              ></a>
-              <a
-                class="placeholder"
-                href="project-02.html"
-                data-project="project-02"
-                data-still="project-02/images/frame-05.png"
-                data-animated="project-02/images/frame-05.gif"
-                data-aspect="1.7"
-                aria-label="Découvrir Titre de Projet"
-              ></a>
-            </div>
+            <div class="media-track" data-media-source="project-02/images/"></div>
           </div>
           <div class="project-heading">
             <h2 class="project-title">TITRE DE PROJET</h2>
             <span class="project-meta">Nom de Prod, 2025</span>
           </div>
         </section>
-        <section class="project" data-project="project-03">
+        <section class="project" data-project="project-03" data-detail-link="project-03.html">
           <div class="media-strip">
-            <div class="media-track">
-              <a
-                class="placeholder"
-                href="project-03.html"
-                data-project="project-03"
-                data-still="project-03/images/frame-01.png"
-                data-animated="project-03/images/frame-01.gif"
-                data-aspect="1.6"
-                aria-label="Découvrir Titre de Projet"
-              ></a>
-              <a
-                class="placeholder"
-                href="project-03.html"
-                data-project="project-03"
-                data-still="project-03/images/frame-02.png"
-                data-animated="project-03/images/frame-02.gif"
-                data-aspect="1.5"
-                aria-label="Découvrir Titre de Projet"
-              ></a>
-              <a
-                class="placeholder"
-                href="project-03.html"
-                data-project="project-03"
-                data-still="project-03/images/frame-03.png"
-                data-animated="project-03/images/frame-03.gif"
-                data-aspect="1.4"
-                aria-label="Découvrir Titre de Projet"
-              ></a>
-              <a
-                class="placeholder"
-                href="project-03.html"
-                data-project="project-03"
-                data-still="project-03/images/frame-04.png"
-                data-animated="project-03/images/frame-04.gif"
-                data-aspect="1.55"
-                aria-label="Découvrir Titre de Projet"
-              ></a>
-              <a
-                class="placeholder"
-                href="project-03.html"
-                data-project="project-03"
-                data-still="project-03/images/frame-05.png"
-                data-animated="project-03/images/frame-05.gif"
-                data-aspect="1.7"
-                aria-label="Découvrir Titre de Projet"
-              ></a>
-            </div>
+            <div class="media-track" data-media-source="project-03/images/"></div>
           </div>
           <div class="project-heading">
             <h2 class="project-title">TITRE DE PROJET</h2>
             <span class="project-meta">Nom de Prod, 2025</span>
           </div>
         </section>
-        <section class="project" data-project="project-04">
+        <section class="project" data-project="project-04" data-detail-link="project-04.html">
           <div class="media-strip">
-            <div class="media-track">
-              <a
-                class="placeholder"
-                href="project-04.html"
-                data-project="project-04"
-                data-still="project-04/images/frame-01.png"
-                data-animated="project-04/images/frame-01.gif"
-                data-aspect="1.6"
-                aria-label="Découvrir Titre de Projet"
-              ></a>
-              <a
-                class="placeholder"
-                href="project-04.html"
-                data-project="project-04"
-                data-still="project-04/images/frame-02.png"
-                data-animated="project-04/images/frame-02.gif"
-                data-aspect="1.5"
-                aria-label="Découvrir Titre de Projet"
-              ></a>
-              <a
-                class="placeholder"
-                href="project-04.html"
-                data-project="project-04"
-                data-still="project-04/images/frame-03.png"
-                data-animated="project-04/images/frame-03.gif"
-                data-aspect="1.4"
-                aria-label="Découvrir Titre de Projet"
-              ></a>
-              <a
-                class="placeholder"
-                href="project-04.html"
-                data-project="project-04"
-                data-still="project-04/images/frame-04.png"
-                data-animated="project-04/images/frame-04.gif"
-                data-aspect="1.55"
-                aria-label="Découvrir Titre de Projet"
-              ></a>
-              <a
-                class="placeholder"
-                href="project-04.html"
-                data-project="project-04"
-                data-still="project-04/images/frame-05.png"
-                data-animated="project-04/images/frame-05.gif"
-                data-aspect="1.7"
-                aria-label="Découvrir Titre de Projet"
-              ></a>
-            </div>
+            <div class="media-track" data-media-source="project-04/images/"></div>
           </div>
           <div class="project-heading">
             <h2 class="project-title">TITRE DE PROJET</h2>
             <span class="project-meta">Nom de Prod, 2025</span>
           </div>
         </section>
-        <section class="project" data-project="project-05">
+        <section class="project" data-project="project-05" data-detail-link="project-05.html">
           <div class="media-strip">
-            <div class="media-track">
-              <a
-                class="placeholder"
-                href="project-05.html"
-                data-project="project-05"
-                data-still="project-05/images/frame-01.png"
-                data-animated="project-05/images/frame-01.gif"
-                data-aspect="1.6"
-                aria-label="Découvrir Titre de Projet"
-              ></a>
-              <a
-                class="placeholder"
-                href="project-05.html"
-                data-project="project-05"
-                data-still="project-05/images/frame-02.png"
-                data-animated="project-05/images/frame-02.gif"
-                data-aspect="1.5"
-                aria-label="Découvrir Titre de Projet"
-              ></a>
-              <a
-                class="placeholder"
-                href="project-05.html"
-                data-project="project-05"
-                data-still="project-05/images/frame-03.png"
-                data-animated="project-05/images/frame-03.gif"
-                data-aspect="1.4"
-                aria-label="Découvrir Titre de Projet"
-              ></a>
-              <a
-                class="placeholder"
-                href="project-05.html"
-                data-project="project-05"
-                data-still="project-05/images/frame-04.png"
-                data-animated="project-05/images/frame-04.gif"
-                data-aspect="1.55"
-                aria-label="Découvrir Titre de Projet"
-              ></a>
-              <a
-                class="placeholder"
-                href="project-05.html"
-                data-project="project-05"
-                data-still="project-05/images/frame-05.png"
-                data-animated="project-05/images/frame-05.gif"
-                data-aspect="1.7"
-                aria-label="Découvrir Titre de Projet"
-              ></a>
-            </div>
+            <div class="media-track" data-media-source="project-05/images/"></div>
           </div>
           <div class="project-heading">
             <h2 class="project-title">TITRE DE PROJET</h2>
             <span class="project-meta">Nom de Prod, 2025</span>
           </div>
         </section>
-        <section class="project" data-project="project-06">
+        <section class="project" data-project="project-06" data-detail-link="project-06.html">
           <div class="media-strip">
-            <div class="media-track">
-              <a
-                class="placeholder"
-                href="project-06.html"
-                data-project="project-06"
-                data-still="project-06/images/frame-01.png"
-                data-animated="project-06/images/frame-01.gif"
-                data-aspect="1.6"
-                aria-label="Découvrir Titre de Projet"
-              ></a>
-              <a
-                class="placeholder"
-                href="project-06.html"
-                data-project="project-06"
-                data-still="project-06/images/frame-02.png"
-                data-animated="project-06/images/frame-02.gif"
-                data-aspect="1.5"
-                aria-label="Découvrir Titre de Projet"
-              ></a>
-              <a
-                class="placeholder"
-                href="project-06.html"
-                data-project="project-06"
-                data-still="project-06/images/frame-03.png"
-                data-animated="project-06/images/frame-03.gif"
-                data-aspect="1.4"
-                aria-label="Découvrir Titre de Projet"
-              ></a>
-              <a
-                class="placeholder"
-                href="project-06.html"
-                data-project="project-06"
-                data-still="project-06/images/frame-04.png"
-                data-animated="project-06/images/frame-04.gif"
-                data-aspect="1.55"
-                aria-label="Découvrir Titre de Projet"
-              ></a>
-              <a
-                class="placeholder"
-                href="project-06.html"
-                data-project="project-06"
-                data-still="project-06/images/frame-05.png"
-                data-animated="project-06/images/frame-05.gif"
-                data-aspect="1.7"
-                aria-label="Découvrir Titre de Projet"
-              ></a>
-            </div>
+            <div class="media-track" data-media-source="project-06/images/"></div>
           </div>
           <div class="project-heading">
             <h2 class="project-title">TITRE DE PROJET</h2>
             <span class="project-meta">Nom de Prod, 2025</span>
           </div>
         </section>
-        <section class="project" data-project="project-07">
+        <section class="project" data-project="project-07" data-detail-link="project-07.html">
           <div class="media-strip">
-            <div class="media-track">
-              <a
-                class="placeholder"
-                href="project-07.html"
-                data-project="project-07"
-                data-still="project-07/images/frame-01.png"
-                data-animated="project-07/images/frame-01.gif"
-                data-aspect="1.6"
-                aria-label="Découvrir Titre de Projet"
-              ></a>
-              <a
-                class="placeholder"
-                href="project-07.html"
-                data-project="project-07"
-                data-still="project-07/images/frame-02.png"
-                data-animated="project-07/images/frame-02.gif"
-                data-aspect="1.5"
-                aria-label="Découvrir Titre de Projet"
-              ></a>
-              <a
-                class="placeholder"
-                href="project-07.html"
-                data-project="project-07"
-                data-still="project-07/images/frame-03.png"
-                data-animated="project-07/images/frame-03.gif"
-                data-aspect="1.4"
-                aria-label="Découvrir Titre de Projet"
-              ></a>
-              <a
-                class="placeholder"
-                href="project-07.html"
-                data-project="project-07"
-                data-still="project-07/images/frame-04.png"
-                data-animated="project-07/images/frame-04.gif"
-                data-aspect="1.55"
-                aria-label="Découvrir Titre de Projet"
-              ></a>
-              <a
-                class="placeholder"
-                href="project-07.html"
-                data-project="project-07"
-                data-still="project-07/images/frame-05.png"
-                data-animated="project-07/images/frame-05.gif"
-                data-aspect="1.7"
-                aria-label="Découvrir Titre de Projet"
-              ></a>
-            </div>
+            <div class="media-track" data-media-source="project-07/images/"></div>
           </div>
           <div class="project-heading">
             <h2 class="project-title">TITRE DE PROJET</h2>
             <span class="project-meta">Nom de Prod, 2025</span>
           </div>
         </section>
-        <section class="project" data-project="project-08">
+        <section class="project" data-project="project-08" data-detail-link="project-08.html">
           <div class="media-strip">
-            <div class="media-track">
-              <a
-                class="placeholder"
-                href="project-08.html"
-                data-project="project-08"
-                data-still="project-08/images/frame-01.png"
-                data-animated="project-08/images/frame-01.gif"
-                data-aspect="1.6"
-                aria-label="Découvrir Titre de Projet"
-              ></a>
-              <a
-                class="placeholder"
-                href="project-08.html"
-                data-project="project-08"
-                data-still="project-08/images/frame-02.png"
-                data-animated="project-08/images/frame-02.gif"
-                data-aspect="1.5"
-                aria-label="Découvrir Titre de Projet"
-              ></a>
-              <a
-                class="placeholder"
-                href="project-08.html"
-                data-project="project-08"
-                data-still="project-08/images/frame-03.png"
-                data-animated="project-08/images/frame-03.gif"
-                data-aspect="1.4"
-                aria-label="Découvrir Titre de Projet"
-              ></a>
-              <a
-                class="placeholder"
-                href="project-08.html"
-                data-project="project-08"
-                data-still="project-08/images/frame-04.png"
-                data-animated="project-08/images/frame-04.gif"
-                data-aspect="1.55"
-                aria-label="Découvrir Titre de Projet"
-              ></a>
-              <a
-                class="placeholder"
-                href="project-08.html"
-                data-project="project-08"
-                data-still="project-08/images/frame-05.png"
-                data-animated="project-08/images/frame-05.gif"
-                data-aspect="1.7"
-                aria-label="Découvrir Titre de Projet"
-              ></a>
-            </div>
+            <div class="media-track" data-media-source="project-08/images/"></div>
           </div>
           <div class="project-heading">
             <h2 class="project-title">TITRE DE PROJET</h2>
             <span class="project-meta">Nom de Prod, 2025</span>
           </div>
         </section>
-        <section class="project" data-project="project-09">
+        <section class="project" data-project="project-09" data-detail-link="project-09.html">
           <div class="media-strip">
-            <div class="media-track">
-              <a
-                class="placeholder"
-                href="project-09.html"
-                data-project="project-09"
-                data-still="project-09/images/frame-01.png"
-                data-animated="project-09/images/frame-01.gif"
-                data-aspect="1.6"
-                aria-label="Découvrir Titre de Projet"
-              ></a>
-              <a
-                class="placeholder"
-                href="project-09.html"
-                data-project="project-09"
-                data-still="project-09/images/frame-02.png"
-                data-animated="project-09/images/frame-02.gif"
-                data-aspect="1.5"
-                aria-label="Découvrir Titre de Projet"
-              ></a>
-              <a
-                class="placeholder"
-                href="project-09.html"
-                data-project="project-09"
-                data-still="project-09/images/frame-03.png"
-                data-animated="project-09/images/frame-03.gif"
-                data-aspect="1.4"
-                aria-label="Découvrir Titre de Projet"
-              ></a>
-              <a
-                class="placeholder"
-                href="project-09.html"
-                data-project="project-09"
-                data-still="project-09/images/frame-04.png"
-                data-animated="project-09/images/frame-04.gif"
-                data-aspect="1.55"
-                aria-label="Découvrir Titre de Projet"
-              ></a>
-              <a
-                class="placeholder"
-                href="project-09.html"
-                data-project="project-09"
-                data-still="project-09/images/frame-05.png"
-                data-animated="project-09/images/frame-05.gif"
-                data-aspect="1.7"
-                aria-label="Découvrir Titre de Projet"
-              ></a>
-            </div>
+            <div class="media-track" data-media-source="project-09/images/"></div>
           </div>
           <div class="project-heading">
             <h2 class="project-title">TITRE DE PROJET</h2>
             <span class="project-meta">Nom de Prod, 2025</span>
           </div>
         </section>
-        <section class="project" data-project="project-10">
+        <section class="project" data-project="project-10" data-detail-link="project-10.html">
           <div class="media-strip">
-            <div class="media-track">
-              <a
-                class="placeholder"
-                href="project-10.html"
-                data-project="project-10"
-                data-still="project-10/images/frame-01.png"
-                data-animated="project-10/images/frame-01.gif"
-                data-aspect="1.6"
-                aria-label="Découvrir Titre de Projet"
-              ></a>
-              <a
-                class="placeholder"
-                href="project-10.html"
-                data-project="project-10"
-                data-still="project-10/images/frame-02.png"
-                data-animated="project-10/images/frame-02.gif"
-                data-aspect="1.5"
-                aria-label="Découvrir Titre de Projet"
-              ></a>
-              <a
-                class="placeholder"
-                href="project-10.html"
-                data-project="project-10"
-                data-still="project-10/images/frame-03.png"
-                data-animated="project-10/images/frame-03.gif"
-                data-aspect="1.4"
-                aria-label="Découvrir Titre de Projet"
-              ></a>
-              <a
-                class="placeholder"
-                href="project-10.html"
-                data-project="project-10"
-                data-still="project-10/images/frame-04.png"
-                data-animated="project-10/images/frame-04.gif"
-                data-aspect="1.55"
-                aria-label="Découvrir Titre de Projet"
-              ></a>
-              <a
-                class="placeholder"
-                href="project-10.html"
-                data-project="project-10"
-                data-still="project-10/images/frame-05.png"
-                data-animated="project-10/images/frame-05.gif"
-                data-aspect="1.7"
-                aria-label="Découvrir Titre de Projet"
-              ></a>
-            </div>
+            <div class="media-track" data-media-source="project-10/images/"></div>
           </div>
           <div class="project-heading">
             <h2 class="project-title">TITRE DE PROJET</h2>

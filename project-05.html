@@ -13,6 +13,28 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body class="project-detail-page">
+    <svg class="gif-icon-defs" width="0" height="0" focusable="false" aria-hidden="true">
+      <defs>
+        <filter id="gif-icon-filter" color-interpolation-filters="sRGB">
+          <feColorMatrix
+            type="matrix"
+            values="
+              0 0 0 0 0
+              0 0 0 0 0
+              0 0 0 0 0
+             -0.299 -0.587 -0.114 0 1
+            "
+            result="luminance"
+          />
+          <feComponentTransfer in="luminance" result="alpha">
+            <feFuncA type="table" tableValues="0 0 0.2 1" />
+          </feComponentTransfer>
+          <feFlood flood-color="#f0ead6" result="fill" />
+          <feComposite in="fill" in2="alpha" operator="in" />
+        </filter>
+      </defs>
+    </svg>
+
     <header class="topbar">
       <div class="topbar__inner">
         <a class="topbar__title" href="index.html">Adèle Farges</a>
@@ -24,17 +46,9 @@
         </a>
       </div>
     </header>
-    <main class="project-detail" data-project="project-05">
+    <main class="project-detail" data-project="project-05" data-media-source="project-05/images/">
       <div class="project-hero">
-        <div
-          class="project-hero__media placeholder"
-          data-default-still="project-05/images/frame-01.png"
-          data-default-animated="project-05/images/frame-01.gif"
-          data-default-aspect="1.7777777778"
-          data-still="project-05/images/frame-01.png"
-          data-animated="project-05/images/frame-01.gif"
-          data-aspect="1.7777777778"
-        ></div>
+        <div class="project-hero__media placeholder"></div>
       </div>
       <section class="project-detail__body">
         <div class="project-detail__heading">
@@ -58,44 +72,7 @@
           pour garantir la réussite du projet et son alignement avec ses besoins.
         </p>
       </section>
-      <section class="project-detail__gallery">
-        <div
-          class="project-detail__item placeholder"
-          data-still="project-05/images/gallery-01.png"
-          data-animated="project-05/images/gallery-01.gif"
-          data-aspect="1.6"
-        ></div>
-        <div
-          class="project-detail__item placeholder"
-          data-still="project-05/images/gallery-02.png"
-          data-animated="project-05/images/gallery-02.gif"
-          data-aspect="1.25"
-        ></div>
-        <div
-          class="project-detail__item placeholder"
-          data-still="project-05/images/gallery-03.png"
-          data-animated="project-05/images/gallery-03.gif"
-          data-aspect="0.85"
-        ></div>
-        <div
-          class="project-detail__item placeholder"
-          data-still="project-05/images/gallery-04.png"
-          data-animated="project-05/images/gallery-04.gif"
-          data-aspect="1.4"
-        ></div>
-        <div
-          class="project-detail__item placeholder"
-          data-still="project-05/images/gallery-05.png"
-          data-animated="project-05/images/gallery-05.gif"
-          data-aspect="1.1"
-        ></div>
-        <div
-          class="project-detail__item placeholder"
-          data-still="project-05/images/gallery-06.png"
-          data-animated="project-05/images/gallery-06.gif"
-          data-aspect="0.9"
-        ></div>
-      </section>
+      <section class="project-detail__gallery"></section>
     </main>
     <script src="script.js"></script>
   </body>

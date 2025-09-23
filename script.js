@@ -4,7 +4,7 @@
     historyApi.scrollRestoration = 'manual';
   }
 
-  document.addEventListener('DOMContentLoaded', () => {
+  document.addEventListener('DOMContentLoaded', async () => {
     const titleLink = document.querySelector('.topbar__title');
     const isHomePage = document.querySelector('.portfolio') !== null;
 
@@ -67,9 +67,10 @@
 
       const still = stillSrc ? stillSrc.trim() : '';
       const animated = animatedSrc ? animatedSrc.trim() : '';
+      const fallbackStill = still || animated;
 
-      if (still) {
-        element.style.setProperty(MEDIA_IMAGE_VAR, `url("${still}")`);
+      if (fallbackStill) {
+        element.style.setProperty(MEDIA_IMAGE_VAR, `url("${fallbackStill}")`);
       } else {
         element.style.removeProperty(MEDIA_IMAGE_VAR);
       }
@@ -79,8 +80,8 @@
           ? `url("${animated}"), url("${still}")`
           : `url("${animated}")`;
         element.style.setProperty(MEDIA_ANIMATED_VAR, animatedValue);
-      } else if (still) {
-        element.style.setProperty(MEDIA_ANIMATED_VAR, `url("${still}")`);
+      } else if (fallbackStill) {
+        element.style.setProperty(MEDIA_ANIMATED_VAR, `url("${fallbackStill}")`);
       } else {
         element.style.removeProperty(MEDIA_ANIMATED_VAR);
       }
@@ -179,6 +180,534 @@
     hoverGifContainers.forEach((container) => {
       setupHoverGif(container);
     });
+
+    const SUPPORTED_MEDIA_EXTENSIONS = new Set(['png', 'gif']);
+
+    const normalizeDirectoryPath = (path) => {
+      if (!path) {
+        return '';
+      }
+      let normalized = `${path}`.trim();
+      if (!normalized) {
+        return '';
+      }
+      normalized = normalized.replace(/\\/g, '/');
+      if (normalized.startsWith('./')) {
+        normalized = normalized.slice(2);
+      }
+      normalized = normalized.replace(/^\/+/, '');
+      if (normalized && !normalized.endsWith('/')) {
+        normalized += '/';
+      }
+      return normalized;
+    };
+
+    const sanitizeFileEntry = (entry) => {
+      if (entry === null || entry === undefined) {
+        return null;
+      }
+      let value = `${entry}`.trim();
+      if (!value) {
+        return null;
+      }
+      value = value.replace(/\\/g, '/');
+      if (/^https?:\/\//i.test(value)) {
+        return value;
+      }
+      value = value.replace(/^\.\/+/, '');
+      value = value.replace(/^\/+/, '');
+      return value;
+    };
+
+    const resolveMediaPath = (directory, file) => {
+      const sanitizedFile = sanitizeFileEntry(file);
+      if (!sanitizedFile) {
+        return null;
+      }
+      if (/^https?:\/\//i.test(sanitizedFile)) {
+        return sanitizedFile;
+      }
+      const dir = normalizeDirectoryPath(directory);
+      if (!dir) {
+        return sanitizedFile;
+      }
+      let relative = sanitizedFile;
+      if (relative.startsWith(dir)) {
+        relative = relative.slice(dir.length);
+      }
+      relative = relative.replace(/^\/+/, '');
+      return `${dir}${relative}`;
+    };
+
+    const extractFileCandidate = (value) => {
+      if (typeof value === 'string') {
+        return value;
+      }
+      if (value && typeof value === 'object') {
+        if (typeof value.url === 'string') {
+          return value.url;
+        }
+        if (typeof value.path === 'string') {
+          return value.path;
+        }
+        if (typeof value.file === 'string') {
+          return value.file;
+        }
+      }
+      return null;
+    };
+
+    const parseListFromData = (data) => {
+      if (Array.isArray(data)) {
+        return data;
+      }
+      if (data && typeof data === 'object') {
+        if (Array.isArray(data.files)) {
+          return data.files;
+        }
+        if (Array.isArray(data.items)) {
+          return data.items;
+        }
+        if (Array.isArray(data.images)) {
+          return data.images;
+        }
+      }
+      return [];
+    };
+
+    const parseListFromText = (text) => {
+      if (!text) {
+        return [];
+      }
+      const matches = new Set();
+      const anchorRegex = /href\s*=\s*['"]([^'"]+)['"]/gi;
+      let match = anchorRegex.exec(text);
+      while (match) {
+        matches.add(match[1]);
+        match = anchorRegex.exec(text);
+      }
+      const pathRegex = /[\w\-./%]+\.(?:png|gif)(?=["'\s>/]|$)/gi;
+      let pathMatch = pathRegex.exec(text);
+      while (pathMatch) {
+        matches.add(pathMatch[0]);
+        pathMatch = pathRegex.exec(text);
+      }
+      return Array.from(matches);
+    };
+
+    const fetchDirectoryFileNames = async (directory) => {
+      if (!directory) {
+        return [];
+      }
+      const dir = normalizeDirectoryPath(directory);
+      if (!dir) {
+        return [];
+      }
+
+      const jsonCandidates = ['index.json', 'manifest.json', '_images.json', '_list.json'];
+      for (let index = 0; index < jsonCandidates.length; index += 1) {
+        const candidate = jsonCandidates[index];
+        try {
+          const response = await fetch(`${dir}${candidate}`, { cache: 'no-store' });
+          if (!response || !response.ok) {
+            continue;
+          }
+          const data = await response.json();
+          const list = parseListFromData(data);
+          if (list.length) {
+            return list;
+          }
+        } catch (error) {
+          /* ignore and continue */
+        }
+      }
+
+      const textCandidates = [`${dir}`, `${dir}?index`, `${dir}?list`, `${dir}?format=html`];
+      for (let index = 0; index < textCandidates.length; index += 1) {
+        const url = textCandidates[index];
+        try {
+          const response = await fetch(url, { cache: 'no-store' });
+          if (!response || !response.ok) {
+            continue;
+          }
+
+          const contentType = response.headers ? response.headers.get('content-type') || '' : '';
+          if (contentType.includes('application/json')) {
+            try {
+              const data = await response.json();
+              const list = parseListFromData(data);
+              if (list.length) {
+                return list;
+              }
+              continue;
+            } catch (error) {
+              /* fall back to text parsing */
+            }
+          }
+
+          const text = await response.text();
+          const list = parseListFromText(text);
+          if (list.length) {
+            return list;
+          }
+        } catch (error) {
+          /* ignore and continue */
+        }
+      }
+
+      return [];
+    };
+
+    const collectInlineMediaList = (container) => {
+      if (!container) {
+        return [];
+      }
+
+      const inlineList = [];
+
+      const manifestScript = container.querySelector('script[data-media-manifest]');
+      if (manifestScript) {
+        try {
+          const parsed = JSON.parse(manifestScript.textContent || '[]');
+          const fromScript = parseListFromData(parsed);
+          fromScript.forEach((entry) => {
+            inlineList.push(entry);
+          });
+        } catch (error) {
+          /* no-op */
+        }
+      }
+
+      const inlinePlaceholders = Array.from(
+        container.querySelectorAll('[data-still], [data-animated]')
+      );
+      inlinePlaceholders.forEach((node) => {
+        const still = readStringAttribute(node, 'data-still');
+        const animated = readStringAttribute(node, 'data-animated');
+        if (still) {
+          inlineList.push(still);
+        }
+        if (animated) {
+          inlineList.push(animated);
+        }
+      });
+
+      return inlineList;
+    };
+
+    const dimensionCache = new Map();
+
+    const loadImageDimensions = (src) => {
+      if (!src) {
+        return Promise.resolve(null);
+      }
+      if (dimensionCache.has(src)) {
+        return dimensionCache.get(src);
+      }
+
+      const promise = new Promise((resolve) => {
+        const image = new Image();
+        image.decoding = 'async';
+        image.onload = () => {
+          const width = image.naturalWidth || image.width || 0;
+          const height = image.naturalHeight || image.height || 0;
+          if (!width || !height) {
+            resolve(null);
+          } else {
+            resolve({ width, height });
+          }
+        };
+        image.onerror = () => {
+          resolve(null);
+        };
+        image.src = src;
+      });
+
+      dimensionCache.set(src, promise);
+      promise.catch(() => {
+        dimensionCache.delete(src);
+      });
+
+      return promise;
+    };
+
+    const assembleMediaEntries = async (directory, fileList) => {
+      if (!Array.isArray(fileList) || !fileList.length) {
+        return [];
+      }
+
+      const dir = normalizeDirectoryPath(directory);
+      const groups = new Map();
+
+      fileList.forEach((raw, index) => {
+        const candidate = extractFileCandidate(raw);
+        const resolved = resolveMediaPath(dir, candidate);
+        if (!resolved) {
+          return;
+        }
+
+        const extensionMatch = resolved.match(/\.([^.?#]+)(?=[?#]?)/);
+        const extension = extensionMatch ? extensionMatch[1].toLowerCase() : '';
+        if (!SUPPORTED_MEDIA_EXTENSIONS.has(extension)) {
+          return;
+        }
+
+        let relative = resolved;
+        if (!/^https?:\/\//i.test(relative)) {
+          relative = relative.replace(/^\/+/, '');
+        }
+
+        const pathWithoutQuery = relative.split(/[?#]/)[0] || relative;
+        const baseKey = pathWithoutQuery.replace(/(\.[^./?#]+)$/, '');
+        if (groups.has(baseKey)) {
+          const existing = groups.get(baseKey);
+          if (extension === 'png' && !existing.png) {
+            existing.png = relative;
+          } else if (extension === 'gif' && !existing.gif) {
+            existing.gif = relative;
+          }
+        } else {
+          groups.set(baseKey, {
+            order: index,
+            png: extension === 'png' ? relative : null,
+            gif: extension === 'gif' ? relative : null,
+          });
+        }
+      });
+
+      const ordered = Array.from(groups.values()).sort((a, b) => a.order - b.order);
+      const results = await Promise.all(
+        ordered.map(async (entry) => {
+          const still = entry.png || entry.gif || null;
+          const animated = entry.gif || null;
+
+          let aspect = null;
+          const sizeSource = entry.png || entry.gif;
+          if (sizeSource) {
+            try {
+              const dimensions = await loadImageDimensions(sizeSource);
+              if (dimensions && dimensions.width && dimensions.height) {
+                aspect = dimensions.width / dimensions.height;
+              }
+            } catch (error) {
+              aspect = null;
+            }
+          }
+
+          return {
+            still,
+            animated,
+            aspect,
+          };
+        })
+      );
+
+      return results.filter((item) => item && (item.still || item.animated));
+    };
+
+    const projectMediaCache = new Map();
+
+    const loadProjectMediaEntries = async (projectId, directory, inlineList) => {
+      const key = directory ? normalizeDirectoryPath(directory) : projectId || '';
+      if (key && projectMediaCache.has(key)) {
+        return projectMediaCache.get(key);
+      }
+
+      let remoteList = [];
+      if (directory) {
+        try {
+          remoteList = await fetchDirectoryFileNames(directory);
+        } catch (error) {
+          remoteList = [];
+        }
+      }
+
+      const fallbackList = Array.isArray(inlineList) ? inlineList : [];
+      const rawList = remoteList.length ? remoteList : fallbackList;
+      const entries = await assembleMediaEntries(directory, rawList);
+
+      if (key) {
+        projectMediaCache.set(key, entries);
+      }
+
+      return entries;
+    };
+
+    const initializeProjectMedia = async () => {
+      const tasks = [];
+
+      const projectSections = Array.from(document.querySelectorAll('.project[data-project]'));
+      projectSections.forEach((section) => {
+        const track = section.querySelector('.media-track');
+        if (!track) {
+          return;
+        }
+
+        const projectId = readStringAttribute(section, 'data-project');
+        const directoryAttr = readStringAttribute(track, 'data-media-source');
+        const directory = directoryAttr || (projectId ? `${projectId}/images/` : null);
+        const detailLink =
+          readStringAttribute(track, 'data-detail-link') ||
+          readStringAttribute(section, 'data-detail-link') ||
+          (projectId ? `${projectId}.html` : '#');
+
+        const inlineList = collectInlineMediaList(track);
+
+        const label = (() => {
+          const titleEl = section.querySelector('.project-title');
+          const metaEl = section.querySelector('.project-meta');
+          const titleText = titleEl ? titleEl.textContent.trim() : '';
+          const metaText = metaEl ? metaEl.textContent.trim() : '';
+          if (titleText && metaText) {
+            return `Découvrir ${titleText} — ${metaText}`;
+          }
+          if (titleText) {
+            return `Découvrir ${titleText}`;
+          }
+          return "Découvrir le projet";
+        })();
+
+        const task = loadProjectMediaEntries(projectId, directory, inlineList)
+          .then((entries) => {
+            if (!track) {
+              return [];
+            }
+
+            track.innerHTML = '';
+
+            if (!entries || !entries.length) {
+              return [];
+            }
+
+            entries.forEach((entry) => {
+              const placeholder = document.createElement('a');
+              placeholder.className = 'placeholder';
+              placeholder.href = detailLink || '#';
+              if (projectId) {
+                placeholder.dataset.project = projectId;
+              }
+              placeholder.setAttribute('aria-label', label);
+
+              if (entry.still) {
+                placeholder.setAttribute('data-still', entry.still);
+              }
+              if (entry.animated) {
+                placeholder.setAttribute('data-animated', entry.animated);
+              }
+              if (Number.isFinite(entry.aspect) && entry.aspect > 0) {
+                placeholder.setAttribute('data-aspect', `${entry.aspect}`);
+              }
+
+              track.appendChild(placeholder);
+            });
+
+            return entries;
+          })
+          .catch(() => []);
+
+        tasks.push(task);
+      });
+
+      const detail = document.querySelector('.project-detail[data-project]');
+      if (detail) {
+        const projectId = readStringAttribute(detail, 'data-project');
+        const directoryAttr = readStringAttribute(detail, 'data-media-source');
+        const directory = directoryAttr || (projectId ? `${projectId}/images/` : null);
+        const inlineList = collectInlineMediaList(detail);
+        const hero = detail.querySelector('.project-hero__media');
+        const gallery = detail.querySelector('.project-detail__gallery');
+
+        const detailTask = loadProjectMediaEntries(projectId, directory, inlineList)
+          .then((entries) => {
+            if (hero) {
+              if (entries && entries.length) {
+                const heroEntry = entries[0];
+                const defaultStill = heroEntry.still || heroEntry.animated || '';
+                const defaultAnimated = heroEntry.animated || heroEntry.still || '';
+                const defaultAspect =
+                  Number.isFinite(heroEntry.aspect) && heroEntry.aspect > 0
+                    ? `${heroEntry.aspect}`
+                    : '';
+
+                if (defaultStill) {
+                  hero.setAttribute('data-default-still', defaultStill);
+                  hero.setAttribute('data-still', defaultStill);
+                } else {
+                  hero.removeAttribute('data-default-still');
+                  hero.removeAttribute('data-still');
+                }
+
+                if (defaultAnimated) {
+                  hero.setAttribute('data-default-animated', defaultAnimated);
+                  hero.setAttribute('data-animated', defaultAnimated);
+                } else {
+                  hero.removeAttribute('data-default-animated');
+                  hero.removeAttribute('data-animated');
+                }
+
+                if (defaultAspect) {
+                  hero.setAttribute('data-default-aspect', defaultAspect);
+                  hero.setAttribute('data-aspect', defaultAspect);
+                } else {
+                  hero.removeAttribute('data-default-aspect');
+                  hero.removeAttribute('data-aspect');
+                }
+              } else {
+                hero.removeAttribute('data-default-still');
+                hero.removeAttribute('data-default-animated');
+                hero.removeAttribute('data-default-aspect');
+                hero.removeAttribute('data-still');
+                hero.removeAttribute('data-animated');
+                hero.removeAttribute('data-aspect');
+              }
+            }
+
+            if (gallery) {
+              gallery.innerHTML = '';
+              if (entries && entries.length) {
+                const heroStill = hero ? readStringAttribute(hero, 'data-still') : null;
+                const heroAnimated = hero ? readStringAttribute(hero, 'data-animated') : null;
+                const heroCandidates = new Set();
+                if (heroStill) {
+                  heroCandidates.add(heroStill);
+                }
+                if (heroAnimated) {
+                  heroCandidates.add(heroAnimated);
+                }
+
+                entries.forEach((entry) => {
+                  const candidateKey = entry.still || entry.animated;
+                  if (candidateKey && heroCandidates.has(candidateKey)) {
+                    return;
+                  }
+
+                  const item = document.createElement('div');
+                  item.className = 'project-detail__item placeholder';
+                  if (entry.still) {
+                    item.setAttribute('data-still', entry.still);
+                  }
+                  if (entry.animated) {
+                    item.setAttribute('data-animated', entry.animated);
+                  }
+                  if (Number.isFinite(entry.aspect) && entry.aspect > 0) {
+                    item.setAttribute('data-aspect', `${entry.aspect}`);
+                  }
+                  gallery.appendChild(item);
+                });
+              }
+            }
+
+            return entries;
+          })
+          .catch(() => []);
+
+        tasks.push(detailTask);
+      }
+
+      await Promise.all(tasks);
+    };
+
+    await initializeProjectMedia();
 
     const mediaPlaceholders = document.querySelectorAll('.placeholder');
     mediaPlaceholders.forEach((element) => {
