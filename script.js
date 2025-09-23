@@ -38,6 +38,27 @@
 
     let updateScrollProgressBar = null;
 
+    const getMaxScrollY = () => {
+      const doc = document.documentElement;
+      const body = document.body;
+      const scrollElement = document.scrollingElement || doc;
+      const viewportHeight = window.innerHeight || (doc ? doc.clientHeight : 0) || 0;
+
+      const heights = [0];
+      if (scrollElement && Number.isFinite(scrollElement.scrollHeight)) {
+        heights.push(scrollElement.scrollHeight);
+      }
+      if (doc && Number.isFinite(doc.scrollHeight)) {
+        heights.push(doc.scrollHeight);
+      }
+      if (body && Number.isFinite(body.scrollHeight)) {
+        heights.push(body.scrollHeight);
+      }
+
+      const maxHeight = Math.max.apply(null, heights);
+      return Math.max(maxHeight - viewportHeight, 0);
+    };
+
     const dimensionCache = new Map();
     const imageReadyCache = new Map();
 
@@ -1084,31 +1105,10 @@
       finishScrollAnimation();
     };
 
-    const getMaxScrollY = () => {
-      const doc = document.documentElement;
-      const body = document.body;
-      const scrollElement = document.scrollingElement || doc;
-      const viewportHeight = window.innerHeight || (doc ? doc.clientHeight : 0) || 0;
+      const startScrollAnimation = (targetY, duration = 900) => {
+        cancelScrollAnimation();
 
-      const heights = [0];
-      if (scrollElement && Number.isFinite(scrollElement.scrollHeight)) {
-        heights.push(scrollElement.scrollHeight);
-      }
-      if (doc && Number.isFinite(doc.scrollHeight)) {
-        heights.push(doc.scrollHeight);
-      }
-      if (body && Number.isFinite(body.scrollHeight)) {
-        heights.push(body.scrollHeight);
-      }
-
-      const maxHeight = Math.max.apply(null, heights);
-      return Math.max(maxHeight - viewportHeight, 0);
-    };
-
-    const startScrollAnimation = (targetY, duration = 900) => {
-      cancelScrollAnimation();
-
-      const maxScroll = getMaxScrollY();
+        const maxScroll = getMaxScrollY();
       const numericTarget = Number.isFinite(targetY) ? targetY : 0;
       const clampedTarget = Math.max(0, Math.min(numericTarget, maxScroll));
       const startY = window.scrollY || window.pageYOffset || 0;
