@@ -96,10 +96,44 @@
       const animated = readStringAttribute(element, 'data-animated');
       const aspectAttr = parseNumeric(element.getAttribute('data-aspect'));
 
-      applyMediaVariables(element, still, animated || still);
+      const applyCurrentMedia = () => {
+        applyMediaVariables(element, still, animated || still);
+      };
+
+      applyCurrentMedia();
 
       if (Number.isFinite(aspectAttr) && aspectAttr > 0) {
         element.style.setProperty('--item-aspect', `${aspectAttr}`);
+      }
+
+      const primarySource = still || animated || null;
+      if (primarySource) {
+        ensureImageReady(primarySource)
+          .then(() => {
+            if (!element.isConnected) {
+              return;
+            }
+
+            const currentStill = readStringAttribute(element, 'data-still');
+            const currentAnimated = readStringAttribute(element, 'data-animated');
+            if (still && currentStill !== still) {
+              return;
+            }
+            if (!still && animated && currentAnimated !== animated) {
+              return;
+            }
+
+            applyCurrentMedia();
+          })
+          .catch(() => {
+            /* ignore preload failures */
+          });
+      }
+
+      if (animated && animated !== still) {
+        ensureImageReady(animated).catch(() => {
+          /* ignore */
+        });
       }
     };
 
@@ -126,9 +160,53 @@
         return;
       }
 
+      const tintCanvasFrame = () => {
+        const width = canvas.width;
+        const height = canvas.height;
+
+        if (!width || !height) {
+          return;
+        }
+
+        try {
+          const imageData = context.getImageData(0, 0, width, height);
+          const data = imageData.data;
+
+          for (let index = 0; index < data.length; index += 4) {
+            const alpha = data[index + 3];
+            if (!alpha) {
+              continue;
+            }
+
+            const red = data[index];
+            const green = data[index + 1];
+            const blue = data[index + 2];
+            const luminance = (0.299 * red + 0.587 * green + 0.114 * blue) / 255;
+
+            if (luminance > 0.92) {
+              data[index + 3] = 0;
+              continue;
+            }
+
+            data[index] = 240;
+            data[index + 1] = 234;
+            data[index + 2] = 214;
+            const boostedAlpha = Math.min(255, alpha + 40);
+            data[index + 3] = boostedAlpha;
+          }
+
+          context.clearRect(0, 0, width, height);
+          context.putImageData(imageData, 0, 0);
+        } catch (error) {
+          /* ignore errors from inaccessible canvas */
+        }
+      };
+
       const loader = new Image();
       loader.decoding = 'async';
       loader.src = gifSrc;
+
+      ensureImageReady(gifSrc).catch(() => {});
 
       const drawFirstFrame = () => {
         const width = loader.naturalWidth || loader.width || 0;
@@ -142,6 +220,7 @@
         canvas.height = height;
         context.clearRect(0, 0, width, height);
         context.drawImage(loader, 0, 0, width, height);
+        tintCanvasFrame();
       };
 
       if (loader.complete) {
@@ -397,6 +476,64 @@
 
     const dimensionCache = new Map();
 
+    const imageReadyCache = new Map();
+
+    const ensureImageReady = (src) => {
+      if (!src) {
+        return Promise.resolve();
+      }
+
+      if (imageReadyCache.has(src)) {
+        return imageReadyCache.get(src);
+      }
+
+      const promise = new Promise((resolve) => {
+        const image = new Image();
+        let settled = false;
+
+        const finalize = () => {
+          if (settled) {
+            return;
+          }
+          settled = true;
+          resolve(true);
+        };
+
+        const decodeOrResolve = () => {
+          if (typeof image.decode === 'function') {
+            image
+              .decode()
+              .then(finalize)
+              .catch(finalize);
+          } else {
+            finalize();
+          }
+        };
+
+        image.decoding = 'async';
+        image.addEventListener('load', decodeOrResolve, { once: true });
+        image.addEventListener(
+          'error',
+          () => {
+            finalize();
+          },
+          { once: true }
+        );
+        image.src = src;
+
+        if (image.complete) {
+          decodeOrResolve();
+        }
+      });
+
+      imageReadyCache.set(src, promise);
+      promise.catch(() => {
+        imageReadyCache.delete(src);
+      });
+
+      return promise;
+    };
+
     const loadImageDimensions = (src) => {
       if (!src) {
         return Promise.resolve(null);
@@ -535,6 +672,7 @@
 
     const initializeProjectMedia = async () => {
       const tasks = [];
+      const mediaReadyPromises = [];
 
       const projectSections = Array.from(document.querySelectorAll('.project[data-project]'));
       projectSections.forEach((section) => {
@@ -590,9 +728,11 @@
 
               if (entry.still) {
                 placeholder.setAttribute('data-still', entry.still);
+                mediaReadyPromises.push(ensureImageReady(entry.still));
               }
               if (entry.animated) {
                 placeholder.setAttribute('data-animated', entry.animated);
+                mediaReadyPromises.push(ensureImageReady(entry.animated));
               }
               if (Number.isFinite(entry.aspect) && entry.aspect > 0) {
                 placeholder.setAttribute('data-aspect', `${entry.aspect}`);
@@ -632,6 +772,7 @@
                 if (defaultStill) {
                   hero.setAttribute('data-default-still', defaultStill);
                   hero.setAttribute('data-still', defaultStill);
+                  mediaReadyPromises.push(ensureImageReady(defaultStill));
                 } else {
                   hero.removeAttribute('data-default-still');
                   hero.removeAttribute('data-still');
@@ -640,6 +781,9 @@
                 if (defaultAnimated) {
                   hero.setAttribute('data-default-animated', defaultAnimated);
                   hero.setAttribute('data-animated', defaultAnimated);
+                  if (defaultAnimated !== defaultStill) {
+                    mediaReadyPromises.push(ensureImageReady(defaultAnimated));
+                  }
                 } else {
                   hero.removeAttribute('data-default-animated');
                   hero.removeAttribute('data-animated');
@@ -685,9 +829,11 @@
                   item.className = 'project-detail__item placeholder';
                   if (entry.still) {
                     item.setAttribute('data-still', entry.still);
+                    mediaReadyPromises.push(ensureImageReady(entry.still));
                   }
                   if (entry.animated) {
                     item.setAttribute('data-animated', entry.animated);
+                    mediaReadyPromises.push(ensureImageReady(entry.animated));
                   }
                   if (Number.isFinite(entry.aspect) && entry.aspect > 0) {
                     item.setAttribute('data-aspect', `${entry.aspect}`);
@@ -705,6 +851,9 @@
       }
 
       await Promise.all(tasks);
+      if (mediaReadyPromises.length) {
+        await Promise.allSettled(mediaReadyPromises);
+      }
     };
 
     await initializeProjectMedia();
@@ -1152,7 +1301,7 @@
 
         let isProjectNavigationActive = false;
 
-        const beginProjectNavigation = (anchor) => {
+        const beginProjectNavigation = async (anchor) => {
           if (!anchor || isProjectNavigationActive) {
             return;
           }
@@ -1195,6 +1344,20 @@
           const scrollX = window.scrollX || window.pageXOffset || 0;
           const scrollY = window.scrollY || window.pageYOffset || 0;
           const rect = anchor.getBoundingClientRect();
+
+          const preloadSource = heroStill || heroAnimated || null;
+          if (preloadSource) {
+            try {
+              await Promise.race([
+                ensureImageReady(preloadSource),
+                new Promise((resolve) => {
+                  window.setTimeout(resolve, 450);
+                }),
+              ]);
+            } catch (error) {
+              /* ignore preload issues */
+            }
+          }
 
           const clone = anchor.cloneNode(true);
           clone.classList.add('placeholder--transition');
@@ -1606,25 +1769,25 @@
           shouldReduceMotion = event.matches;
 
           if (shouldReduceMotion) {
-          cancelScrollAnimation();
-          hideIntroElement();
-          trackStates.forEach((state) => {
-            state.offset = 0;
-            state.speed = 0;
-            state.mode = 'base-left';
-            state.track.style.transform = 'translateX(0)';
-          });
-          lastKnownScrollY = window.scrollY || window.pageYOffset || 0;
-          hoverGifContainers.forEach((container) => {
-            if (typeof container.__hoverGifDeactivate === 'function') {
-              container.__hoverGifDeactivate();
-            }
-          });
+            cancelScrollAnimation();
+            hideIntroElement();
+            trackStates.forEach((state) => {
+              state.offset = 0;
+              state.speed = 0;
+              state.mode = 'base-left';
+              state.track.style.transform = 'translateX(0)';
+            });
+            lastKnownScrollY = window.scrollY || window.pageYOffset || 0;
+            hoverGifContainers.forEach((container) => {
+              if (typeof container.__hoverGifDeactivate === 'function') {
+                container.__hoverGifDeactivate();
+              }
+            });
           } else {
-          previousTime = undefined;
-          runResizeTasks();
-        }
-      };
+            previousTime = undefined;
+            runResizeTasks();
+          }
+        };
 
         if (typeof reduceMotionMedia.addEventListener === 'function') {
           reduceMotionMedia.addEventListener('change', handleMotionPreferenceChange);

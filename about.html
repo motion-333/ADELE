@@ -26,11 +26,16 @@
             "
             result="luminance"
           />
-          <feComponentTransfer in="luminance" result="alpha">
-            <feFuncA type="table" tableValues="0 0 0.2 1" />
+          <feComponentTransfer in="luminance" result="alphaBoost">
+            <feFuncA type="gamma" amplitude="1" exponent="1.45" offset="0" />
           </feComponentTransfer>
+          <feComponentTransfer in="alphaBoost" result="alphaThreshold">
+            <feFuncA type="table" tableValues="0 0 0 0 1" />
+          </feComponentTransfer>
+          <feMorphology in="alphaThreshold" operator="erode" radius="0.35" result="alphaTight" />
+          <feGaussianBlur in="alphaTight" stdDeviation="0.18" result="alphaSoft" />
           <feFlood flood-color="#f0ead6" result="fill" />
-          <feComposite in="fill" in2="alpha" operator="in" />
+          <feComposite in="fill" in2="alphaSoft" operator="in" />
         </filter>
       </defs>
     </svg>
@@ -46,6 +51,19 @@
         </a>
       </div>
     </header>
-    <main class="about-page"></main>
+    <main class="about-page">
+      <section class="about-page__content" aria-label="Coordonnées">
+        <p class="about-page__line">Numéro de Tel</p>
+        <p class="about-page__line">Mail</p>
+        <p class="about-page__line">Réseaux</p>
+        <p class="about-page__line">Infos additionelles</p>
+      </section>
+    </main>
+    <footer class="site-footer">
+      <small>
+        Site dev by
+        <a href="https://www.motion333.com" target="_blank" rel="noopener">Motion</a>
+      </small>
+    </footer>
   </body>
 </html>
