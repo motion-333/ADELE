@@ -161,14 +161,6 @@ a {
   filter: url(#gif-icon-filter);
 }
 
-.gif-icon--active img {
-  opacity: 1;
-}
-
-.gif-icon--active canvas {
-  opacity: 0;
-}
-
 .gif-icon--rotate canvas,
 .gif-icon--rotate img {
   transform: rotate(180deg);

@@ -31,7 +31,6 @@
     const MASONRY_MIN_COLUMN_WIDTH = 220;
     const MASONRY_MAX_COLUMN_WIDTH = 380;
     const HOVER_GIF_SELECTOR = '[data-hover-gif]';
-    const HOVER_GIF_ACTIVE_CLASS = 'gif-icon--active';
 
     const MEDIA_IMAGE_VAR = '--placeholder-image';
     const MEDIA_ANIMATED_VAR = '--placeholder-animated';
@@ -322,13 +321,83 @@
         loader.addEventListener('load', drawFirstFrame, { once: true });
       }
 
-      const activate = () => {
-          if (shouldReduceMotion) {
+      let animationFrameId = null;
+      let isAnimating = false;
+
+      const renderAnimatedFrame = () => {
+        const width =
+          animatedImage.naturalWidth ||
+          loader.naturalWidth ||
+          canvas.width ||
+          0;
+        const height =
+          animatedImage.naturalHeight ||
+          loader.naturalHeight ||
+          canvas.height ||
+          0;
+
+        if (!width || !height) {
           return;
         }
 
-        if (!container.classList.contains(HOVER_GIF_ACTIVE_CLASS)) {
-          container.classList.add(HOVER_GIF_ACTIVE_CLASS);
+        if (canvas.width !== width || canvas.height !== height) {
+          canvas.width = width;
+          canvas.height = height;
+        }
+
+        try {
+          context.clearRect(0, 0, width, height);
+          context.drawImage(animatedImage, 0, 0, width, height);
+          tintCanvasFrame();
+        } catch (error) {
+          /* ignore draw errors */
+        }
+      };
+
+      const stopAnimationLoop = () => {
+        if (animationFrameId !== null) {
+          cancelAnimationFrame(animationFrameId);
+          animationFrameId = null;
+        }
+      };
+
+      const stepAnimation = () => {
+        if (!isAnimating) {
+          return;
+        }
+
+        renderAnimatedFrame();
+        animationFrameId = requestAnimationFrame(stepAnimation);
+      };
+
+      const beginAnimationLoop = () => {
+        if (!isAnimating) {
+          return;
+        }
+
+        stopAnimationLoop();
+        stepAnimation();
+      };
+
+      const activate = () => {
+        if (shouldReduceMotion || isAnimating) {
+          return;
+        }
+
+        isAnimating = true;
+
+        const startPlayback = () => {
+          if (!isAnimating) {
+            return;
+          }
+
+          beginAnimationLoop();
+        };
+
+        if (animatedImage.complete && animatedImage.naturalWidth && animatedImage.naturalHeight) {
+          startPlayback();
+        } else {
+          animatedImage.addEventListener('load', startPlayback, { once: true });
         }
 
         animatedImage.decoding = 'async';
@@ -336,8 +405,14 @@
       };
 
       const deactivate = () => {
-        container.classList.remove(HOVER_GIF_ACTIVE_CLASS);
+        if (!isAnimating) {
+          return;
+        }
+
+        isAnimating = false;
+        stopAnimationLoop();
         animatedImage.removeAttribute('src');
+        drawFirstFrame();
       };
 
       container.addEventListener('mouseenter', activate);
@@ -1315,10 +1390,13 @@
           const heroAnimated = readStringAttribute(anchor, 'data-animated');
           const heroAspect = parseNumeric(anchor.getAttribute('data-aspect'));
 
-          if (projectId && (heroStill || heroAnimated)) {
+          const storedStill = heroStill || heroAnimated || null;
+          const storedAnimated = heroAnimated || null;
+
+          if (projectId && (storedStill || storedAnimated)) {
             storeHeroData(projectId, {
-              still: heroStill || null,
-              animated: heroAnimated || null,
+              still: storedStill,
+              animated: storedAnimated,
               aspect: Number.isFinite(heroAspect) && heroAspect > 0 ? heroAspect : HERO_ASPECT,
             });
           }
@@ -1818,8 +1896,21 @@
         : { still: null, animated: null, aspect: null };
 
       const storedHero = readHeroData(projectId) || {};
-      const heroStill = storedHero.still || heroDefaults.still || null;
-      const heroAnimated = storedHero.animated || heroDefaults.animated || heroStill;
+      const storedStill = storedHero.still || null;
+      const storedAnimated = storedHero.animated || null;
+
+      const heroStill =
+        storedStill ||
+        storedAnimated ||
+        heroDefaults.still ||
+        heroDefaults.animated ||
+        null;
+      const heroAnimated =
+        storedAnimated ||
+        heroDefaults.animated ||
+        storedStill ||
+        heroDefaults.still ||
+        heroStill;
 
       if (heroFrame) {
         if (heroStill) {
