@@ -146,18 +146,19 @@ a {
   height: 100%;
   object-fit: contain;
   pointer-events: none;
-  filter: url(#gif-icon-filter);
 }
 
 .gif-icon canvas {
   display: block;
   background: transparent;
   transition: opacity 0.2s ease;
+  filter: none;
 }
 
 .gif-icon img {
   opacity: 0;
   transition: opacity 0.2s ease;
+  filter: url(#gif-icon-filter);
 }
 
 .gif-icon--active img {

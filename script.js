@@ -1392,12 +1392,7 @@
           const targetLeft = scrollX + (viewportWidth - targetWidth) / 2;
           const topbar = document.querySelector('.topbar');
           const topbarHeight = topbar ? topbar.getBoundingClientRect().height : 0;
-          const rootFontSize =
-            parseFloat(window.getComputedStyle(document.documentElement).fontSize) || 16;
-          const minPadding = 5 * rootFontSize;
-          const preferredPadding = viewportWidth * 0.12;
-          const maxPadding = 8 * rootFontSize;
-          const detailOffset = Math.min(Math.max(minPadding, preferredPadding), maxPadding);
+          const detailOffset = 30;
           const targetTop = scrollY + topbarHeight + detailOffset;
 
           requestAnimationFrame(() => {
@@ -1825,31 +1820,103 @@
       const storedHero = readHeroData(projectId) || {};
       const heroStill = storedHero.still || heroDefaults.still || null;
       const heroAnimated = storedHero.animated || heroDefaults.animated || heroStill;
-      const heroAspectCandidate = Number.isFinite(storedHero.aspect)
-        ? storedHero.aspect
-        : null;
-      const defaultAspect = Number.isFinite(heroDefaults.aspect)
-        ? heroDefaults.aspect
-        : null;
-      const heroAspect =
-        (heroAspectCandidate && heroAspectCandidate > 0
-          ? heroAspectCandidate
-          : null) ||
-        (defaultAspect && defaultAspect > 0 ? defaultAspect : HERO_ASPECT);
 
       if (heroFrame) {
+        if (heroStill) {
+          heroFrame.setAttribute('data-still', heroStill);
+        } else {
+          heroFrame.removeAttribute('data-still');
+        }
+
+        if (heroAnimated) {
+          heroFrame.setAttribute('data-animated', heroAnimated);
+        } else {
+          heroFrame.removeAttribute('data-animated');
+        }
+
+        heroFrame.setAttribute('data-aspect', `${HERO_ASPECT}`);
+        heroFrame.style.setProperty('--hero-aspect', `${HERO_ASPECT}`);
         applyMediaVariables(heroFrame, heroStill, heroAnimated);
-        heroFrame.style.setProperty('--hero-aspect', `${heroAspect}`);
+
+        if (heroStill) {
+          ensureImageReady(heroStill).catch(() => {});
+        }
+        if (heroAnimated && heroAnimated !== heroStill) {
+          ensureImageReady(heroAnimated).catch(() => {});
+        }
       }
 
       const gallery = projectDetail.querySelector('.project-detail__gallery');
       if (gallery) {
+        const heroSources = new Set();
         if (heroStill) {
-          const duplicateHero = Array.from(
-            gallery.querySelectorAll('.project-detail__item')
-          ).find((item) => readStringAttribute(item, 'data-still') === heroStill);
-          if (duplicateHero && duplicateHero.parentElement === gallery) {
-            duplicateHero.remove();
+          heroSources.add(heroStill);
+        }
+        if (heroAnimated) {
+          heroSources.add(heroAnimated);
+        }
+
+        if (heroSources.size) {
+          Array.from(gallery.querySelectorAll('.project-detail__item')).forEach((item) => {
+            const stillAttr = readStringAttribute(item, 'data-still');
+            const animatedAttr = readStringAttribute(item, 'data-animated');
+            if (
+              (stillAttr && heroSources.has(stillAttr)) ||
+              (animatedAttr && heroSources.has(animatedAttr))
+            ) {
+              item.remove();
+            }
+          });
+        }
+
+        const defaultSources = new Set();
+        if (heroDefaults.still) {
+          defaultSources.add(heroDefaults.still);
+        }
+        if (heroDefaults.animated) {
+          defaultSources.add(heroDefaults.animated);
+        }
+
+        if (defaultSources.size) {
+          const matchesSelected = Array.from(heroSources).some((src) =>
+            defaultSources.has(src)
+          );
+
+          if (!matchesSelected) {
+            const hasDefaultEntry = Array.from(
+              gallery.querySelectorAll('.project-detail__item')
+            ).some((item) => {
+              const stillAttr = readStringAttribute(item, 'data-still');
+              const animatedAttr = readStringAttribute(item, 'data-animated');
+              return (
+                (stillAttr && defaultSources.has(stillAttr)) ||
+                (animatedAttr && defaultSources.has(animatedAttr))
+              );
+            });
+
+            if (!hasDefaultEntry) {
+              const fallbackItem = document.createElement('div');
+              fallbackItem.className = 'project-detail__item placeholder';
+
+              if (heroDefaults.still) {
+                fallbackItem.setAttribute('data-still', heroDefaults.still);
+                ensureImageReady(heroDefaults.still).catch(() => {});
+              }
+
+              if (heroDefaults.animated) {
+                fallbackItem.setAttribute('data-animated', heroDefaults.animated);
+                if (heroDefaults.animated !== heroDefaults.still) {
+                  ensureImageReady(heroDefaults.animated).catch(() => {});
+                }
+              }
+
+              if (Number.isFinite(heroDefaults.aspect) && heroDefaults.aspect > 0) {
+                fallbackItem.setAttribute('data-aspect', `${heroDefaults.aspect}`);
+              }
+
+              gallery.insertBefore(fallbackItem, gallery.firstChild);
+              initializeMediaElement(fallbackItem);
+            }
           }
         }
 
