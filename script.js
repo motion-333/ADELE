@@ -26,6 +26,7 @@
     const HERO_MAX_WIDTH = 1200;
     const HERO_ASPECT = 16 / 9;
     const RETURN_SCROLL_KEY = 'adele:return-scroll';
+    const INTRO_PLAYED_KEY = 'adele:intro-played';
 
     const collectPlaceholderVariants = (element) =>
       element
@@ -108,6 +109,30 @@
       }
     };
 
+    const hasIntroPlayed = () => {
+      if (!canUseHeroStorage) {
+        return false;
+      }
+
+      try {
+        return window.sessionStorage.getItem(INTRO_PLAYED_KEY) === '1';
+      } catch (error) {
+        return false;
+      }
+    };
+
+    const rememberIntroPlayed = () => {
+      if (!canUseHeroStorage) {
+        return;
+      }
+
+      try {
+        window.sessionStorage.setItem(INTRO_PLAYED_KEY, '1');
+      } catch (error) {
+        /* no-op */
+      }
+    };
+
     let scrollAnimationFrame = null;
     let scrollAnimationStart = null;
 
@@ -185,11 +210,17 @@
       const INTRO_HOLD_MS = 1000;
       const INTRO_ANIM_MS = 1100;
       const INTRO_FADE_DELAY_MS = INTRO_HOLD_MS + INTRO_ANIM_MS + 150;
+      const introAlreadyPlayed = hasIntroPlayed();
+
+      const hideAndRememberIntro = () => {
+        rememberIntroPlayed();
+        hideIntroElement();
+      };
 
       if (!introTitle || !titleLink) {
-        hideIntroElement();
-      } else if (shouldReduceMotion) {
-        hideIntroElement();
+        hideAndRememberIntro();
+      } else if (shouldReduceMotion || introAlreadyPlayed) {
+        hideAndRememberIntro();
       } else {
         let introSequenceStarted = false;
 
@@ -198,6 +229,7 @@
             return;
           }
           introSequenceStarted = true;
+          rememberIntroPlayed();
 
           requestAnimationFrame(() => {
             requestAnimationFrame(() => {

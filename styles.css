@@ -427,18 +427,22 @@ body.is-transitioning {
 .project-detail__gallery {
   width: min(95vw, 1100px);
   margin: 0 auto;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(clamp(160px, 22vw, 280px), 1fr));
+  column-width: clamp(180px, 24vw, 320px);
   column-gap: 5px;
-  row-gap: 5px;
-  align-items: start;
+  column-fill: balance;
 }
 
 .project-detail__item {
+  display: block;
   width: 100%;
+  margin: 0 0 5px;
   aspect-ratio: var(--item-aspect, 1.35);
-  min-height: clamp(150px, 22vw, 240px);
   box-shadow: 0 20px 40px rgba(15, 15, 15, 0.08);
+  break-inside: avoid;
+}
+
+.project-detail__item:last-child {
+  margin-bottom: 0;
 }
 
 @media (max-width: 768px) {
