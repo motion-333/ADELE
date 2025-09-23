@@ -69,7 +69,7 @@
     };
 
     const sessionStore = safeStorageAccess('sessionStorage');
-    const persistentStore = safeStorageAccess('localStorage') || sessionStore;
+    const persistentStore = sessionStore;
 
     const storeHeroData = (projectId, heroClass, ratio) => {
       if (!projectId || !sessionStore) {
