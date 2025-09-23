@@ -72,6 +72,28 @@ body {
   display: none;
 }
 
+.scroll-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  pointer-events: none;
+  z-index: 170;
+  background: transparent;
+}
+
+.scroll-progress__bar {
+  width: 100%;
+  height: 100%;
+  background: var(--color-text);
+  transform-origin: left center;
+  transform: scaleX(0);
+  will-change: transform;
+  transition: transform 0.2s ease-out;
+  opacity: 0.85;
+}
+
 a {
   color: inherit;
   text-decoration: none;
@@ -153,12 +175,21 @@ a {
   background: transparent;
   transition: opacity 0.2s ease;
   filter: none;
+  opacity: 1;
 }
 
 .gif-icon img {
   opacity: 0;
   transition: opacity 0.2s ease;
   filter: url(#gif-icon-filter);
+}
+
+.gif-icon--active canvas {
+  opacity: 0;
+}
+
+.gif-icon--active img {
+  opacity: 1;
 }
 
 .gif-icon--rotate canvas,

@@ -31,9 +31,12 @@
     const MASONRY_MIN_COLUMN_WIDTH = 220;
     const MASONRY_MAX_COLUMN_WIDTH = 380;
     const HOVER_GIF_SELECTOR = '[data-hover-gif]';
+    const GIF_ICON_ACTIVE_CLASS = 'gif-icon--active';
 
     const MEDIA_IMAGE_VAR = '--placeholder-image';
     const MEDIA_ANIMATED_VAR = '--placeholder-animated';
+
+    let updateScrollProgressBar = null;
 
     const dimensionCache = new Map();
     const imageReadyCache = new Map();
@@ -385,6 +388,7 @@
         }
 
         isAnimating = true;
+        container.classList.add(GIF_ICON_ACTIVE_CLASS);
 
         const startPlayback = () => {
           if (!isAnimating) {
@@ -410,6 +414,7 @@
         }
 
         isAnimating = false;
+        container.classList.remove(GIF_ICON_ACTIVE_CLASS);
         stopAnimationLoop();
         animatedImage.removeAttribute('src');
         drawFirstFrame();
@@ -427,6 +432,27 @@
     hoverGifContainers.forEach((container) => {
       setupHoverGif(container);
     });
+
+    if (isHomePage) {
+      const progressBarElement = document.querySelector('.scroll-progress__bar');
+      if (progressBarElement) {
+        const update = () => {
+          const maxScroll = getMaxScrollY();
+          const current = window.scrollY || window.pageYOffset || 0;
+          const ratio = maxScroll > 0 ? Math.min(Math.max(current / maxScroll, 0), 1) : 0;
+          progressBarElement.style.transform = `scaleX(${ratio})`;
+        };
+
+        updateScrollProgressBar = update;
+        update();
+
+        window.addEventListener('scroll', update, { passive: true });
+        window.addEventListener('resize', update);
+        window.addEventListener('load', update, { once: true });
+      }
+    } else {
+      updateScrollProgressBar = null;
+    }
 
     const SUPPORTED_MEDIA_EXTENSIONS = new Set(['png', 'gif']);
 
@@ -1036,9 +1062,18 @@
 
     let scrollAnimationFrame = null;
     let scrollAnimationStart = null;
+    let scrollAnimationResolver = null;
 
     const easeInOutCubic = (t) =>
       t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
+    const finishScrollAnimation = () => {
+      if (typeof scrollAnimationResolver === 'function') {
+        const resolver = scrollAnimationResolver;
+        scrollAnimationResolver = null;
+        resolver();
+      }
+    };
 
     const cancelScrollAnimation = () => {
       if (scrollAnimationFrame !== null) {
@@ -1046,39 +1081,82 @@
         scrollAnimationFrame = null;
       }
       scrollAnimationStart = null;
+      finishScrollAnimation();
     };
 
-    const startScrollToTopAnimation = () => {
-      cancelScrollAnimation();
+    const getMaxScrollY = () => {
+      const doc = document.documentElement;
+      const body = document.body;
+      const scrollElement = document.scrollingElement || doc;
+      const viewportHeight = window.innerHeight || (doc ? doc.clientHeight : 0) || 0;
 
-      const startY = window.scrollY || window.pageYOffset || 0;
-      if (startY <= 0) {
-        return;
+      const heights = [0];
+      if (scrollElement && Number.isFinite(scrollElement.scrollHeight)) {
+        heights.push(scrollElement.scrollHeight);
+      }
+      if (doc && Number.isFinite(doc.scrollHeight)) {
+        heights.push(doc.scrollHeight);
+      }
+      if (body && Number.isFinite(body.scrollHeight)) {
+        heights.push(body.scrollHeight);
       }
 
-      const duration = 2000;
-
-      const step = (timestamp) => {
-        if (scrollAnimationStart === null) {
-          scrollAnimationStart = timestamp;
-        }
-
-        const elapsed = timestamp - scrollAnimationStart;
-        const progress = Math.min(elapsed / duration, 1);
-        const eased = easeInOutCubic(progress);
-        const nextY = startY * (1 - eased);
-
-        window.scrollTo(0, nextY);
-
-        if (progress < 1) {
-          scrollAnimationFrame = requestAnimationFrame(step);
-        } else {
-          cancelScrollAnimation();
-        }
-      };
-
-      scrollAnimationFrame = requestAnimationFrame(step);
+      const maxHeight = Math.max.apply(null, heights);
+      return Math.max(maxHeight - viewportHeight, 0);
     };
+
+    const startScrollAnimation = (targetY, duration = 900) => {
+      cancelScrollAnimation();
+
+      const maxScroll = getMaxScrollY();
+      const numericTarget = Number.isFinite(targetY) ? targetY : 0;
+      const clampedTarget = Math.max(0, Math.min(numericTarget, maxScroll));
+      const startY = window.scrollY || window.pageYOffset || 0;
+      const distance = clampedTarget - startY;
+
+      if (Math.abs(distance) < 1) {
+        window.scrollTo(0, clampedTarget);
+        if (typeof updateScrollProgressBar === 'function') {
+          updateScrollProgressBar();
+        }
+        return Promise.resolve();
+      }
+
+      const effectiveDuration = Math.max(duration, 0) || 0;
+
+      return new Promise((resolve) => {
+        scrollAnimationResolver = resolve;
+
+        const step = (timestamp) => {
+          if (scrollAnimationStart === null) {
+            scrollAnimationStart = timestamp;
+          }
+
+          const elapsed = timestamp - scrollAnimationStart;
+          const progress =
+            effectiveDuration > 0 ? Math.min(elapsed / effectiveDuration, 1) : 1;
+          const eased = easeInOutCubic(progress);
+          const nextY = startY + distance * eased;
+
+          window.scrollTo(0, nextY);
+          if (typeof updateScrollProgressBar === 'function') {
+            updateScrollProgressBar();
+          }
+
+          if (progress >= 1) {
+            scrollAnimationFrame = null;
+            scrollAnimationStart = null;
+            finishScrollAnimation();
+          } else {
+            scrollAnimationFrame = requestAnimationFrame(step);
+          }
+        };
+
+        scrollAnimationFrame = requestAnimationFrame(step);
+      });
+    };
+
+    const startScrollToTopAnimation = () => startScrollAnimation(0, 2000);
 
     if (titleLink) {
       titleLink.addEventListener('click', (event) => {
@@ -1321,6 +1399,11 @@
           state.baseSpeedAbs = state.contentWidth / state.baseDuration;
           state.fastSpeedAbs = state.contentWidth / state.fastDuration;
 
+          if (state.mode === 'manual') {
+            state.speed = 0;
+            return;
+          }
+
           if (state.mode === 'fast-right') {
             state.speed = state.fastSpeedAbs;
           } else if (state.mode === 'fast-left') {
@@ -1416,25 +1499,119 @@
           }
 
           isProjectNavigationActive = true;
+
+          const preloadSource = heroStill || heroAnimated || null;
+          let preloadPromise = Promise.resolve();
+          if (preloadSource) {
+            preloadPromise = Promise.race([
+              ensureImageReady(preloadSource),
+              new Promise((resolve) => {
+                window.setTimeout(resolve, 450);
+              }),
+            ]).catch(() => {});
+          }
+
+          const trackElement = anchor.closest('.media-track');
+          const trackState = trackElement ? trackStateMap.get(trackElement) : null;
+          if (trackState) {
+            trackState.mode = 'manual';
+            trackState.speed = 0;
+          }
+
+          const alignScrollToSelection = async () => {
+            const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+            if (!viewportHeight) {
+              return;
+            }
+
+            const rect = anchor.getBoundingClientRect();
+            const currentScroll = window.scrollY || window.pageYOffset || 0;
+            const anchorCenterY = currentScroll + rect.top + rect.height / 2;
+            const targetY = anchorCenterY - viewportHeight / 2;
+
+            await startScrollAnimation(targetY, 700);
+          };
+
+          const alignStripToSelection = async () => {
+            if (!trackState || !trackState.track || !trackState.track.isConnected) {
+              return;
+            }
+
+            const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+            if (!viewportWidth) {
+              return;
+            }
+
+            const rect = anchor.getBoundingClientRect();
+            const anchorCenterX = rect.left + rect.width / 2;
+            const viewportCenterX = viewportWidth / 2;
+            const delta = viewportCenterX - anchorCenterX;
+
+            if (Math.abs(delta) < 1) {
+              return;
+            }
+
+            const track = trackState.track;
+            const currentOffset = Number.isFinite(trackState.offset) ? trackState.offset : 0;
+            const targetOffset = currentOffset + delta;
+            trackState.offset = targetOffset;
+
+            await new Promise((resolve) => {
+              let resolved = false;
+
+              const cleanup = () => {
+                if (resolved) {
+                  return;
+                }
+                resolved = true;
+                track.style.transition = '';
+                track.removeEventListener('transitionend', onTransitionEnd);
+                resolve();
+              };
+
+              const onTransitionEnd = (event) => {
+                if (event.target === track && event.propertyName === 'transform') {
+                  cleanup();
+                }
+              };
+
+              track.addEventListener('transitionend', onTransitionEnd);
+
+              requestAnimationFrame(() => {
+                track.style.transition = 'transform 0.5s cubic-bezier(0.45, 0, 0.2, 1)';
+                track.style.transform = `translateX(${targetOffset}px)`;
+              });
+
+              window.setTimeout(cleanup, 520);
+            });
+          };
+
+          try {
+            await alignScrollToSelection();
+          } catch (error) {
+            /* ignore alignment issues */
+          }
+
+          try {
+            await alignStripToSelection();
+          } catch (error) {
+            /* ignore alignment issues */
+          }
+
+          await Promise.all([
+            preloadPromise,
+            new Promise((resolve) => {
+              requestAnimationFrame(() => {
+                requestAnimationFrame(resolve);
+              });
+            }),
+          ]);
+
           document.body.classList.add('is-transitioning');
 
           const scrollX = window.scrollX || window.pageXOffset || 0;
           const scrollY = window.scrollY || window.pageYOffset || 0;
           const rect = anchor.getBoundingClientRect();
-
-          const preloadSource = heroStill || heroAnimated || null;
-          if (preloadSource) {
-            try {
-              await Promise.race([
-                ensureImageReady(preloadSource),
-                new Promise((resolve) => {
-                  window.setTimeout(resolve, 450);
-                }),
-              ]);
-            } catch (error) {
-              /* ignore preload issues */
-            }
-          }
 
           const clone = anchor.cloneNode(true);
           clone.classList.add('placeholder--transition');
