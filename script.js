@@ -21,7 +21,7 @@
 
     const ACTION_KEYS = new Set(['Enter', ' ']);
 
-    const placeholderSelector = '.placeholder[data-project][data-hero-class]';
+    const placeholderSelector = '.placeholder[data-project]';
     const HERO_WIDTH_RATIO = 0.95;
     const HERO_MAX_WIDTH = 1200;
     const HERO_ASPECT = 16 / 9;
@@ -33,23 +33,72 @@
     const HOVER_GIF_SELECTOR = '[data-hover-gif]';
     const HOVER_GIF_ACTIVE_CLASS = 'gif-icon--active';
 
-    const collectPlaceholderVariants = (element) =>
-      element
-        ? Array.from(element.classList).filter((className) =>
-            typeof className === 'string' && className.startsWith('placeholder--')
-          )
-        : [];
+    const MEDIA_IMAGE_VAR = '--placeholder-image';
+    const MEDIA_ANIMATED_VAR = '--placeholder-animated';
 
-    const swapPlaceholderVariant = (element, targetClass) => {
+    const parseNumeric = (value) => {
+      if (value === null || value === undefined) {
+        return null;
+      }
+      const trimmed = `${value}`.trim();
+      if (!trimmed) {
+        return null;
+      }
+      const parsed = parseFloat(trimmed);
+      return Number.isFinite(parsed) ? parsed : null;
+    };
+
+    const readStringAttribute = (element, attribute) => {
+      if (!element) {
+        return null;
+      }
+      const value = element.getAttribute(attribute);
+      if (!value) {
+        return null;
+      }
+      const trimmed = value.trim();
+      return trimmed ? trimmed : null;
+    };
+
+    const applyMediaVariables = (element, stillSrc, animatedSrc) => {
       if (!element) {
         return;
       }
-      const existing = collectPlaceholderVariants(element);
-      existing.forEach((className) => {
-        element.classList.remove(className);
-      });
-      if (targetClass) {
-        element.classList.add(targetClass);
+
+      const still = stillSrc ? stillSrc.trim() : '';
+      const animated = animatedSrc ? animatedSrc.trim() : '';
+
+      if (still) {
+        element.style.setProperty(MEDIA_IMAGE_VAR, `url("${still}")`);
+      } else {
+        element.style.removeProperty(MEDIA_IMAGE_VAR);
+      }
+
+      if (animated) {
+        const animatedValue = still
+          ? `url("${animated}"), url("${still}")`
+          : `url("${animated}")`;
+        element.style.setProperty(MEDIA_ANIMATED_VAR, animatedValue);
+      } else if (still) {
+        element.style.setProperty(MEDIA_ANIMATED_VAR, `url("${still}")`);
+      } else {
+        element.style.removeProperty(MEDIA_ANIMATED_VAR);
+      }
+    };
+
+    const initializeMediaElement = (element) => {
+      if (!element) {
+        return;
+      }
+
+      const still = readStringAttribute(element, 'data-still');
+      const animated = readStringAttribute(element, 'data-animated');
+      const aspectAttr = parseNumeric(element.getAttribute('data-aspect'));
+
+      applyMediaVariables(element, still, animated || still);
+
+      if (Number.isFinite(aspectAttr) && aspectAttr > 0) {
+        element.style.setProperty('--item-aspect', `${aspectAttr}`);
       }
     };
 
@@ -131,6 +180,11 @@
       setupHoverGif(container);
     });
 
+    const mediaPlaceholders = document.querySelectorAll('.placeholder');
+    mediaPlaceholders.forEach((element) => {
+      initializeMediaElement(element);
+    });
+
     const heroStorageKey = (projectId) => `adele:project-hero:${projectId}`;
 
     const safeStorageAccess = (type) => {
@@ -151,22 +205,26 @@
     const sessionStore = safeStorageAccess('sessionStorage');
     const persistentStore = sessionStore;
 
-    const storeHeroData = (projectId, heroClass, ratio) => {
+    const storeHeroData = (projectId, payload) => {
       if (!projectId || !sessionStore) {
         return;
       }
 
-      const payload = {};
-      if (heroClass) {
-        payload.heroClass = heroClass;
-      }
-
-      if (Number.isFinite(ratio) && ratio > 0) {
-        payload.ratio = ratio;
+      const data = {};
+      if (payload && typeof payload === 'object') {
+        if (payload.still && typeof payload.still === 'string') {
+          data.still = payload.still;
+        }
+        if (payload.animated && typeof payload.animated === 'string') {
+          data.animated = payload.animated;
+        }
+        if (Number.isFinite(payload.aspect) && payload.aspect > 0) {
+          data.aspect = payload.aspect;
+        }
       }
 
       try {
-        sessionStore.setItem(heroStorageKey(projectId), JSON.stringify(payload));
+        sessionStore.setItem(heroStorageKey(projectId), JSON.stringify(data));
       } catch (error) {
         /* no-op */
       }
@@ -190,10 +248,11 @@
 
       try {
         const parsed = JSON.parse(raw);
-        const heroClass = typeof parsed.heroClass === 'string' ? parsed.heroClass : null;
-        const ratioCandidate = parsed && typeof parsed === 'object' ? parsed.ratio : null;
-        const ratio = Number.isFinite(ratioCandidate) ? ratioCandidate : null;
-        return { heroClass, ratio };
+        const still = parsed && typeof parsed.still === 'string' ? parsed.still : null;
+        const animated = parsed && typeof parsed.animated === 'string' ? parsed.animated : null;
+        const aspectCandidate = parsed && typeof parsed.aspect === 'number' ? parsed.aspect : null;
+        const aspect = Number.isFinite(aspectCandidate) ? aspectCandidate : null;
+        return { still, animated, aspect };
       } catch (error) {
         return null;
       }
@@ -387,7 +446,9 @@
           const placeholders = Array.from(track.children);
           const duplicateSet = document.createDocumentFragment();
           placeholders.forEach((placeholder) => {
-            duplicateSet.appendChild(placeholder.cloneNode(true));
+            const clone = placeholder.cloneNode(true);
+            initializeMediaElement(clone);
+            duplicateSet.appendChild(clone);
           });
           track.appendChild(duplicateSet);
 
@@ -397,7 +458,11 @@
 
         const loopFragment = document.createDocumentFragment();
         baseProjects.forEach((project) => {
-          loopFragment.appendChild(project.cloneNode(true));
+          const clone = project.cloneNode(true);
+          Array.from(clone.querySelectorAll('.placeholder')).forEach((element) => {
+            initializeMediaElement(element);
+          });
+          loopFragment.appendChild(clone);
         });
         projectList.appendChild(loopFragment);
 
@@ -569,10 +634,16 @@
           }
 
           const projectId = anchor.getAttribute('data-project');
-          const heroClass = anchor.getAttribute('data-hero-class');
+          const heroStill = readStringAttribute(anchor, 'data-still');
+          const heroAnimated = readStringAttribute(anchor, 'data-animated');
+          const heroAspect = parseNumeric(anchor.getAttribute('data-aspect'));
 
-          if (projectId || heroClass) {
-            storeHeroData(projectId, heroClass, HERO_ASPECT);
+          if (projectId && (heroStill || heroAnimated)) {
+            storeHeroData(projectId, {
+              still: heroStill || null,
+              animated: heroAnimated || null,
+              aspect: Number.isFinite(heroAspect) && heroAspect > 0 ? heroAspect : HERO_ASPECT,
+            });
           }
 
           if (sessionStore) {
@@ -598,6 +669,7 @@
 
           const clone = anchor.cloneNode(true);
           clone.classList.add('placeholder--transition');
+          initializeMediaElement(clone);
           clone.style.position = 'fixed';
           clone.style.left = `${rect.left + scrollX}px`;
           clone.style.top = `${rect.top + scrollY}px`;
@@ -1053,26 +1125,39 @@
       const heroFrame = projectDetail.querySelector('.project-hero__media');
       const heroDefaults = heroFrame
         ? {
-            className: heroFrame.getAttribute('data-default-hero') || null,
+            still: readStringAttribute(heroFrame, 'data-default-still'),
+            animated: readStringAttribute(heroFrame, 'data-default-animated'),
+            aspect: parseNumeric(heroFrame.getAttribute('data-default-aspect')),
           }
-        : { className: null };
+        : { still: null, animated: null, aspect: null };
 
-      const storedHero = readHeroData(projectId);
-      const heroClassToUse =
-        (storedHero && storedHero.heroClass) || heroDefaults.className || null;
+      const storedHero = readHeroData(projectId) || {};
+      const heroStill = storedHero.still || heroDefaults.still || null;
+      const heroAnimated = storedHero.animated || heroDefaults.animated || heroStill;
+      const heroAspectCandidate = Number.isFinite(storedHero.aspect)
+        ? storedHero.aspect
+        : null;
+      const defaultAspect = Number.isFinite(heroDefaults.aspect)
+        ? heroDefaults.aspect
+        : null;
+      const heroAspect =
+        (heroAspectCandidate && heroAspectCandidate > 0
+          ? heroAspectCandidate
+          : null) ||
+        (defaultAspect && defaultAspect > 0 ? defaultAspect : HERO_ASPECT);
 
       if (heroFrame) {
-        swapPlaceholderVariant(heroFrame, heroClassToUse);
-        heroFrame.style.setProperty('--hero-aspect', `${HERO_ASPECT}`);
+        applyMediaVariables(heroFrame, heroStill, heroAnimated);
+        heroFrame.style.setProperty('--hero-aspect', `${heroAspect}`);
       }
 
       const gallery = projectDetail.querySelector('.project-detail__gallery');
       if (gallery) {
-        if (heroClassToUse) {
-          const duplicateHero = gallery.querySelector(
-            `[data-media-class="${heroClassToUse}"]`
-          );
-          if (duplicateHero) {
+        if (heroStill) {
+          const duplicateHero = Array.from(
+            gallery.querySelectorAll('.project-detail__item')
+          ).find((item) => readStringAttribute(item, 'data-still') === heroStill);
+          if (duplicateHero && duplicateHero.parentElement === gallery) {
             duplicateHero.remove();
           }
         }

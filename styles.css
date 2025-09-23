@@ -1,16 +1,16 @@
 :root {
   color-scheme: dark;
-  --color-bg: #050506;
-  --color-surface: #0f1013;
-  --color-overlay: rgba(11, 11, 14, 0.78);
+  --color-bg: #101013;
+  --color-surface: #17181d;
+  --color-overlay: rgba(18, 19, 24, 0.82);
   --color-border: rgba(240, 234, 214, 0.12);
   --color-border-strong: rgba(240, 234, 214, 0.32);
-  --color-text: #f4efe3;
-  --color-text-subtle: rgba(244, 239, 227, 0.68);
-  --color-text-muted: rgba(244, 239, 227, 0.42);
+  --color-text: #f0ead6;
+  --color-text-subtle: rgba(240, 234, 214, 0.72);
+  --color-text-muted: rgba(240, 234, 214, 0.48);
   --color-icon: #f0ead6;
-  --color-shadow: rgba(0, 0, 0, 0.48);
-  --color-shadow-soft: rgba(0, 0, 0, 0.35);
+  --color-shadow: rgba(0, 0, 0, 0.55);
+  --color-shadow-soft: rgba(0, 0, 0, 0.4);
 }
 
 * {
@@ -115,14 +115,7 @@ a {
   border-radius: 50%;
   background: transparent;
   border: none;
-  transition: transform 0.3s ease, opacity 0.3s ease;
   isolation: isolate;
-}
-
-.topbar__about:hover,
-.topbar__about:focus-visible {
-  transform: translateY(-2px);
-  opacity: 0.85;
 }
 
 .topbar__about:focus-visible {
@@ -152,9 +145,9 @@ a {
   height: 100%;
   object-fit: contain;
   pointer-events: none;
-  mix-blend-mode: lighten;
-  filter: invert(1) sepia(12%) saturate(482%) hue-rotate(358deg) brightness(106%)
-    contrast(92%);
+  mix-blend-mode: screen;
+  filter: brightness(0) saturate(100%) invert(92%) sepia(8%) saturate(432%)
+    hue-rotate(321deg) brightness(104%) contrast(92%);
 }
 
 .gif-icon canvas {
@@ -222,6 +215,14 @@ a {
   border-radius: 0;
   box-shadow: 0 20px 40px var(--color-shadow);
   cursor: pointer;
+  overflow: hidden;
+  --placeholder-image: none;
+  --placeholder-animated: var(--placeholder-image);
+  background-color: var(--color-surface);
+  background-image: var(--placeholder-image);
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center;
 }
 
 .portfolio .placeholder {
@@ -238,52 +239,8 @@ a {
   height: clamp(210px, 30vw, 360px);
 }
 
-.placeholder--sunset {
-  background: linear-gradient(135deg, #ff9f6e, #ff5f6d);
-}
-
-.placeholder--ocean {
-  background: linear-gradient(135deg, #6fa6ff, #367bff);
-}
-
-.placeholder--emerald {
-  background: linear-gradient(135deg, #6be5b0, #3cb37e);
-}
-
-.placeholder--coral {
-  background: linear-gradient(135deg, #f6d365, #fda085);
-}
-
-.placeholder--lavender {
-  background: linear-gradient(135deg, #c8b5ff, #8a6eff);
-}
-
-.placeholder--rose {
-  background: linear-gradient(135deg, #ff8ac9, #ff5ea6);
-}
-
-.placeholder--amber {
-  background: linear-gradient(135deg, #ffd36e, #ff9e4f);
-}
-
-.placeholder--teal {
-  background: linear-gradient(135deg, #64f2ff, #2ca6b5);
-}
-
-.placeholder--slate {
-  background: linear-gradient(135deg, #a3b9ff, #5c6cff);
-}
-
-.placeholder--forest {
-  background: linear-gradient(135deg, #8cd17a, #3c9d4b);
-}
-
-.placeholder--berry {
-  background: linear-gradient(135deg, #d06bff, #8c3bd9);
-}
-
-.placeholder--mocha {
-  background: linear-gradient(135deg, #d7b39b, #a3745b);
+.placeholder:is(:hover, :focus-visible) {
+  background-image: var(--placeholder-animated);
 }
 
 .transition-overlay {
@@ -420,14 +377,7 @@ body.is-transitioning {
   border-radius: 50%;
   text-decoration: none;
   cursor: pointer;
-  transition: transform 0.2s ease, opacity 0.2s ease;
   isolation: isolate;
-}
-
-.project-detail__back:hover,
-.project-detail__back:focus-visible {
-  opacity: 0.75;
-  transform: translateY(-2px);
 }
 
 .project-detail__back:focus-visible {
