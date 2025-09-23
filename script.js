@@ -30,6 +30,8 @@
     const MASONRY_GAP = 5;
     const MASONRY_MIN_COLUMN_WIDTH = 220;
     const MASONRY_MAX_COLUMN_WIDTH = 380;
+    const HOVER_GIF_SELECTOR = '[data-hover-gif]';
+    const HOVER_GIF_ACTIVE_CLASS = 'gif-icon--active';
 
     const collectPlaceholderVariants = (element) =>
       element
@@ -50,6 +52,84 @@
         element.classList.add(targetClass);
       }
     };
+
+    const setupHoverGif = (container) => {
+      if (!container) {
+        return;
+      }
+
+      const gifSrc = container.getAttribute('data-hover-gif');
+      const canvas = container.querySelector('canvas');
+      const animatedImage = container.querySelector('img');
+
+      if (
+        !gifSrc ||
+        !canvas ||
+        !animatedImage ||
+        typeof canvas.getContext !== 'function'
+      ) {
+        return;
+      }
+
+      const context = canvas.getContext('2d');
+      if (!context) {
+        return;
+      }
+
+      const loader = new Image();
+      loader.decoding = 'async';
+      loader.src = gifSrc;
+
+      const drawFirstFrame = () => {
+        const width = loader.naturalWidth || loader.width || 0;
+        const height = loader.naturalHeight || loader.height || 0;
+
+        if (!width || !height) {
+          return;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        context.clearRect(0, 0, width, height);
+        context.drawImage(loader, 0, 0, width, height);
+      };
+
+      if (loader.complete) {
+        drawFirstFrame();
+      } else {
+        loader.addEventListener('load', drawFirstFrame, { once: true });
+      }
+
+      const activate = () => {
+          if (shouldReduceMotion) {
+          return;
+        }
+
+        if (!container.classList.contains(HOVER_GIF_ACTIVE_CLASS)) {
+          container.classList.add(HOVER_GIF_ACTIVE_CLASS);
+        }
+
+        animatedImage.decoding = 'async';
+        animatedImage.src = `${gifSrc}?frame=${Date.now()}`;
+      };
+
+      const deactivate = () => {
+        container.classList.remove(HOVER_GIF_ACTIVE_CLASS);
+        animatedImage.removeAttribute('src');
+      };
+
+      container.addEventListener('mouseenter', activate);
+      container.addEventListener('mouseleave', deactivate);
+      container.addEventListener('focusin', activate);
+      container.addEventListener('focusout', deactivate);
+
+      container.__hoverGifDeactivate = deactivate;
+    };
+
+    const hoverGifContainers = document.querySelectorAll(HOVER_GIF_SELECTOR);
+    hoverGifContainers.forEach((container) => {
+      setupHoverGif(container);
+    });
 
     const heroStorageKey = (projectId) => `adele:project-hero:${projectId}`;
 
@@ -925,20 +1005,25 @@
           shouldReduceMotion = event.matches;
 
           if (shouldReduceMotion) {
-            cancelScrollAnimation();
-            hideIntroElement();
-            trackStates.forEach((state) => {
-              state.offset = 0;
-              state.speed = 0;
-              state.mode = 'base-left';
-              state.track.style.transform = 'translateX(0)';
-            });
-            lastKnownScrollY = window.scrollY || window.pageYOffset || 0;
+          cancelScrollAnimation();
+          hideIntroElement();
+          trackStates.forEach((state) => {
+            state.offset = 0;
+            state.speed = 0;
+            state.mode = 'base-left';
+            state.track.style.transform = 'translateX(0)';
+          });
+          lastKnownScrollY = window.scrollY || window.pageYOffset || 0;
+          hoverGifContainers.forEach((container) => {
+            if (typeof container.__hoverGifDeactivate === 'function') {
+              container.__hoverGifDeactivate();
+            }
+          });
           } else {
-            previousTime = undefined;
-            runResizeTasks();
-          }
-        };
+          previousTime = undefined;
+          runResizeTasks();
+        }
+      };
 
         if (typeof reduceMotionMedia.addEventListener === 'function') {
           reduceMotionMedia.addEventListener('change', handleMotionPreferenceChange);

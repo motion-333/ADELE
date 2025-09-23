@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@100..900&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="styles.css" />
@@ -17,31 +17,14 @@
       <div class="topbar__inner">
         <a class="topbar__title" href="index.html">Adèle Farges</a>
         <a class="topbar__about" href="about.html" aria-label="À propos d'Adèle Farges">
-          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            <circle cx="12" cy="12" r="10" />
-            <line x1="12" y1="10" x2="12" y2="16" />
-            <circle cx="12" cy="7" r="1" />
-          </svg>
+          <span class="gif-icon" data-hover-gif="elements/info.gif">
+            <canvas aria-hidden="true"></canvas>
+            <img alt="" aria-hidden="true" />
+          </span>
         </a>
       </div>
     </header>
     <main class="project-detail" data-project="project-06">
-      <a
-        class="project-detail__back"
-        href="index.html"
-        aria-label="Retourner au portfolio"
-      >
-        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-          <path
-            d="M14.5 6.5 8.5 12l6 5.5M8.5 12H19"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.75"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          />
-        </svg>
-      </a>
       <div class="project-hero">
         <div
           class="project-hero__media placeholder placeholder--sunset"
@@ -51,6 +34,12 @@
       </div>
       <section class="project-detail__body">
         <div class="project-detail__heading">
+          <a class="project-detail__back" href="index.html" aria-label="Retourner au portfolio">
+            <span class="gif-icon gif-icon--rotate" data-hover-gif="elements/back.gif">
+              <canvas aria-hidden="true"></canvas>
+              <img alt="" aria-hidden="true" />
+            </span>
+          </a>
           <h1 class="project-detail__title">TITRE DE PROJET</h1>
           <span class="project-detail__meta">Nom de Prod, 2025</span>
         </div>
