@@ -35,6 +35,7 @@
     const MEDIA_ANIMATED_VAR = '--placeholder-animated';
 
     let updateScrollProgressBar = null;
+    let animateLoopResetProgress = null;
 
     const getMaxScrollY = () => {
       const doc = document.documentElement;
@@ -532,26 +533,162 @@
     });
 
     if (isHomePage) {
+
       const progressBarElement = document.querySelector('.scroll-progress__bar');
       if (progressBarElement) {
-        const update = () => {
-          const maxScroll = getMaxScrollY();
-          const current = window.scrollY || window.pageYOffset || 0;
-          const targetScroll = maxScroll * 0.5;
-          const effectiveMax = targetScroll > 0 ? targetScroll : maxScroll;
-          const ratio = effectiveMax > 0 ? Math.min(Math.max(current / effectiveMax, 0), 1) : 0;
-          progressBarElement.style.transform = `scaleY(${ratio})`;
+        const state = {
+          lastRendered: 0,
+          target: 0,
+          isAnimating: false,
+          animationFrame: null,
         };
 
-        updateScrollProgressBar = update;
+        const clampRatio = (value) => {
+          if (!Number.isFinite(value)) {
+            return 0;
+          }
+          if (value <= 0) {
+            return 0;
+          }
+          if (value >= 1) {
+            return 1;
+          }
+          return value;
+        };
+
+        const applyProgress = (value) => {
+          const clamped = clampRatio(value);
+          progressBarElement.style.transform = `scaleY(${clamped})`;
+          state.lastRendered = clamped;
+        };
+
+        const stopProgressAnimation = () => {
+          if (state.animationFrame !== null) {
+            cancelAnimationFrame(state.animationFrame);
+            state.animationFrame = null;
+          }
+          state.isAnimating = false;
+        };
+
+        const computeProgressRatio = (scrollValue) => {
+          const maxScroll = getMaxScrollY();
+          const current = Number.isFinite(scrollValue) ? Math.max(scrollValue, 0) : 0;
+          const targetScroll = maxScroll * 0.5;
+          const effectiveMax = targetScroll > 0 ? targetScroll : maxScroll;
+          if (effectiveMax <= 0) {
+            return 0;
+          }
+          return clampRatio(current / effectiveMax);
+        };
+
+        const animateProgress = (start, end, duration = 500) => {
+          const from = clampRatio(start);
+          const to = clampRatio(end);
+          if (Math.abs(from - to) < 0.001) {
+            stopProgressAnimation();
+            applyProgress(to);
+            state.target = to;
+            return;
+          }
+
+          stopProgressAnimation();
+          state.isAnimating = true;
+          state.target = to;
+          let startTime = null;
+
+          const step = (timestamp) => {
+            if (!state.isAnimating) {
+              return;
+            }
+
+            const now =
+              typeof timestamp === 'number'
+                ? timestamp
+                : typeof performance !== 'undefined' && typeof performance.now === 'function'
+                ? performance.now()
+                : Date.now();
+
+            if (startTime === null) {
+              startTime = now;
+            }
+
+            const elapsed = now - startTime;
+            const progress = elapsed <= 0 ? 0 : elapsed >= duration ? 1 : elapsed / duration;
+            const eased = 1 - Math.pow(1 - progress, 3);
+            const value = from + (to - from) * eased;
+            applyProgress(value);
+
+            if (progress < 1) {
+              state.animationFrame = requestAnimationFrame(step);
+            } else {
+              state.isAnimating = false;
+              state.animationFrame = null;
+              applyProgress(to);
+            }
+          };
+
+          state.animationFrame = requestAnimationFrame(step);
+        };
+
+        const update = () => {
+          const current = window.scrollY || window.pageYOffset || 0;
+          const ratio = computeProgressRatio(current);
+
+          if (state.isAnimating) {
+            const difference = Math.abs(ratio - state.target);
+            if (difference > 0.05) {
+              stopProgressAnimation();
+              state.target = ratio;
+              applyProgress(ratio);
+            }
+            return;
+          }
+
+          state.target = ratio;
+          applyProgress(ratio);
+        };
+
+        animateLoopResetProgress = (startScroll, targetScroll) => {
+          const computedStart = computeProgressRatio(startScroll);
+          const startRatio = clampRatio(
+            Math.max(computedStart, state.lastRendered)
+          );
+          const targetRatio = computeProgressRatio(targetScroll);
+          if (startRatio <= targetRatio) {
+            stopProgressAnimation();
+            state.target = targetRatio;
+            applyProgress(targetRatio);
+            return;
+          }
+
+          animateProgress(startRatio, targetRatio, 520);
+        };
+
+        updateScrollProgressBar = () => {
+          stopProgressAnimation();
+          update();
+        };
+
         update();
 
         window.addEventListener('scroll', update, { passive: true });
-        window.addEventListener('resize', update);
-        window.addEventListener('load', update, { once: true });
+        window.addEventListener('resize', () => {
+          stopProgressAnimation();
+          update();
+        });
+        window.addEventListener(
+          'load',
+          () => {
+            stopProgressAnimation();
+            update();
+          },
+          { once: true }
+        );
       }
+
     } else {
       updateScrollProgressBar = null;
+      animateLoopResetProgress = null;
     }
 
     const SUPPORTED_MEDIA_EXTENSIONS = new Set(['png', 'gif']);
@@ -1995,6 +2132,9 @@
             let normalized = currentY % loopHeight;
             if (!Number.isFinite(normalized)) {
               normalized = 0;
+            }
+            if (typeof animateLoopResetProgress === 'function') {
+              animateLoopResetProgress(currentY, normalized);
             }
             adjustLoopScroll(normalized);
             return;

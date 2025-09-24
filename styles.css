@@ -88,7 +88,7 @@ body::-webkit-scrollbar {
   top: 0;
   right: 0;
   bottom: 0;
-  width: 3px;
+  width: 6px;
   pointer-events: none;
   z-index: 170;
   background: transparent;
