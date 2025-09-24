@@ -259,6 +259,7 @@
       const gifSrc = container.getAttribute('data-hover-gif');
       const canvas = container.querySelector('canvas');
       const animatedImage = container.querySelector('img');
+      const ignoreReducedMotion = container.hasAttribute('data-ignore-reduced-motion');
 
       if (
         !gifSrc ||
@@ -467,7 +468,7 @@
       };
 
       const activate = () => {
-        if (shouldReduceMotion || isAnimating) {
+        if ((shouldReduceMotion && !ignoreReducedMotion) || isAnimating) {
           return;
         }
 
@@ -522,6 +523,7 @@
       window.addEventListener('resize', handleResize);
 
       container.__hoverGifDeactivate = deactivate;
+      container.__hoverGifIgnoreReducedMotion = ignoreReducedMotion;
     };
 
     const hoverGifContainers = document.querySelectorAll(HOVER_GIF_SELECTOR);
@@ -535,8 +537,10 @@
         const update = () => {
           const maxScroll = getMaxScrollY();
           const current = window.scrollY || window.pageYOffset || 0;
-          const ratio = maxScroll > 0 ? Math.min(Math.max(current / maxScroll, 0), 1) : 0;
-          progressBarElement.style.transform = `scaleX(${ratio})`;
+          const targetScroll = maxScroll * 0.5;
+          const effectiveMax = targetScroll > 0 ? targetScroll : maxScroll;
+          const ratio = effectiveMax > 0 ? Math.min(Math.max(current / effectiveMax, 0), 1) : 0;
+          progressBarElement.style.transform = `scaleY(${ratio})`;
         };
 
         updateScrollProgressBar = update;
@@ -2101,9 +2105,15 @@
             });
             lastKnownScrollY = window.scrollY || window.pageYOffset || 0;
             hoverGifContainers.forEach((container) => {
-              if (typeof container.__hoverGifDeactivate === 'function') {
-                container.__hoverGifDeactivate();
+              if (!container || typeof container.__hoverGifDeactivate !== 'function') {
+                return;
               }
+
+              if (container.__hoverGifIgnoreReducedMotion) {
+                return;
+              }
+
+              container.__hoverGifDeactivate();
             });
           } else {
             previousTime = undefined;
