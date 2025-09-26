@@ -120,6 +120,7 @@
     const HERO_ASPECT = 16 / 9;
     const RETURN_SCROLL_KEY = 'adele:return-scroll';
     const LAST_CATEGORY_KEY = 'adele:last-category';
+    const RETURN_SCROLL_EVENT = 'adele:return-scroll-restored';
     const MASONRY_GAP = 5;
     const MASONRY_MIN_COLUMN_WIDTH = 220;
     const MASONRY_MAX_COLUMN_WIDTH = 380;
@@ -146,6 +147,7 @@
       'credits': 'credits',
       'credit': 'credits',
       'crédits': 'credits',
+      'vimeo': 'vimeo',
     };
 
     const normalizeMetadataKey = (key) => {
@@ -165,6 +167,72 @@
         return '';
       }
       return `${value}`.replace(/^\s*[-–—•*·]+\s*/, '').trim();
+    };
+
+    const normalizeVimeoUrl = (value) => {
+      if (!value) {
+        return null;
+      }
+
+      const raw = `${value}`.trim();
+      if (!raw) {
+        return null;
+      }
+
+      const extractId = (input) => {
+        const idMatch = `${input}`.match(/(?:video\/)?(\d{3,})/);
+        return idMatch && idMatch[1] ? idMatch[1] : null;
+      };
+
+      if (/^https?:\/\//i.test(raw)) {
+        const directMatch = raw.match(/player\.vimeo\.com\/video\/(\d{3,})/i);
+        if (directMatch && directMatch[1]) {
+          return `https://player.vimeo.com/video/${directMatch[1]}`;
+        }
+
+        const genericMatch = raw.match(/vimeo\.com\/(?:video\/)?(\d{3,})/i);
+        if (genericMatch && genericMatch[1]) {
+          return `https://player.vimeo.com/video/${genericMatch[1]}`;
+        }
+
+        const fallbackId = extractId(raw);
+        if (fallbackId) {
+          return `https://player.vimeo.com/video/${fallbackId}`;
+        }
+
+        return raw;
+      }
+
+      const numericMatch = raw.match(/^(\d{3,})$/);
+      if (numericMatch && numericMatch[1]) {
+        return `https://player.vimeo.com/video/${numericMatch[1]}`;
+      }
+
+      const embeddedId = extractId(raw);
+      if (embeddedId) {
+        return `https://player.vimeo.com/video/${embeddedId}`;
+      }
+
+      return null;
+    };
+
+    const buildVimeoAutoplayUrl = (url) => {
+      if (!url) {
+        return null;
+      }
+
+      try {
+        const base = window.location && window.location.origin ? window.location.origin : 'https://example.com';
+        const parsed = new URL(url, base);
+        parsed.searchParams.set('autoplay', '1');
+        parsed.searchParams.set('muted', '0');
+        parsed.searchParams.set('playsinline', '1');
+        return parsed.toString();
+      } catch (error) {
+        const hasQuery = url.includes('?');
+        const separator = hasQuery ? '&' : '?';
+        return `${url}${separator}autoplay=1&muted=0&playsinline=1`;
+      }
     };
 
     const parseNumeric = (value) => {
@@ -197,6 +265,7 @@
         info: null,
         paragraph: null,
         credits: [],
+        vimeo: null,
       };
 
       if (!text) {
@@ -233,6 +302,10 @@
               if (value) {
                 creditLines.push(stripMetadataBullet(value));
               }
+            } else if (alias === 'vimeo') {
+              if (value) {
+                result.vimeo = value;
+              }
             }
             return;
           }
@@ -256,6 +329,8 @@
           paragraphLines.push(trimmed);
         } else if (currentKey === 'credits') {
           creditLines.push(stripMetadataBullet(trimmed));
+        } else if (currentKey === 'vimeo') {
+          result.vimeo = result.vimeo ? `${result.vimeo} ${trimmed}` : trimmed;
         }
       });
 
@@ -301,6 +376,7 @@
           const text = await response.text();
           const parsed = parseProjectMetadataText(text);
           const mediaDirectory = normalizeDirectoryPath(`${baseDir}images`);
+          const vimeoUrl = normalizeVimeoUrl(parsed.vimeo);
           const metadata = {
             id: projectId,
             category,
@@ -309,6 +385,7 @@
             info: parsed.info || null,
             paragraph: parsed.paragraph || null,
             credits: Array.isArray(parsed.credits) ? parsed.credits : [],
+            vimeo: vimeoUrl,
           };
 
           projectMetadataCache.set(projectId, metadata);
@@ -378,6 +455,11 @@
       }
 
       detail.setAttribute('data-media-source', metadata.mediaDirectory);
+      if (metadata.vimeo) {
+        detail.setAttribute('data-vimeo', metadata.vimeo);
+      } else {
+        detail.removeAttribute('data-vimeo');
+      }
 
       const titleEl = detail.querySelector('.project-detail__title');
       if (titleEl && metadata.title) {
@@ -1590,6 +1672,7 @@
 
     const sessionStore = safeStorageAccess('sessionStorage');
     let pendingReturnScroll = null;
+    let returnScrollReady = true;
 
     const readStoredCategory = () => {
       if (!sessionStore) {
@@ -1791,6 +1874,7 @@
 
     if (pendingReturnScroll === null) {
       pendingReturnScroll = readStoredScrollPosition();
+      returnScrollReady = pendingReturnScroll === null;
     }
 
     if (titleLink) {
@@ -1913,7 +1997,24 @@
 
       const targetCategory = ensureLandingSelection();
       if (targetCategory) {
-        requestCategoryActivation(targetCategory, { initial: true, force: true });
+        const activateCategory = () => {
+          requestCategoryActivation(targetCategory, { initial: true, force: true });
+        };
+
+        if (!returnScrollReady) {
+          const onRestored = () => {
+            activateCategory();
+          };
+          try {
+            document.addEventListener(RETURN_SCROLL_EVENT, onRestored, {
+              once: true,
+            });
+          } catch (error) {
+            activateCategory();
+          }
+        } else {
+          activateCategory();
+        }
       }
       landingSelection = null;
     };
@@ -2222,8 +2323,8 @@
           });
         }
 
-        const FAST_MULTIPLIER = 0.33;
-        const MIN_FAST_DURATION = 0.6;
+        const FAST_MULTIPLIER = 0.18;
+        const MIN_FAST_DURATION = 0.45;
         const EDGE_ZONE_RATIO = 0.22;
         const EDGE_ZONE_MIN = 120;
         const EDGE_ZONE_MAX = 320;
@@ -2260,6 +2361,7 @@
         });
 
         pendingReturnScroll = readStoredScrollPosition();
+        returnScrollReady = pendingReturnScroll === null;
 
         const wrapOffset = (state) => {
           const width = state.contentWidth;
@@ -2849,7 +2951,13 @@
             }
             adjustLoopScroll(target);
             pendingReturnScroll = null;
+            returnScrollReady = true;
             clearStoredScrollPosition();
+            try {
+              document.dispatchEvent(new CustomEvent(RETURN_SCROLL_EVENT));
+            } catch (error) {
+              /* no-op */
+            }
             return;
           }
           const currentY = window.scrollY || window.pageYOffset || 0;
@@ -2971,6 +3079,8 @@
         window.addEventListener('load', () => {
           scheduleResizeTasks();
         });
+
+        scheduleResizeTasks();
       }
     }
 
@@ -3021,6 +3131,8 @@
 
       const projectId = projectDetail.getAttribute('data-project');
       const heroFrame = projectDetail.querySelector('.project-hero__media');
+      const heroPlayButton = projectDetail.querySelector('.project-hero__play');
+      const heroVideoContainer = projectDetail.querySelector('.project-hero__video');
       const heroDefaults = heroFrame
         ? {
             still: readStringAttribute(heroFrame, 'data-default-still'),
@@ -3069,6 +3181,103 @@
         if (heroAnimated && heroAnimated !== heroStill) {
           ensureImageReady(heroAnimated).catch(() => {});
         }
+      }
+
+      let heroVimeoUrl = null;
+
+      const updateVideoAvailability = (metadata) => {
+        heroVimeoUrl = metadata && metadata.vimeo ? metadata.vimeo : null;
+
+        if (heroVideoContainer) {
+          if (heroVimeoUrl) {
+            heroVideoContainer.dataset.vimeo = heroVimeoUrl;
+          } else {
+            delete heroVideoContainer.dataset.vimeo;
+            if (!heroVideoContainer.hasAttribute('hidden')) {
+              heroVideoContainer.setAttribute('hidden', 'hidden');
+            }
+            heroVideoContainer.innerHTML = '';
+          }
+        }
+
+        if (heroPlayButton) {
+          if (heroVimeoUrl) {
+            heroPlayButton.classList.remove('is-hidden');
+            heroPlayButton.removeAttribute('hidden');
+          } else {
+            heroPlayButton.classList.add('is-hidden');
+            heroPlayButton.setAttribute('hidden', 'hidden');
+          }
+        }
+
+        if (!heroVimeoUrl && heroFrame) {
+          heroFrame.classList.remove('is-playing');
+        }
+      };
+
+      if (detailMetadataPromise && typeof detailMetadataPromise.then === 'function') {
+        detailMetadataPromise
+          .then((metadata) => {
+            if (metadata && metadata.category) {
+              storeLastCategory(metadata.category);
+            }
+            updateVideoAvailability(metadata || null);
+          })
+          .catch(() => {
+            updateVideoAvailability(null);
+          });
+      } else {
+        updateVideoAvailability(null);
+      }
+
+      const ensureVideoIframe = () => {
+        if (!heroVideoContainer || !heroVimeoUrl) {
+          return null;
+        }
+
+        let iframe = heroVideoContainer.querySelector('iframe');
+        const autoplayUrl = buildVimeoAutoplayUrl(heroVimeoUrl);
+
+        if (!iframe) {
+          iframe = document.createElement('iframe');
+          iframe.setAttribute('allow', 'autoplay; fullscreen; picture-in-picture');
+          iframe.setAttribute('allowfullscreen', '');
+          iframe.setAttribute('title', 'Lecture vidéo du projet');
+          iframe.src = autoplayUrl || heroVimeoUrl;
+          heroVideoContainer.appendChild(iframe);
+        } else if (autoplayUrl && iframe.src !== autoplayUrl) {
+          iframe.src = autoplayUrl;
+        }
+
+        heroVideoContainer.removeAttribute('hidden');
+        return iframe;
+      };
+
+      const beginHeroPlayback = () => {
+        if (!heroFrame) {
+          return;
+        }
+        const iframe = ensureVideoIframe();
+        if (!iframe) {
+          return;
+        }
+
+        heroFrame.classList.add('is-playing');
+      };
+
+      if (heroPlayButton) {
+        heroPlayButton.addEventListener('click', (event) => {
+          event.preventDefault();
+          beginHeroPlayback();
+        });
+
+        heroPlayButton.addEventListener('keydown', (event) => {
+          if (!ACTION_KEYS.has(event.key)) {
+            return;
+          }
+          event.preventDefault();
+          beginHeroPlayback();
+        });
       }
 
       const gallery = projectDetail.querySelector('.project-detail__gallery');
