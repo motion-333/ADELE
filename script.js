@@ -1,4 +1,8 @@
 (function () {
+  if (document.documentElement && document.documentElement.classList) {
+    document.documentElement.classList.add('has-js');
+  }
+
   const historyApi = window.history;
   if (historyApi && 'scrollRestoration' in historyApi) {
     historyApi.scrollRestoration = 'manual';
@@ -1278,6 +1282,46 @@
     };
 
     const sessionStore = safeStorageAccess('sessionStorage');
+    let pendingReturnScroll = null;
+
+    const readStoredScrollPosition = () => {
+      if (!sessionStore) {
+        return null;
+      }
+
+      try {
+        const raw = sessionStore.getItem(RETURN_SCROLL_KEY);
+        if (raw === null) {
+          return null;
+        }
+
+        const value = parseFloat(raw);
+        if (!Number.isFinite(value) || value < 0) {
+          try {
+            sessionStore.removeItem(RETURN_SCROLL_KEY);
+          } catch (error) {
+            /* no-op */
+          }
+          return null;
+        }
+
+        return value;
+      } catch (error) {
+        return null;
+      }
+    };
+
+    const clearStoredScrollPosition = () => {
+      if (!sessionStore) {
+        return;
+      }
+
+      try {
+        sessionStore.removeItem(RETURN_SCROLL_KEY);
+      } catch (error) {
+        /* no-op */
+      }
+    };
 
     const storeHeroData = (projectId, payload) => {
       if (!projectId || !sessionStore) {
@@ -1409,6 +1453,10 @@
 
     const startScrollToTopAnimation = () => startScrollAnimation(0, 2000);
 
+    if (pendingReturnScroll === null) {
+      pendingReturnScroll = readStoredScrollPosition();
+    }
+
     if (titleLink) {
       titleLink.addEventListener('click', (event) => {
         if (isHomePage) {
@@ -1429,6 +1477,45 @@
 
     const intro = document.querySelector('.intro');
     const introTitle = intro ? intro.querySelector('.intro__title') : null;
+    const introRole = intro ? intro.querySelector('.intro__role') : null;
+    const introCategories = intro
+      ? Array.from(intro.querySelectorAll('.intro__category'))
+      : [];
+
+    let introSequenceStarted = false;
+    const startIntroSequence = () => {
+      if (introSequenceStarted || !intro) {
+        return;
+      }
+      introSequenceStarted = true;
+
+      const elements = [];
+      if (introTitle) {
+        introTitle.classList.remove('is-visible');
+        elements.push(introTitle);
+      }
+      if (introRole) {
+        introRole.classList.remove('is-visible');
+        elements.push(introRole);
+      }
+      introCategories.forEach((category) => {
+        category.classList.remove('is-visible');
+        elements.push(category);
+      });
+
+      if (shouldReduceMotion) {
+        elements.forEach((element) => {
+          element.classList.add('is-visible');
+        });
+        return;
+      }
+
+      elements.forEach((element, index) => {
+        window.setTimeout(() => {
+          element.classList.add('is-visible');
+        }, 150 + index * 180);
+      });
+    };
 
     const hideIntroElement = () => {
       if (intro && !intro.classList.contains('intro--hidden')) {
@@ -1510,7 +1597,25 @@
       });
     };
 
-    if (intro) {
+    const shouldSkipLanding = intro && pendingReturnScroll !== null;
+
+    if (shouldSkipLanding) {
+      introSequenceStarted = true;
+      if (introTitle) {
+        introTitle.classList.add('is-visible');
+      }
+      if (introRole) {
+        introRole.classList.add('is-visible');
+      }
+      introCategories.forEach((category) => {
+        category.classList.add('is-visible');
+      });
+      hideIntroElement();
+      finishLanding();
+    } else if (intro) {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(startIntroSequence);
+      });
       intro.addEventListener('transitionend', (event) => {
         if (event.target === intro && event.propertyName === 'opacity') {
           hideIntroElement();
@@ -1554,8 +1659,8 @@
     if (projectList) {
       const baseProjects = Array.from(projectList.children);
       if (baseProjects.length) {
-        const baseDurationStart = 32;
-        const durationStep = 4;
+        const baseDurationStart = 68;
+        const durationStep = 12;
 
         baseProjects.forEach((project, index) => {
           project.classList.add('project--primary');
@@ -1572,6 +1677,9 @@
             duplicateSet.appendChild(clone);
           });
           track.appendChild(duplicateSet);
+
+          const direction = index % 2 === 0 ? 'left' : 'right';
+          track.dataset.baseDirection = direction;
 
           const duration = baseDurationStart + (index % 5) * durationStep;
           track.dataset.baseDuration = duration.toString();
@@ -1598,6 +1706,7 @@
         let activeCategory = null;
         let isCategoryAnimating = false;
         const localCategoryQueue = [];
+        let scheduleResizeTasks = () => {};
 
         const dequeueNextCategory = () => {
           if (!localCategoryQueue.length || isCategoryAnimating) {
@@ -1642,10 +1751,18 @@
             activeCategory = category;
             updateCategoryButtonState(category);
             applyBodyCategory(category);
+            scheduleResizeTasks();
+            window.setTimeout(() => {
+              scheduleResizeTasks();
+            }, 0);
 
             if (shouldReduceMotion) {
               newPrimary.forEach((project) => project.classList.add('is-visible'));
               newClones.forEach((project) => project.classList.add('is-visible'));
+              scheduleResizeTasks();
+              window.setTimeout(() => {
+                scheduleResizeTasks();
+              }, 0);
               isCategoryAnimating = false;
               dequeueNextCategory();
               return;
@@ -1663,6 +1780,7 @@
             const totalDelay = newPrimary.length * 160 + 420;
             window.setTimeout(() => {
               newClones.forEach((project) => project.classList.add('is-visible'));
+              scheduleResizeTasks();
               isCategoryAnimating = false;
               dequeueNextCategory();
             }, totalDelay);
@@ -1726,11 +1844,11 @@
           });
         }
 
-        const FAST_MULTIPLIER = 0.45;
-        const MIN_FAST_DURATION = 0.7;
-        const EDGE_ZONE_RATIO = 0.16;
-        const EDGE_ZONE_MIN = 80;
-        const EDGE_ZONE_MAX = 240;
+        const FAST_MULTIPLIER = 0.33;
+        const MIN_FAST_DURATION = 0.6;
+        const EDGE_ZONE_RATIO = 0.22;
+        const EDGE_ZONE_MIN = 120;
+        const EDGE_ZONE_MAX = 320;
 
         const trackStates = [];
         const trackStateMap = new WeakMap();
@@ -1742,6 +1860,8 @@
             Number.isFinite(baseDurationAttr) && baseDurationAttr > 0
               ? baseDurationAttr
               : baseDurationStart;
+          const baseDirectionAttr = `${track.dataset.baseDirection || 'left'}`.toLowerCase();
+          const baseDirection = baseDirectionAttr === 'right' ? 1 : -1;
 
           const state = {
             track,
@@ -1752,53 +1872,16 @@
             baseSpeedAbs: 0,
             fastSpeedAbs: 0,
             speed: 0,
-            mode: 'base-left',
+            mode: 'base',
+            baseDirection,
+            initialized: false,
           };
 
           trackStates.push(state);
           trackStateMap.set(track, state);
         });
 
-        const readStoredScrollPosition = () => {
-          if (!sessionStore) {
-            return null;
-          }
-
-          try {
-            const raw = sessionStore.getItem(RETURN_SCROLL_KEY);
-            if (raw === null) {
-              return null;
-            }
-
-            const value = parseFloat(raw);
-            if (!Number.isFinite(value) || value < 0) {
-              try {
-                sessionStore.removeItem(RETURN_SCROLL_KEY);
-              } catch (error) {
-                /* no-op */
-              }
-              return null;
-            }
-
-            return value;
-          } catch (error) {
-            return null;
-          }
-        };
-
-        const clearStoredScrollPosition = () => {
-          if (!sessionStore) {
-            return;
-          }
-
-          try {
-            sessionStore.removeItem(RETURN_SCROLL_KEY);
-          } catch (error) {
-            /* no-op */
-          }
-        };
-
-        let pendingReturnScroll = readStoredScrollPosition();
+        pendingReturnScroll = readStoredScrollPosition();
 
         const wrapOffset = (state) => {
           const width = state.contentWidth;
@@ -1839,8 +1922,9 @@
           } else if (state.mode === 'fast-left') {
             state.speed = -state.fastSpeedAbs;
           } else {
-            state.mode = 'base-left';
-            state.speed = -state.baseSpeedAbs;
+            state.mode = 'base';
+            const direction = state.baseDirection >= 0 ? 1 : -1;
+            state.speed = state.baseSpeedAbs ? state.baseSpeedAbs * direction : 0;
           }
         };
 
@@ -1849,7 +1933,20 @@
             const track = state.track;
             const totalWidth = track.scrollWidth;
             const baseWidth = totalWidth / 2;
+            const previousWidth = state.contentWidth;
             state.contentWidth = baseWidth || totalWidth || 0;
+
+            if (!state.initialized) {
+              state.offset = state.baseDirection > 0 ? -state.contentWidth : 0;
+              state.initialized = true;
+            } else if (
+              previousWidth &&
+              state.contentWidth &&
+              previousWidth !== state.contentWidth
+            ) {
+              const ratio = state.offset / previousWidth;
+              state.offset = ratio * state.contentWidth;
+            }
 
             if (!state.contentWidth) {
               state.offset = 0;
@@ -1869,7 +1966,7 @@
           }
 
           if (shouldReduceMotion) {
-            state.mode = 'base-left';
+            state.mode = 'base';
             state.speed = 0;
             return;
           }
@@ -1881,8 +1978,9 @@
             state.mode = 'fast-left';
             state.speed = state.fastSpeedAbs ? -state.fastSpeedAbs : 0;
           } else {
-            state.mode = 'base-left';
-            state.speed = state.baseSpeedAbs ? -state.baseSpeedAbs : 0;
+            state.mode = 'base';
+            const direction = state.baseDirection >= 0 ? 1 : -1;
+            state.speed = state.baseSpeedAbs ? state.baseSpeedAbs * direction : 0;
           }
         };
 
@@ -2156,7 +2254,7 @@
             if (shouldReduceMotion) {
               if (edgePointerActive) {
                 edgePointerActive = false;
-                updateEdgeMode('base-left');
+                updateEdgeMode('base');
               }
               return;
             }
@@ -2165,7 +2263,7 @@
             if (pointerType === 'touch') {
               if (edgePointerActive) {
                 edgePointerActive = false;
-                updateEdgeMode('base-left');
+                updateEdgeMode('base');
               }
               return;
             }
@@ -2187,8 +2285,8 @@
                 updateEdgeMode('fast-right');
               } else if (x >= rect.right - edgeWidth) {
                 updateEdgeMode('fast-left');
-              } else if (state.mode !== 'base-left') {
-                updateEdgeMode('base-left');
+              } else if (state.mode !== 'base') {
+                updateEdgeMode('base');
               }
             }
           };
@@ -2198,7 +2296,7 @@
               return;
             }
             edgePointerActive = false;
-            updateEdgeMode('base-left');
+            updateEdgeMode('base');
           };
 
           strip.addEventListener('pointerenter', handleEdgePointerMove);
@@ -2242,7 +2340,7 @@
 
           const endFastMode = (control, pointerId) => {
             control.classList.remove('is-active');
-            applyMode(state, 'base-left');
+            applyMode(state, 'base');
             if (
               pointerId !== undefined &&
               typeof control.releasePointerCapture === 'function' &&
@@ -2267,12 +2365,12 @@
             control.addEventListener('pointercancel', reset);
             control.addEventListener('lostpointercapture', () => {
               control.classList.remove('is-active');
-              applyMode(state, 'base-left');
+              applyMode(state, 'base');
             });
             control.addEventListener('pointerleave', (event) => {
               if (event.pointerType === 'mouse') {
                 control.classList.remove('is-active');
-                applyMode(state, 'base-left');
+                applyMode(state, 'base');
               }
             });
 
@@ -2293,12 +2391,12 @@
               }
               event.preventDefault();
               control.classList.remove('is-active');
-              applyMode(state, 'base-left');
+              applyMode(state, 'base');
             });
 
             control.addEventListener('blur', () => {
               control.classList.remove('is-active');
-              applyMode(state, 'base-left');
+              applyMode(state, 'base');
             });
           };
 
@@ -2393,7 +2491,7 @@
         };
 
         let resizeFrame = null;
-        const scheduleResizeTasks = () => {
+        scheduleResizeTasks = () => {
           if (resizeFrame !== null) {
             return;
           }
@@ -2455,7 +2553,7 @@
             trackStates.forEach((state) => {
               state.offset = 0;
               state.speed = 0;
-              state.mode = 'base-left';
+              state.mode = 'base';
               state.track.style.transform = 'translateX(0)';
             });
             lastKnownScrollY = window.scrollY || window.pageYOffset || 0;
@@ -2522,6 +2620,19 @@
 
     const projectDetail = document.querySelector('.project-detail');
     if (projectDetail) {
+      const backLink = projectDetail.querySelector('.project-detail__back');
+      if (backLink) {
+        backLink.addEventListener('click', (event) => {
+          event.preventDefault();
+          if (window.history && typeof window.history.back === 'function' && window.history.length > 1) {
+            window.history.back();
+          } else {
+            const fallbackHref = backLink.getAttribute('href') || 'index.html';
+            window.location.href = fallbackHref;
+          }
+        });
+      }
+
       const projectId = projectDetail.getAttribute('data-project');
       const heroFrame = projectDetail.querySelector('.project-hero__media');
       const heroDefaults = heroFrame
