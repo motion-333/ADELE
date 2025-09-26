@@ -97,6 +97,280 @@
     const HOVER_GIF_SELECTOR = '[data-hover-gif]';
     const MEDIA_IMAGE_VAR = '--placeholder-image';
     const MEDIA_ANIMATED_VAR = '--placeholder-animated';
+    const CATEGORY_DIRECTORY_LOOKUP = CATEGORY_KEYS.reduce((accumulator, key) => {
+      accumulator[key] = normalizeDirectoryPath(key);
+      return accumulator;
+    }, {});
+
+    const projectMetadataCache = new Map();
+
+    const METADATA_KEY_ALIASES = {
+      'titre de projet': 'title',
+      'titre': 'title',
+      'infos additionelles': 'info',
+      'infos additionnelles': 'info',
+      'infos supplementaires': 'info',
+      'infos supplémentaires': 'info',
+      'paragraphe': 'paragraph',
+      'description': 'paragraph',
+      'texte': 'paragraph',
+      'credits': 'credits',
+      'credit': 'credits',
+      'crédits': 'credits',
+    };
+
+    const normalizeMetadataKey = (key) => {
+      if (!key) {
+        return '';
+      }
+      return key
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim();
+    };
+
+    const stripMetadataBullet = (value) => {
+      if (!value) {
+        return '';
+      }
+      return `${value}`.replace(/^\s*[-–—•*·]+\s*/, '').trim();
+    };
+
+    const parseProjectMetadataText = (text) => {
+      const result = {
+        title: null,
+        info: null,
+        paragraph: null,
+        credits: [],
+      };
+
+      if (!text) {
+        return result;
+      }
+
+      const normalizedText = `${text}`.replace(/\r\n/g, '\n');
+      const lines = normalizedText.split('\n');
+
+      const paragraphLines = [];
+      const creditLines = [];
+
+      let currentKey = null;
+
+      lines.forEach((rawLine) => {
+        const line = rawLine.replace(/\r/g, '');
+        const keyMatch = line.match(/^\s*([^:]+):\s*(.*)$/);
+        if (keyMatch) {
+          const alias = METADATA_KEY_ALIASES[normalizeMetadataKey(keyMatch[1])];
+          if (alias) {
+            currentKey = alias;
+            const value = keyMatch[2].trim();
+            if (alias === 'title') {
+              result.title = value || result.title;
+            } else if (alias === 'info') {
+              result.info = value || result.info;
+            } else if (alias === 'paragraph') {
+              paragraphLines.length = 0;
+              if (value) {
+                paragraphLines.push(value);
+              }
+            } else if (alias === 'credits') {
+              creditLines.length = 0;
+              if (value) {
+                creditLines.push(stripMetadataBullet(value));
+              }
+            }
+            return;
+          }
+        }
+
+        const trimmed = line.trim();
+        if (!trimmed) {
+          if (currentKey === 'paragraph') {
+            paragraphLines.push('');
+          } else if (currentKey !== 'credits') {
+            currentKey = null;
+          }
+          return;
+        }
+
+        if (currentKey === 'title') {
+          result.title = result.title ? `${result.title} ${trimmed}` : trimmed;
+        } else if (currentKey === 'info') {
+          result.info = result.info ? `${result.info} ${trimmed}` : trimmed;
+        } else if (currentKey === 'paragraph') {
+          paragraphLines.push(trimmed);
+        } else if (currentKey === 'credits') {
+          creditLines.push(stripMetadataBullet(trimmed));
+        }
+      });
+
+      const paragraph = paragraphLines
+        .join('\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+      if (paragraph) {
+        result.paragraph = paragraph;
+      }
+
+      const credits = creditLines
+        .map((entry) => stripMetadataBullet(entry))
+        .filter((entry) => !!entry);
+      if (credits.length) {
+        result.credits = credits;
+      }
+
+      return result;
+    };
+
+    const fetchProjectMetadata = async (projectId) => {
+      if (!projectId) {
+        return null;
+      }
+
+      if (projectMetadataCache.has(projectId)) {
+        return projectMetadataCache.get(projectId);
+      }
+
+      for (let index = 0; index < CATEGORY_KEYS.length; index += 1) {
+        const category = CATEGORY_KEYS[index];
+        const categoryRoot = CATEGORY_DIRECTORY_LOOKUP[category] || normalizeDirectoryPath(category);
+        const baseDir = normalizeDirectoryPath(`${categoryRoot}${projectId}`);
+        const metadataUrl = `${baseDir}project.txt`;
+
+        try {
+          const response = await fetch(metadataUrl, { cache: 'no-store' });
+          if (!response || !response.ok) {
+            continue;
+          }
+
+          const text = await response.text();
+          const parsed = parseProjectMetadataText(text);
+          const mediaDirectory = normalizeDirectoryPath(`${baseDir}images`);
+          const metadata = {
+            id: projectId,
+            category,
+            mediaDirectory,
+            title: parsed.title || null,
+            info: parsed.info || null,
+            paragraph: parsed.paragraph || null,
+            credits: Array.isArray(parsed.credits) ? parsed.credits : [],
+          };
+
+          projectMetadataCache.set(projectId, metadata);
+          return metadata;
+        } catch (error) {
+          /* ignore this attempt and try the next category */
+        }
+      }
+
+      projectMetadataCache.set(projectId, null);
+      return null;
+    };
+
+    const hydrateHomeProjects = async () => {
+      const sections = Array.from(document.querySelectorAll('.project[data-project]'));
+      if (!sections.length) {
+        return;
+      }
+
+      await Promise.all(
+        sections.map(async (section) => {
+          const projectId = readStringAttribute(section, 'data-project');
+          if (!projectId) {
+            return;
+          }
+
+          const metadata = await fetchProjectMetadata(projectId);
+          if (!metadata) {
+            return;
+          }
+
+          section.setAttribute('data-category', metadata.category);
+
+          const titleEl = section.querySelector('.project-title');
+          if (titleEl && metadata.title) {
+            titleEl.textContent = metadata.title;
+          }
+
+          const metaEl = section.querySelector('.project-meta');
+          if (metaEl && metadata.info) {
+            metaEl.textContent = metadata.info;
+          }
+
+          const track = section.querySelector('.media-track');
+          if (track) {
+            track.setAttribute('data-media-source', metadata.mediaDirectory);
+          }
+        })
+      );
+    };
+
+    const hydrateProjectDetailMetadata = async () => {
+      const detail = document.querySelector('.project-detail[data-project]');
+      if (!detail) {
+        return null;
+      }
+
+      const projectId = readStringAttribute(detail, 'data-project');
+      if (!projectId) {
+        return null;
+      }
+
+      const metadata = await fetchProjectMetadata(projectId);
+      if (!metadata) {
+        return null;
+      }
+
+      detail.setAttribute('data-media-source', metadata.mediaDirectory);
+
+      const titleEl = detail.querySelector('.project-detail__title');
+      if (titleEl && metadata.title) {
+        titleEl.textContent = metadata.title;
+      }
+
+      const metaEl = detail.querySelector('.project-detail__meta');
+      if (metaEl && metadata.info) {
+        metaEl.textContent = metadata.info;
+      }
+
+      const descriptionEl = detail.querySelector('.project-detail__description');
+      if (descriptionEl && metadata.paragraph) {
+        descriptionEl.textContent = metadata.paragraph;
+      }
+
+      const creditsSection = detail.querySelector('.project-detail__credits');
+      const creditsList = detail.querySelector('.project-detail__credits-list');
+      if (creditsList) {
+        creditsList.innerHTML = '';
+        if (Array.isArray(metadata.credits) && metadata.credits.length) {
+          metadata.credits.forEach((entry) => {
+            const item = document.createElement('li');
+            item.textContent = entry;
+            creditsList.appendChild(item);
+          });
+          if (creditsSection) {
+            creditsSection.classList.remove('is-hidden');
+          }
+        } else if (creditsSection) {
+          creditsSection.classList.add('is-hidden');
+        }
+      }
+
+      if (metadata.title) {
+        const currentTitle = document.title || '';
+        const pieces = currentTitle.split('—');
+        if (pieces.length > 1) {
+          const suffix = pieces.slice(1).join('—').trim();
+          document.title = suffix ? `${metadata.title} — ${suffix}` : metadata.title;
+        } else {
+          document.title = `${metadata.title} — Adèle Farges`;
+        }
+      }
+
+      return metadata;
+    };
 
     let updateScrollProgressBar = null;
     let animateLoopResetProgress = null;
@@ -757,7 +1031,7 @@
 
     const SUPPORTED_MEDIA_EXTENSIONS = new Set(['png', 'gif']);
 
-    const normalizeDirectoryPath = (path) => {
+    function normalizeDirectoryPath(path) {
       if (!path) {
         return '';
       }
@@ -774,7 +1048,7 @@
         normalized += '/';
       }
       return normalized;
-    };
+    }
 
     const sanitizeFileEntry = (entry) => {
       if (entry === null || entry === undefined) {
@@ -1257,6 +1531,7 @@
       }
     };
 
+    await detailMetadataPromise;
     await initializeProjectMedia();
 
     const mediaPlaceholders = document.querySelectorAll('.placeholder');
@@ -1655,8 +1930,12 @@
       button.addEventListener('click', handleCategoryButtonClick);
     });
 
+    const detailMetadataPromise = hydrateProjectDetailMetadata();
+
     const projectList = document.querySelector('.projects');
     if (projectList) {
+      await hydrateHomeProjects();
+
       const baseProjects = Array.from(projectList.children);
       if (baseProjects.length) {
         const baseDurationStart = 68;

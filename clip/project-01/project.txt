@@ -1,0 +1,7 @@
+Titre de Projet: Titre de Projet 01
+Infos additionelles: Nom de Prod, 2025
+Paragraphe:
+Ce texte décrit le projet 01 avec quelques détails fictifs pour illustrer la mise en page.
+Crédits:
+Réalisateur — Nom Exemple
+Producteur — Nom Exemple
