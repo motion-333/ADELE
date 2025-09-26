@@ -7,6 +7,67 @@
   document.addEventListener('DOMContentLoaded', async () => {
     const titleLink = document.querySelector('.topbar__title');
     const isHomePage = document.querySelector('.portfolio') !== null;
+    const body = document.body || document.documentElement;
+    const topbar = document.querySelector('.topbar');
+    const CATEGORY_KEYS = ['clip', 'pub', 'captation', 'edito'];
+    const categoryClassNames = CATEGORY_KEYS.map((key) => `category-${key}`);
+    const allCategoryButtons = Array.from(
+      document.querySelectorAll('[data-category-select]')
+    );
+    const topbarCategoryButtons = allCategoryButtons.filter((button) =>
+      button.classList.contains('topbar__nav-link')
+    );
+    const initialHashCategory = (() => {
+      if (!window.location || typeof window.location.hash !== 'string') {
+        return null;
+      }
+      const raw = window.location.hash.replace('#', '').toLowerCase();
+      return CATEGORY_KEYS.includes(raw) ? raw : null;
+    })();
+    let projectController = null;
+    const pendingCategoryQueue = [];
+
+    const applyBodyCategory = (category) => {
+      if (!body) {
+        return;
+      }
+
+      categoryClassNames.forEach((cls) => {
+        body.classList.remove(cls);
+      });
+
+      if (category && CATEGORY_KEYS.includes(category)) {
+        body.classList.add(`category-${category}`);
+      }
+    };
+
+    const updateCategoryButtonState = (category) => {
+      topbarCategoryButtons.forEach((button) => {
+        const key = button.getAttribute('data-category-select');
+        if (!key) {
+          return;
+        }
+
+        if (key === category) {
+          button.classList.add('is-active');
+        } else {
+          button.classList.remove('is-active');
+        }
+      });
+    };
+
+    const requestCategoryActivation = (category, options = {}) => {
+      if (!category || !CATEGORY_KEYS.includes(category)) {
+        return;
+      }
+
+      if (projectController) {
+        projectController.activate(category, options);
+        return;
+      }
+
+      pendingCategoryQueue.push({ category, options });
+    };
 
     const reduceMotionMedia =
       typeof window.matchMedia === 'function'
@@ -26,7 +87,6 @@
     const HERO_MAX_WIDTH = 1200;
     const HERO_ASPECT = 16 / 9;
     const RETURN_SCROLL_KEY = 'adele:return-scroll';
-    const INTRO_PLAYED_KEY = 'adele:intro-played';
     const MASONRY_GAP = 5;
     const MASONRY_MIN_COLUMN_WIDTH = 220;
     const MASONRY_MAX_COLUMN_WIDTH = 380;
@@ -1218,7 +1278,6 @@
     };
 
     const sessionStore = safeStorageAccess('sessionStorage');
-    const persistentStore = sessionStore;
 
     const storeHeroData = (projectId, payload) => {
       if (!projectId || !sessionStore) {
@@ -1270,30 +1329,6 @@
         return { still, animated, aspect };
       } catch (error) {
         return null;
-      }
-    };
-
-    const hasIntroPlayed = () => {
-      if (!persistentStore) {
-        return false;
-      }
-
-      try {
-        return persistentStore.getItem(INTRO_PLAYED_KEY) === '1';
-      } catch (error) {
-        return false;
-      }
-    };
-
-    const rememberIntroPlayed = () => {
-      if (!persistentStore) {
-        return;
-      }
-
-      try {
-        persistentStore.setItem(INTRO_PLAYED_KEY, '1');
-      } catch (error) {
-        /* no-op */
       }
     };
 
@@ -1401,89 +1436,129 @@
       }
     };
 
-    if (intro) {
-      const INTRO_HOLD_MS = 1000;
-      const INTRO_ANIM_MS = 1100;
-      const INTRO_FADE_DELAY_MS = INTRO_HOLD_MS + INTRO_ANIM_MS + 150;
-      const introAlreadyPlayed = hasIntroPlayed();
+    let landingSelection = null;
+    let landingTransitionStarted = false;
+    let landingFinished = false;
 
-      const hideAndRememberIntro = () => {
-        rememberIntroPlayed();
+    const finishLanding = () => {
+      if (landingFinished) {
+        return;
+      }
+      landingFinished = true;
+
+      if (topbar) {
+        topbar.classList.remove('topbar--landing');
+      }
+      if (body) {
+        body.classList.remove('is-landing');
+      }
+
+      if (landingSelection && CATEGORY_KEYS.includes(landingSelection)) {
+        requestCategoryActivation(landingSelection, { initial: true });
+      }
+      landingSelection = null;
+    };
+
+    const beginLandingTransition = (category) => {
+      if (category && CATEGORY_KEYS.includes(category)) {
+        landingSelection = category;
+      }
+
+      if (landingTransitionStarted) {
+        return;
+      }
+      landingTransitionStarted = true;
+
+      if (!intro || !introTitle || !titleLink || shouldReduceMotion) {
         hideIntroElement();
-      };
+        finishLanding();
+        return;
+      }
 
-      if (!introTitle || !titleLink) {
-        hideAndRememberIntro();
-      } else if (shouldReduceMotion || introAlreadyPlayed) {
-        hideAndRememberIntro();
-      } else {
-        let introSequenceStarted = false;
-
-        const startIntro = () => {
-          if (introSequenceStarted || !intro || intro.classList.contains('intro--hidden')) {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (!intro || intro.classList.contains('intro--hidden')) {
+            finishLanding();
             return;
           }
-          introSequenceStarted = true;
-          rememberIntroPlayed();
 
-          requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-              if (!intro || intro.classList.contains('intro--hidden')) {
-                return;
-              }
+          const introRect = introTitle.getBoundingClientRect();
+          const targetRect = titleLink.getBoundingClientRect();
 
-              const introRect = introTitle.getBoundingClientRect();
-              const targetRect = titleLink.getBoundingClientRect();
+          const introCenterX = introRect.left + introRect.width / 2;
+          const introCenterY = introRect.top + introRect.height / 2;
+          const targetCenterX = targetRect.left + targetRect.width / 2;
+          const targetCenterY = targetRect.top + targetRect.height / 2;
 
-              const introCenterX = introRect.left + introRect.width / 2;
-              const introCenterY = introRect.top + introRect.height / 2;
-              const targetCenterX = targetRect.left + targetRect.width / 2;
-              const targetCenterY = targetRect.top + targetRect.height / 2;
+          const deltaX = targetCenterX - introCenterX;
+          const deltaY = targetCenterY - introCenterY;
+          const scale = introRect.width > 0 ? targetRect.width / introRect.width : 1;
 
-              const deltaX = targetCenterX - introCenterX;
-              const deltaY = targetCenterY - introCenterY;
-              const scale = introRect.width > 0 ? targetRect.width / introRect.width : 1;
+          intro.style.setProperty('--intro-translate-x', `${deltaX}px`);
+          intro.style.setProperty('--intro-translate-y', `${deltaY}px`);
+          intro.style.setProperty('--intro-scale', `${scale}`);
 
-              intro.style.setProperty('--intro-translate-x', `${deltaX}px`);
-              intro.style.setProperty('--intro-translate-y', `${deltaY}px`);
-              intro.style.setProperty('--intro-scale', `${scale}`);
+          intro.classList.add('intro--running');
 
-              intro.classList.add('intro--running');
-
-              window.setTimeout(() => {
-                if (intro && !intro.classList.contains('intro--hidden')) {
-                  intro.classList.add('intro--fade');
-                }
-              }, INTRO_FADE_DELAY_MS);
-            });
-          });
-        };
-
-        intro.addEventListener('transitionend', (event) => {
-          if (event.target === intro && event.propertyName === 'opacity') {
-            hideIntroElement();
-          }
+          const INTRO_FADE_DELAY_MS = 1150;
+          window.setTimeout(() => {
+            if (intro && !intro.classList.contains('intro--hidden')) {
+              intro.classList.add('intro--fade');
+            }
+          }, INTRO_FADE_DELAY_MS);
         });
+      });
+    };
 
-        const fontsReady = fontsReadyPromise;
-        if (fontsReady && typeof fontsReady.then === 'function') {
-          fontsReady.then(startIntro).catch(startIntro);
-        } else if (document.readyState === 'complete') {
-          startIntro();
-        } else {
-          window.addEventListener('load', startIntro, { once: true });
+    if (intro) {
+      intro.addEventListener('transitionend', (event) => {
+        if (event.target === intro && event.propertyName === 'opacity') {
+          hideIntroElement();
+          finishLanding();
         }
-      }
+      });
+    } else {
+      finishLanding();
     }
+
+    const handleCategoryButtonClick = (event) => {
+      const button = event.currentTarget;
+      if (!button) {
+        return;
+      }
+
+      const category = button.getAttribute('data-category-select');
+      if (!category) {
+        return;
+      }
+
+      event.preventDefault();
+
+      if (!isHomePage) {
+        window.location.href = `index.html#${category}`;
+        return;
+      }
+
+      if (body && body.classList.contains('is-landing')) {
+        beginLandingTransition(category);
+      } else {
+        requestCategoryActivation(category, { userInitiated: true });
+      }
+    };
+
+    allCategoryButtons.forEach((button) => {
+      button.addEventListener('click', handleCategoryButtonClick);
+    });
 
     const projectList = document.querySelector('.projects');
     if (projectList) {
       const baseProjects = Array.from(projectList.children);
       if (baseProjects.length) {
-        const baseDurationStart = 12;
-        const durationStep = 1.5;
+        const baseDurationStart = 32;
+        const durationStep = 4;
 
         baseProjects.forEach((project, index) => {
+          project.classList.add('project--primary');
           const track = project.querySelector('.media-track');
           if (!track) {
             return;
@@ -1505,12 +1580,151 @@
         const loopFragment = document.createDocumentFragment();
         baseProjects.forEach((project) => {
           const clone = project.cloneNode(true);
+          clone.classList.remove('project--primary');
+          clone.classList.add('project--clone');
           Array.from(clone.querySelectorAll('.placeholder')).forEach((element) => {
             initializeMediaElement(element);
           });
           loopFragment.appendChild(clone);
         });
         projectList.appendChild(loopFragment);
+
+        const allProjects = Array.from(projectList.querySelectorAll('.project'));
+        const primaryProjects = baseProjects;
+        const cloneProjects = allProjects.filter((project) =>
+          project.classList.contains('project--clone')
+        );
+
+        let activeCategory = null;
+        let isCategoryAnimating = false;
+        const localCategoryQueue = [];
+
+        const dequeueNextCategory = () => {
+          if (!localCategoryQueue.length || isCategoryAnimating) {
+            return;
+          }
+          const next = localCategoryQueue.shift();
+          if (!next) {
+            return;
+          }
+          requestActivate(next.category, next.options || {});
+        };
+
+        const runCategoryTransition = (category, options = {}) => {
+          if (!CATEGORY_KEYS.includes(category)) {
+            isCategoryAnimating = false;
+            dequeueNextCategory();
+            return;
+          }
+
+          const forcing = options && options.force === true;
+          if (activeCategory === category && !forcing) {
+            isCategoryAnimating = false;
+            updateCategoryButtonState(category);
+            dequeueNextCategory();
+            return;
+          }
+
+          const previouslyVisible = primaryProjects.filter((project) =>
+            project.classList.contains('is-visible')
+          );
+          const clonesVisible = cloneProjects.filter((project) =>
+            project.classList.contains('is-visible')
+          );
+          const newPrimary = primaryProjects.filter(
+            (project) => project.getAttribute('data-category') === category
+          );
+          const newClones = cloneProjects.filter(
+            (project) => project.getAttribute('data-category') === category
+          );
+
+          const showNewCategory = () => {
+            activeCategory = category;
+            updateCategoryButtonState(category);
+            applyBodyCategory(category);
+
+            if (shouldReduceMotion) {
+              newPrimary.forEach((project) => project.classList.add('is-visible'));
+              newClones.forEach((project) => project.classList.add('is-visible'));
+              isCategoryAnimating = false;
+              dequeueNextCategory();
+              return;
+            }
+
+            newPrimary.forEach((project) => project.classList.remove('is-visible'));
+            newClones.forEach((project) => project.classList.remove('is-visible'));
+
+            newPrimary.forEach((project, index) => {
+              window.setTimeout(() => {
+                project.classList.add('is-visible');
+              }, index * 160);
+            });
+
+            const totalDelay = newPrimary.length * 160 + 420;
+            window.setTimeout(() => {
+              newClones.forEach((project) => project.classList.add('is-visible'));
+              isCategoryAnimating = false;
+              dequeueNextCategory();
+            }, totalDelay);
+          };
+
+          const fadeOutPrevious = (callback) => {
+            if (!previouslyVisible.length) {
+              clonesVisible.forEach((project) => project.classList.remove('is-visible'));
+              callback();
+              return;
+            }
+
+            if (shouldReduceMotion) {
+              previouslyVisible.forEach((project) => project.classList.remove('is-visible'));
+              clonesVisible.forEach((project) => project.classList.remove('is-visible'));
+              callback();
+              return;
+            }
+
+            previouslyVisible
+              .slice()
+              .reverse()
+              .forEach((project, index) => {
+                window.setTimeout(() => {
+                  project.classList.remove('is-visible');
+                }, index * 120);
+              });
+
+            clonesVisible.forEach((project) => project.classList.remove('is-visible'));
+
+            const totalFade = previouslyVisible.length * 120 + 360;
+            window.setTimeout(callback, totalFade);
+          };
+
+          fadeOutPrevious(showNewCategory);
+        };
+
+        function requestActivate(category, options = {}) {
+          if (!CATEGORY_KEYS.includes(category)) {
+            return;
+          }
+
+          if (isCategoryAnimating) {
+            localCategoryQueue.push({ category, options });
+            return;
+          }
+
+          isCategoryAnimating = true;
+          runCategoryTransition(category, options);
+        }
+
+        projectController = {
+          activate: requestActivate,
+          getActiveCategory: () => activeCategory,
+        };
+
+        if (pendingCategoryQueue.length) {
+          const queuedSelections = pendingCategoryQueue.splice(0);
+          queuedSelections.forEach(({ category, options }) => {
+            requestActivate(category, options || {});
+          });
+        }
 
         const FAST_MULTIPLIER = 0.45;
         const MIN_FAST_DURATION = 0.7;
@@ -2237,6 +2451,7 @@
           if (shouldReduceMotion) {
             cancelScrollAnimation();
             hideIntroElement();
+            finishLanding();
             trackStates.forEach((state) => {
               state.offset = 0;
               state.speed = 0;
@@ -2280,6 +2495,28 @@
         window.addEventListener('load', () => {
           scheduleResizeTasks();
         });
+      }
+    }
+
+    const startInitialCategory = () => {
+      if (!initialHashCategory || !isHomePage) {
+        return;
+      }
+
+      if (body && body.classList.contains('is-landing')) {
+        beginLandingTransition(initialHashCategory);
+      } else {
+        requestCategoryActivation(initialHashCategory, { initial: true, force: true });
+      }
+    };
+
+    if (initialHashCategory && isHomePage) {
+      if (fontsReadyPromise && typeof fontsReadyPromise.then === 'function') {
+        fontsReadyPromise.then(startInitialCategory).catch(startInitialCategory);
+      } else if (document.readyState === 'complete') {
+        startInitialCategory();
+      } else {
+        window.addEventListener('load', startInitialCategory, { once: true });
       }
     }
 

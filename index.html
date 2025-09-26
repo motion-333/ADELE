@@ -12,7 +12,7 @@
     />
     <link rel="stylesheet" href="styles.css" />
   </head>
-  <body>
+  <body class="is-landing">
     <svg class="gif-icon-defs" width="0" height="0" focusable="false" aria-hidden="true">
       <defs>
         <filter id="gif-icon-filter" color-interpolation-filters="sRGB">
@@ -41,11 +41,31 @@
     </svg>
 
     <div class="intro" aria-hidden="true">
-      <span class="intro__title">Adèle Farges</span>
+      <div class="intro__content">
+        <span class="intro__title">Adèle Farges</span>
+        <div class="intro__meta">
+          <span class="intro__role">Freelance Producer</span>
+          <nav class="intro__categories" aria-label="Types de projets">
+            <button type="button" class="intro__category" data-category-select="clip">Clip</button>
+            <button type="button" class="intro__category" data-category-select="pub">Pub</button>
+            <button type="button" class="intro__category" data-category-select="captation">Captation</button>
+            <button type="button" class="intro__category" data-category-select="edito">Édito</button>
+          </nav>
+        </div>
+      </div>
     </div>
-    <header class="topbar">
+    <header class="topbar topbar--landing">
       <div class="topbar__inner">
-        <a class="topbar__title" href="index.html">Adèle Farges</a>
+        <div class="topbar__identity">
+          <a class="topbar__title" href="index.html">Adèle Farges</a>
+          <span class="topbar__subtitle">Freelance Producer</span>
+        </div>
+        <nav class="topbar__nav" aria-label="Catégories de projets">
+          <button type="button" class="topbar__nav-link" data-category-select="clip">Clip</button>
+          <button type="button" class="topbar__nav-link" data-category-select="pub">Pub</button>
+          <button type="button" class="topbar__nav-link" data-category-select="captation">Captation</button>
+          <button type="button" class="topbar__nav-link" data-category-select="edito">Édito</button>
+        </nav>
         <a class="topbar__about" href="about.html" aria-label="À propos d'Adèle Farges">
           <span class="gif-icon" data-ignore-reduced-motion data-hover-gif="elements/info.gif">
             <canvas aria-hidden="true"></canvas>
@@ -59,7 +79,12 @@
     </div>
     <main class="portfolio" aria-label="Portfolio d'Adèle Farges">
       <div class="projects">
-        <section class="project" data-project="project-01" data-detail-link="project-01.html">
+        <section
+          class="project"
+          data-project="project-01"
+          data-detail-link="project-01.html"
+          data-category="clip"
+        >
           <div class="media-strip">
             <div class="media-track" data-media-source="project-01/images/"></div>
           </div>
@@ -68,7 +93,12 @@
             <span class="project-meta">Nom de Prod, 2025</span>
           </div>
         </section>
-        <section class="project" data-project="project-02" data-detail-link="project-02.html">
+        <section
+          class="project"
+          data-project="project-02"
+          data-detail-link="project-02.html"
+          data-category="clip"
+        >
           <div class="media-strip">
             <div class="media-track" data-media-source="project-02/images/"></div>
           </div>
@@ -77,7 +107,12 @@
             <span class="project-meta">Nom de Prod, 2025</span>
           </div>
         </section>
-        <section class="project" data-project="project-03" data-detail-link="project-03.html">
+        <section
+          class="project"
+          data-project="project-03"
+          data-detail-link="project-03.html"
+          data-category="clip"
+        >
           <div class="media-strip">
             <div class="media-track" data-media-source="project-03/images/"></div>
           </div>
@@ -86,7 +121,12 @@
             <span class="project-meta">Nom de Prod, 2025</span>
           </div>
         </section>
-        <section class="project" data-project="project-04" data-detail-link="project-04.html">
+        <section
+          class="project"
+          data-project="project-04"
+          data-detail-link="project-04.html"
+          data-category="pub"
+        >
           <div class="media-strip">
             <div class="media-track" data-media-source="project-04/images/"></div>
           </div>
@@ -95,7 +135,12 @@
             <span class="project-meta">Nom de Prod, 2025</span>
           </div>
         </section>
-        <section class="project" data-project="project-05" data-detail-link="project-05.html">
+        <section
+          class="project"
+          data-project="project-05"
+          data-detail-link="project-05.html"
+          data-category="pub"
+        >
           <div class="media-strip">
             <div class="media-track" data-media-source="project-05/images/"></div>
           </div>
@@ -104,7 +149,12 @@
             <span class="project-meta">Nom de Prod, 2025</span>
           </div>
         </section>
-        <section class="project" data-project="project-06" data-detail-link="project-06.html">
+        <section
+          class="project"
+          data-project="project-06"
+          data-detail-link="project-06.html"
+          data-category="captation"
+        >
           <div class="media-strip">
             <div class="media-track" data-media-source="project-06/images/"></div>
           </div>
@@ -113,7 +163,12 @@
             <span class="project-meta">Nom de Prod, 2025</span>
           </div>
         </section>
-        <section class="project" data-project="project-07" data-detail-link="project-07.html">
+        <section
+          class="project"
+          data-project="project-07"
+          data-detail-link="project-07.html"
+          data-category="captation"
+        >
           <div class="media-strip">
             <div class="media-track" data-media-source="project-07/images/"></div>
           </div>
@@ -122,7 +177,12 @@
             <span class="project-meta">Nom de Prod, 2025</span>
           </div>
         </section>
-        <section class="project" data-project="project-08" data-detail-link="project-08.html">
+        <section
+          class="project"
+          data-project="project-08"
+          data-detail-link="project-08.html"
+          data-category="edito"
+        >
           <div class="media-strip">
             <div class="media-track" data-media-source="project-08/images/"></div>
           </div>
@@ -131,7 +191,12 @@
             <span class="project-meta">Nom de Prod, 2025</span>
           </div>
         </section>
-        <section class="project" data-project="project-09" data-detail-link="project-09.html">
+        <section
+          class="project"
+          data-project="project-09"
+          data-detail-link="project-09.html"
+          data-category="edito"
+        >
           <div class="media-strip">
             <div class="media-track" data-media-source="project-09/images/"></div>
           </div>
@@ -140,7 +205,12 @@
             <span class="project-meta">Nom de Prod, 2025</span>
           </div>
         </section>
-        <section class="project" data-project="project-10" data-detail-link="project-10.html">
+        <section
+          class="project"
+          data-project="project-10"
+          data-detail-link="project-10.html"
+          data-category="edito"
+        >
           <div class="media-strip">
             <div class="media-track" data-media-source="project-10/images/"></div>
           </div>
