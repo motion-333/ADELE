@@ -360,6 +360,7 @@
       );
     };
 
+    const homeMetadataPromise = hydrateHomeProjects();
     const hydrateProjectDetailMetadata = async () => {
       const detail = document.querySelector('.project-detail[data-project]');
       if (!detail) {
@@ -1562,7 +1563,7 @@
       }
     };
 
-    await detailMetadataPromise;
+    await Promise.all([detailMetadataPromise, homeMetadataPromise]);
     await initializeProjectMedia();
 
     const mediaPlaceholders = document.querySelectorAll('.placeholder');
@@ -2029,7 +2030,7 @@
 
     const projectList = document.querySelector('.projects');
     if (projectList) {
-      await hydrateHomeProjects();
+      await homeMetadataPromise;
 
       const baseProjects = Array.from(projectList.children);
       if (baseProjects.length) {
