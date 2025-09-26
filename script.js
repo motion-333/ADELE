@@ -10,6 +10,7 @@
 
   document.addEventListener('DOMContentLoaded', async () => {
     const titleLink = document.querySelector('.topbar__title');
+    const aboutLink = document.querySelector('.topbar__about');
     const isHomePage = document.querySelector('.portfolio') !== null;
     const body = document.body || document.documentElement;
     const topbar = document.querySelector('.topbar');
@@ -60,6 +61,33 @@
       });
     };
 
+    const syncLocationHash = (category, options = {}) => {
+      if (!isHomePage || !CATEGORY_KEYS.includes(category)) {
+        return;
+      }
+
+      const desiredHash = `#${category}`;
+      if (window.location) {
+        const currentHash = window.location.hash || '';
+        if (!options.force && currentHash === desiredHash) {
+          return;
+        }
+      }
+
+      try {
+        if (historyApi && typeof historyApi.replaceState === 'function') {
+          historyApi.replaceState(null, '', desiredHash);
+          return;
+        }
+      } catch (error) {
+        /* ignore history errors */
+      }
+
+      if (window.location) {
+        window.location.hash = category;
+      }
+    };
+
     const requestCategoryActivation = (category, options = {}) => {
       if (!category || !CATEGORY_KEYS.includes(category)) {
         return;
@@ -91,6 +119,7 @@
     const HERO_MAX_WIDTH = 1200;
     const HERO_ASPECT = 16 / 9;
     const RETURN_SCROLL_KEY = 'adele:return-scroll';
+    const LAST_CATEGORY_KEY = 'adele:last-category';
     const MASONRY_GAP = 5;
     const MASONRY_MIN_COLUMN_WIDTH = 220;
     const MASONRY_MAX_COLUMN_WIDTH = 380;
@@ -1561,6 +1590,35 @@
     const sessionStore = safeStorageAccess('sessionStorage');
     let pendingReturnScroll = null;
 
+    const readStoredCategory = () => {
+      if (!sessionStore) {
+        return null;
+      }
+
+      try {
+        const value = sessionStore.getItem(LAST_CATEGORY_KEY);
+        if (CATEGORY_KEYS.includes(value)) {
+          return value;
+        }
+      } catch (error) {
+        return null;
+      }
+
+      return null;
+    };
+
+    const storeLastCategory = (category) => {
+      if (!sessionStore || !CATEGORY_KEYS.includes(category)) {
+        return;
+      }
+
+      try {
+        sessionStore.setItem(LAST_CATEGORY_KEY, category);
+      } catch (error) {
+        /* ignore storage failures */
+      }
+    };
+
     const readStoredScrollPosition = () => {
       if (!sessionStore) {
         return null;
@@ -1677,10 +1735,10 @@
       finishScrollAnimation();
     };
 
-      const startScrollAnimation = (targetY, duration = 900) => {
-        cancelScrollAnimation();
+    const startScrollAnimation = (targetY, duration = 900) => {
+      cancelScrollAnimation();
 
-        const maxScroll = getMaxScrollY();
+      const maxScroll = getMaxScrollY();
       const numericTarget = Number.isFinite(targetY) ? targetY : 0;
       const clampedTarget = Math.max(0, Math.min(numericTarget, maxScroll));
       const startY = window.scrollY || window.pageYOffset || 0;
@@ -1747,6 +1805,21 @@
       });
     }
 
+    if (aboutLink) {
+      aboutLink.addEventListener('click', () => {
+        if (!sessionStore) {
+          return;
+        }
+
+        try {
+          const currentScroll = window.scrollY || window.pageYOffset || 0;
+          sessionStore.setItem(RETURN_SCROLL_KEY, `${currentScroll}`);
+        } catch (error) {
+          /* ignore storage failures */
+        }
+      });
+    }
+
     window.addEventListener('wheel', cancelScrollAnimation, { passive: true });
     window.addEventListener('touchstart', cancelScrollAnimation, {
       passive: true,
@@ -1804,6 +1877,26 @@
     let landingTransitionStarted = false;
     let landingFinished = false;
 
+    const ensureLandingSelection = () => {
+      if (landingSelection && CATEGORY_KEYS.includes(landingSelection)) {
+        return landingSelection;
+      }
+
+      if (initialHashCategory && CATEGORY_KEYS.includes(initialHashCategory)) {
+        landingSelection = initialHashCategory;
+        return landingSelection;
+      }
+
+      const storedCategory = readStoredCategory();
+      if (storedCategory) {
+        landingSelection = storedCategory;
+        return landingSelection;
+      }
+
+      landingSelection = CATEGORY_KEYS[0];
+      return landingSelection;
+    };
+
     const finishLanding = () => {
       if (landingFinished) {
         return;
@@ -1817,8 +1910,9 @@
         body.classList.remove('is-landing');
       }
 
-      if (landingSelection && CATEGORY_KEYS.includes(landingSelection)) {
-        requestCategoryActivation(landingSelection, { initial: true });
+      const targetCategory = ensureLandingSelection();
+      if (targetCategory) {
+        requestCategoryActivation(targetCategory, { initial: true, force: true });
       }
       landingSelection = null;
     };
@@ -1924,6 +2018,7 @@
       if (body && body.classList.contains('is-landing')) {
         beginLandingTransition(category);
       } else {
+        landingSelection = category;
         requestCategoryActivation(category, { userInitiated: true });
       }
     };
@@ -2028,8 +2123,11 @@
 
           const showNewCategory = () => {
             activeCategory = category;
+            landingSelection = category;
             updateCategoryButtonState(category);
             applyBodyCategory(category);
+            storeLastCategory(category);
+            syncLocationHash(category, options);
             scheduleResizeTasks();
             window.setTimeout(() => {
               scheduleResizeTasks();
@@ -2876,18 +2974,26 @@
     }
 
     const startInitialCategory = () => {
-      if (!initialHashCategory || !isHomePage) {
+      if (!isHomePage) {
+        return;
+      }
+
+      const targetCategory = ensureLandingSelection();
+      if (!targetCategory) {
         return;
       }
 
       if (body && body.classList.contains('is-landing')) {
-        beginLandingTransition(initialHashCategory);
+        const shouldAutoStart = Boolean(initialHashCategory) || pendingReturnScroll !== null;
+        if (shouldAutoStart) {
+          beginLandingTransition(targetCategory);
+        }
       } else {
-        requestCategoryActivation(initialHashCategory, { initial: true, force: true });
+        requestCategoryActivation(targetCategory, { initial: true, force: true });
       }
     };
 
-    if (initialHashCategory && isHomePage) {
+    if (isHomePage) {
       if (fontsReadyPromise && typeof fontsReadyPromise.then === 'function') {
         fontsReadyPromise.then(startInitialCategory).catch(startInitialCategory);
       } else if (document.readyState === 'complete') {
