@@ -138,6 +138,30 @@
       return `${value}`.replace(/^\s*[-–—•*·]+\s*/, '').trim();
     };
 
+    const parseNumeric = (value) => {
+      if (value === null || value === undefined) {
+        return null;
+      }
+      const trimmed = `${value}`.trim();
+      if (!trimmed) {
+        return null;
+      }
+      const parsed = parseFloat(trimmed);
+      return Number.isFinite(parsed) ? parsed : null;
+    };
+
+    const readStringAttribute = (element, attribute) => {
+      if (!element) {
+        return null;
+      }
+      const value = element.getAttribute(attribute);
+      if (!value) {
+        return null;
+      }
+      const trimmed = value.trim();
+      return trimmed ? trimmed : null;
+    };
+
     const parseProjectMetadataText = (text) => {
       const result = {
         title: null,
@@ -372,6 +396,8 @@
       return metadata;
     };
 
+    const detailMetadataPromise = hydrateProjectDetailMetadata();
+
     let updateScrollProgressBar = null;
     let animateLoopResetProgress = null;
 
@@ -487,30 +513,6 @@
       });
 
       return promise;
-    };
-
-    const parseNumeric = (value) => {
-      if (value === null || value === undefined) {
-        return null;
-      }
-      const trimmed = `${value}`.trim();
-      if (!trimmed) {
-        return null;
-      }
-      const parsed = parseFloat(trimmed);
-      return Number.isFinite(parsed) ? parsed : null;
-    };
-
-    const readStringAttribute = (element, attribute) => {
-      if (!element) {
-        return null;
-      }
-      const value = element.getAttribute(attribute);
-      if (!value) {
-        return null;
-      }
-      const trimmed = value.trim();
-      return trimmed ? trimmed : null;
     };
 
     const applyMediaVariables = (element, stillSrc, animatedSrc) => {
@@ -1929,8 +1931,6 @@
     allCategoryButtons.forEach((button) => {
       button.addEventListener('click', handleCategoryButtonClick);
     });
-
-    const detailMetadataPromise = hydrateProjectDetailMetadata();
 
     const projectList = document.querySelector('.projects');
     if (projectList) {
