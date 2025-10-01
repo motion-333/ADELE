@@ -7,56 +7,30 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@100..900&display=swap"
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@100..900&family=Raleway:ital,wght@0,100..900;1,100..900&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body class="project-detail-page">
-    <svg class="gif-icon-defs" width="0" height="0" focusable="false" aria-hidden="true">
-      <defs>
-        <filter id="gif-icon-filter" color-interpolation-filters="sRGB">
-          <feColorMatrix
-            type="matrix"
-            values="
-              0 0 0 0 0
-              0 0 0 0 0
-              0 0 0 0 0
-             -0.299 -0.587 -0.114 0 1
-            "
-            result="luminance"
-          />
-          <feComponentTransfer in="luminance" result="alphaBoost">
-            <feFuncA type="gamma" amplitude="1" exponent="1.45" offset="0" />
-          </feComponentTransfer>
-          <feComponentTransfer in="alphaBoost" result="alphaThreshold">
-            <feFuncA type="table" tableValues="0 0 0 0 1" />
-          </feComponentTransfer>
-          <feMorphology in="alphaThreshold" operator="erode" radius="0.35" result="alphaTight" />
-          <feGaussianBlur in="alphaTight" stdDeviation="0.18" result="alphaSoft" />
-          <feFlood flood-color="#f0ead6" result="fill" />
-          <feComposite in="fill" in2="alphaSoft" operator="in" />
-        </filter>
-      </defs>
-    </svg>
-
+    
     <header class="topbar">
       <div class="topbar__inner">
         <div class="topbar__identity">
           <a class="topbar__title" href="index.html">Adèle Farges</a>
-          <span class="topbar__subtitle">Freelance Producer</span>
+          <span class="topbar__subtitle">DIRECTRICE DE PRODUCTION</span>
         </div>
         <nav class="topbar__nav" aria-label="Catégories de projets">
-          <button type="button" class="topbar__nav-link" data-category-select="clip">Clip</button>
-          <button type="button" class="topbar__nav-link" data-category-select="pub">Pub</button>
-          <button type="button" class="topbar__nav-link" data-category-select="captation">Captation</button>
-          <button type="button" class="topbar__nav-link" data-category-select="edito">Édito</button>
+          <button type="button" class="topbar__nav-link" data-category-select="film">FILM</button>
+          <button type="button" class="topbar__nav-link" data-category-select="photo">PHOTO</button>
+          <button type="button" class="topbar__nav-link" data-category-select="evenementiel">ÉVÉNEMENTIEL</button>
         </nav>
         <a class="topbar__about" href="about.html" aria-label="À propos d'Adèle Farges">
-          <span class="gif-icon" data-ignore-reduced-motion data-hover-gif="elements/info.gif">
-            <canvas aria-hidden="true"></canvas>
-            <img alt="" aria-hidden="true" />
-          </span>
+          <svg class="icon icon--info" viewBox="0 0 24 24" role="img" aria-hidden="true">
+            <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.8"></circle>
+            <line x1="12" y1="10" x2="12" y2="16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></line>
+            <circle cx="12" cy="7" r="1.2" fill="currentColor"></circle>
+          </svg>
         </a>
       </div>
     </header>
@@ -74,10 +48,10 @@
       <section class="project-detail__body">
         <div class="project-detail__heading">
           <a class="project-detail__back" href="index.html" aria-label="Retourner au portfolio">
-            <span class="gif-icon gif-icon--rotate" data-ignore-reduced-motion data-hover-gif="elements/back.gif">
-              <canvas aria-hidden="true"></canvas>
-              <img alt="" aria-hidden="true" />
-            </span>
+            <svg class="icon icon--back" viewBox="0 0 24 24" role="img" aria-hidden="true">
+              <polyline points="14 6 8 12 14 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></polyline>
+              <line x1="9" y1="12" x2="20" y2="12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></line>
+            </svg>
           </a>
           <div class="project-detail__heading-text">
             <h1 class="project-detail__title">TITRE DE PROJET</h1>

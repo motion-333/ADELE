@@ -14,7 +14,7 @@
     const isHomePage = document.querySelector('.portfolio') !== null;
     const body = document.body || document.documentElement;
     const topbar = document.querySelector('.topbar');
-    const CATEGORY_KEYS = ['clip', 'pub', 'captation', 'edito'];
+    const CATEGORY_KEYS = ['film', 'photo', 'evenementiel'];
     const categoryClassNames = CATEGORY_KEYS.map((key) => `category-${key}`);
     const allCategoryButtons = Array.from(
       document.querySelectorAll('[data-category-select]')
@@ -31,6 +31,7 @@
     })();
     let projectController = null;
     const pendingCategoryQueue = [];
+    let shouldReduceMotion = false;
 
     const applyBodyCategory = (category) => {
       if (!body) {
@@ -59,6 +60,37 @@
           button.classList.remove('is-active');
         }
       });
+    };
+
+    const showTitleOverlay = () => {
+      if (!body) {
+        return null;
+      }
+
+      let overlay = document.querySelector('.transition-overlay--title');
+      if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.className = 'transition-overlay transition-overlay--title';
+        overlay.setAttribute('aria-hidden', 'true');
+        const title = document.createElement('span');
+        title.className = 'transition-overlay__title';
+        title.textContent = 'ADÈLE FARGES';
+        overlay.appendChild(title);
+        document.body.appendChild(overlay);
+      }
+
+      body.classList.add('is-transitioning');
+      if (shouldReduceMotion) {
+        overlay.classList.add('is-active');
+      } else {
+        overlay.classList.remove('is-active');
+        void overlay.offsetWidth;
+        requestAnimationFrame(() => {
+          overlay.classList.add('is-active');
+        });
+      }
+
+      return overlay;
     };
 
     const syncLocationHash = (category, options = {}) => {
@@ -105,7 +137,7 @@
       typeof window.matchMedia === 'function'
         ? window.matchMedia('(prefers-reduced-motion: reduce)')
         : { matches: false, addEventListener: null, addListener: null };
-    let shouldReduceMotion = reduceMotionMedia.matches;
+    shouldReduceMotion = reduceMotionMedia.matches;
 
     const fontsReadyPromise =
       document.fonts && document.fonts.ready && typeof document.fonts.ready.then === 'function'
@@ -124,7 +156,6 @@
     const MASONRY_GAP = 5;
     const MASONRY_MIN_COLUMN_WIDTH = 220;
     const MASONRY_MAX_COLUMN_WIDTH = 380;
-    const HOVER_GIF_SELECTOR = '[data-hover-gif]';
     const MEDIA_IMAGE_VAR = '--placeholder-image';
     const MEDIA_ANIMATED_VAR = '--placeholder-animated';
     const CATEGORY_DIRECTORY_LOOKUP = CATEGORY_KEYS.reduce((accumulator, key) => {
@@ -704,285 +735,6 @@
       }
     };
 
-    const setupHoverGif = (container) => {
-      if (!container) {
-        return;
-      }
-
-      const gifSrc = container.getAttribute('data-hover-gif');
-      const canvas = container.querySelector('canvas');
-      const animatedImage = container.querySelector('img');
-      const ignoreReducedMotion = container.hasAttribute('data-ignore-reduced-motion');
-
-      if (
-        !gifSrc ||
-        !canvas ||
-        !animatedImage ||
-        typeof canvas.getContext !== 'function'
-      ) {
-        return;
-      }
-
-      const context = canvas.getContext('2d');
-      if (!context) {
-        return;
-      }
-
-      const tintCanvasFrame = () => {
-        const width = canvas.width;
-        const height = canvas.height;
-
-        if (!width || !height) {
-          return;
-        }
-
-        try {
-          const imageData = context.getImageData(0, 0, width, height);
-          const data = imageData.data;
-
-          for (let index = 0; index < data.length; index += 4) {
-            const alpha = data[index + 3];
-            if (!alpha) {
-              continue;
-            }
-
-            const red = data[index];
-            const green = data[index + 1];
-            const blue = data[index + 2];
-            const luminance = (0.299 * red + 0.587 * green + 0.114 * blue) / 255;
-
-            if (luminance > 0.92) {
-              data[index + 3] = 0;
-              continue;
-            }
-
-            data[index] = 240;
-            data[index + 1] = 234;
-            data[index + 2] = 214;
-            const boostedAlpha = Math.min(255, alpha + 40);
-            data[index + 3] = boostedAlpha;
-          }
-
-          context.clearRect(0, 0, width, height);
-          context.putImageData(imageData, 0, 0);
-        } catch (error) {
-          /* ignore errors from inaccessible canvas */
-        }
-      };
-
-      const loader = new Image();
-      loader.decoding = 'async';
-      loader.src = gifSrc;
-
-      ensureImageReady(gifSrc).catch(() => {});
-
-      const computeCanvasSizing = (sourceWidth, sourceHeight) => {
-        const bounds = container.getBoundingClientRect();
-        let displayWidth = Math.round(bounds.width);
-        let displayHeight = Math.round(bounds.height);
-
-        if (!displayWidth || !displayHeight) {
-          displayWidth = Math.round(container.offsetWidth || canvas.width || sourceWidth || 0);
-          displayHeight = Math.round(container.offsetHeight || canvas.height || sourceHeight || 0);
-        }
-
-        if (!displayWidth || !displayHeight) {
-          displayWidth = Math.max(1, Math.round(sourceWidth || 1));
-          displayHeight = Math.max(1, Math.round(sourceHeight || 1));
-        }
-
-        const pixelRatio = window.devicePixelRatio || 1;
-        const renderWidth = Math.max(1, Math.round(displayWidth * pixelRatio));
-        const renderHeight = Math.max(1, Math.round(displayHeight * pixelRatio));
-
-        return {
-          displayWidth,
-          displayHeight,
-          renderWidth,
-          renderHeight,
-          pixelRatio,
-        };
-      };
-
-      const fitImageWithin = (sourceWidth, sourceHeight, targetWidth, targetHeight) => {
-        if (!sourceWidth || !sourceHeight || !targetWidth || !targetHeight) {
-          return { x: 0, y: 0, width: targetWidth, height: targetHeight };
-        }
-
-        const sourceRatio = sourceWidth / sourceHeight;
-        const targetRatio = targetWidth / targetHeight;
-        let width = targetWidth;
-        let height = targetHeight;
-
-        if (sourceRatio > targetRatio) {
-          width = targetWidth;
-          height = targetWidth / sourceRatio;
-        } else {
-          height = targetHeight;
-          width = targetHeight * sourceRatio;
-        }
-
-        const x = (targetWidth - width) / 2;
-        const y = (targetHeight - height) / 2;
-
-        return { x, y, width, height };
-      };
-
-      const drawImageToCanvas = (image) => {
-        if (!image) {
-          return false;
-        }
-
-        const sourceWidth = image.naturalWidth || image.width || 0;
-        const sourceHeight = image.naturalHeight || image.height || 0;
-
-        if (!sourceWidth || !sourceHeight) {
-          return false;
-        }
-
-        const { displayWidth, displayHeight, renderWidth, renderHeight, pixelRatio } =
-          computeCanvasSizing(sourceWidth, sourceHeight);
-
-        if (!renderWidth || !renderHeight) {
-          return false;
-        }
-
-        if (canvas.width !== renderWidth || canvas.height !== renderHeight) {
-          canvas.width = renderWidth;
-          canvas.height = renderHeight;
-        }
-
-        context.setTransform(1, 0, 0, 1, 0, 0);
-        context.clearRect(0, 0, renderWidth, renderHeight);
-        context.imageSmoothingEnabled = true;
-        if (typeof context.imageSmoothingQuality === 'string') {
-          context.imageSmoothingQuality = 'high';
-        }
-
-        const fit = fitImageWithin(sourceWidth, sourceHeight, displayWidth, displayHeight);
-        const destX = fit.x * pixelRatio;
-        const destY = fit.y * pixelRatio;
-        const destWidth = fit.width * pixelRatio;
-        const destHeight = fit.height * pixelRatio;
-
-        context.drawImage(image, destX, destY, destWidth, destHeight);
-        tintCanvasFrame();
-        return true;
-      };
-
-      const drawFirstFrame = () => {
-        if (drawImageToCanvas(loader)) {
-          return;
-        }
-
-        drawImageToCanvas(animatedImage);
-      };
-
-      if (loader.complete) {
-        drawFirstFrame();
-      } else {
-        loader.addEventListener('load', drawFirstFrame, { once: true });
-      }
-
-      let animationFrameId = null;
-      let isAnimating = false;
-
-      const renderAnimatedFrame = () => {
-        try {
-          drawImageToCanvas(animatedImage);
-        } catch (error) {
-          /* ignore draw errors */
-        }
-      };
-
-      const stopAnimationLoop = () => {
-        if (animationFrameId !== null) {
-          cancelAnimationFrame(animationFrameId);
-          animationFrameId = null;
-        }
-      };
-
-      const stepAnimation = () => {
-        if (!isAnimating) {
-          return;
-        }
-
-        renderAnimatedFrame();
-        animationFrameId = requestAnimationFrame(stepAnimation);
-      };
-
-      const beginAnimationLoop = () => {
-        if (!isAnimating) {
-          return;
-        }
-
-        stopAnimationLoop();
-        stepAnimation();
-      };
-
-      const activate = () => {
-        if ((shouldReduceMotion && !ignoreReducedMotion) || isAnimating) {
-          return;
-        }
-
-        isAnimating = true;
-        const startPlayback = () => {
-          if (!isAnimating) {
-            return;
-          }
-
-          beginAnimationLoop();
-        };
-
-        if (animatedImage.complete && animatedImage.naturalWidth && animatedImage.naturalHeight) {
-          startPlayback();
-        } else {
-          animatedImage.addEventListener('load', startPlayback, { once: true });
-        }
-
-        animatedImage.decoding = 'async';
-        animatedImage.src = `${gifSrc}?frame=${Date.now()}`;
-      };
-
-      const deactivate = () => {
-        if (!isAnimating) {
-          return;
-        }
-
-        isAnimating = false;
-        stopAnimationLoop();
-        animatedImage.removeAttribute('src');
-        drawFirstFrame();
-      };
-
-      container.addEventListener('mouseenter', activate);
-      container.addEventListener('mouseleave', deactivate);
-      container.addEventListener('focusin', activate);
-      container.addEventListener('focusout', deactivate);
-
-      const handleResize = () => {
-        if (!canvas.isConnected) {
-          window.removeEventListener('resize', handleResize);
-          return;
-        }
-
-        if (isAnimating) {
-          renderAnimatedFrame();
-        } else {
-          drawFirstFrame();
-        }
-      };
-
-      window.addEventListener('resize', handleResize);
-
-      container.__hoverGifDeactivate = deactivate;
-      container.__hoverGifIgnoreReducedMotion = ignoreReducedMotion;
-    };
-
-    const hoverGifContainers = document.querySelectorAll(HOVER_GIF_SELECTOR);
-    hoverGifContainers.forEach((container) => {
-      setupHoverGif(container);
-    });
 
     if (isHomePage) {
 
@@ -2113,7 +1865,11 @@
       event.preventDefault();
 
       if (!isHomePage) {
-        window.location.href = `index.html#${category}`;
+        storeLastCategory(category);
+        showTitleOverlay();
+        window.setTimeout(() => {
+          window.location.href = `index.html#${category}`;
+        }, 180);
         return;
       }
 
@@ -3043,17 +2799,6 @@
               state.track.style.transform = 'translateX(0)';
             });
             lastKnownScrollY = window.scrollY || window.pageYOffset || 0;
-            hoverGifContainers.forEach((container) => {
-              if (!container || typeof container.__hoverGifDeactivate !== 'function') {
-                return;
-              }
-
-              if (container.__hoverGifIgnoreReducedMotion) {
-                return;
-              }
-
-              container.__hoverGifDeactivate();
-            });
           } else {
             previousTime = undefined;
             runResizeTasks();
@@ -3120,12 +2865,13 @@
       if (backLink) {
         backLink.addEventListener('click', (event) => {
           event.preventDefault();
-          if (window.history && typeof window.history.back === 'function' && window.history.length > 1) {
-            window.history.back();
-          } else {
+          const lastCategory = readStoredCategory() || initialHashCategory || CATEGORY_KEYS[0];
+          showTitleOverlay();
+          window.setTimeout(() => {
             const fallbackHref = backLink.getAttribute('href') || 'index.html';
-            window.location.href = fallbackHref;
-          }
+            const targetHref = lastCategory ? `index.html#${lastCategory}` : fallbackHref;
+            window.location.href = targetHref;
+          }, 180);
         });
       }
 
