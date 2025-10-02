@@ -7,52 +7,56 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@100..900&family=Raleway:ital,wght@0,100..900;1,100..900&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body class="project-detail-page">
+    
     <header class="topbar">
       <div class="topbar__inner">
-        <a class="topbar__title" href="index.html">Adèle Farges</a>
+        <div class="topbar__identity">
+          <a class="topbar__title" href="index.html">Adèle Farges</a>
+          <span class="topbar__subtitle">DIRECTRICE DE PRODUCTION</span>
+        </div>
+        <nav class="topbar__nav" aria-label="Catégories de projets">
+          <button type="button" class="topbar__nav-link" data-category-select="film">FILM</button>
+          <button type="button" class="topbar__nav-link" data-category-select="photo">PHOTO</button>
+          <button type="button" class="topbar__nav-link" data-category-select="evenementiel">ÉVÉNEMENTIEL</button>
+        </nav>
         <a class="topbar__about" href="about.html" aria-label="À propos d'Adèle Farges">
-          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            <circle cx="12" cy="12" r="10" />
-            <line x1="12" y1="10" x2="12" y2="16" />
-            <circle cx="12" cy="7" r="1" />
+          <svg class="icon icon--info" viewBox="0 0 24 24" role="img" aria-hidden="true">
+            <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.8"></circle>
+            <line x1="12" y1="10" x2="12" y2="16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></line>
+            <circle cx="12" cy="7" r="1.2" fill="currentColor"></circle>
           </svg>
         </a>
       </div>
     </header>
     <main class="project-detail" data-project="project-10">
-      <a
-        class="project-detail__back"
-        href="index.html"
-        aria-label="Retourner au portfolio"
-      >
-        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-          <path
-            d="M14.5 6.5 8.5 12l6 5.5M8.5 12H19"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.75"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          />
-        </svg>
-      </a>
       <div class="project-hero">
-        <div
-          class="project-hero__media placeholder placeholder--emerald"
-          data-default-hero="placeholder--emerald"
-          data-default-aspect="1.7777777778"
-        ></div>
+        <div class="project-hero__media placeholder">
+          <button
+            class="project-hero__play"
+            type="button"
+            aria-label="Lire la vidéo du projet"
+          ></button>
+          <div class="project-hero__video" hidden></div>
+        </div>
       </div>
       <section class="project-detail__body">
         <div class="project-detail__heading">
-          <h1 class="project-detail__title">TITRE DE PROJET</h1>
-          <span class="project-detail__meta">Nom de Prod, 2025</span>
+          <a class="project-detail__back" href="index.html" aria-label="Retourner au portfolio">
+            <svg class="icon icon--back" viewBox="0 0 24 24" role="img" aria-hidden="true">
+              <polyline points="14 6 8 12 14 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></polyline>
+              <line x1="9" y1="12" x2="20" y2="12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></line>
+            </svg>
+          </a>
+          <div class="project-detail__heading-text">
+            <h1 class="project-detail__title">TITRE DE PROJET</h1>
+            <span class="project-detail__meta">Nom de Prod, 2025</span>
+          </div>
         </div>
         <p class="project-detail__description">
           Cette section présente une description détaillée du projet, incluant son périmètre,
@@ -63,69 +67,18 @@
           pour garantir la réussite du projet et son alignement avec ses besoins.
         </p>
       </section>
-      <section class="project-detail__gallery">
-        <div
-          class="project-detail__item placeholder placeholder--sunset"
-          data-media-class="placeholder--sunset"
-          style="--item-aspect: 1.6;"
-        ></div>
-        <div
-          class="project-detail__item placeholder placeholder--ocean"
-          data-media-class="placeholder--ocean"
-          style="--item-aspect: 1.25;"
-        ></div>
-        <div
-          class="project-detail__item placeholder placeholder--emerald"
-          data-media-class="placeholder--emerald"
-          style="--item-aspect: 0.85;"
-        ></div>
-        <div
-          class="project-detail__item placeholder placeholder--coral"
-          data-media-class="placeholder--coral"
-          style="--item-aspect: 1.4;"
-        ></div>
-        <div
-          class="project-detail__item placeholder placeholder--lavender"
-          data-media-class="placeholder--lavender"
-          style="--item-aspect: 1.1;"
-        ></div>
-        <div
-          class="project-detail__item placeholder placeholder--rose"
-          data-media-class="placeholder--rose"
-          style="--item-aspect: 0.9;"
-        ></div>
-        <div
-          class="project-detail__item placeholder placeholder--amber"
-          data-media-class="placeholder--amber"
-          style="--item-aspect: 1.5;"
-        ></div>
-        <div
-          class="project-detail__item placeholder placeholder--teal"
-          data-media-class="placeholder--teal"
-          style="--item-aspect: 0.75;"
-        ></div>
-        <div
-          class="project-detail__item placeholder placeholder--slate"
-          data-media-class="placeholder--slate"
-          style="--item-aspect: 1.33;"
-        ></div>
-        <div
-          class="project-detail__item placeholder placeholder--forest"
-          data-media-class="placeholder--forest"
-          style="--item-aspect: 0.95;"
-        ></div>
-        <div
-          class="project-detail__item placeholder placeholder--berry"
-          data-media-class="placeholder--berry"
-          style="--item-aspect: 1.2;"
-        ></div>
-        <div
-          class="project-detail__item placeholder placeholder--mocha"
-          data-media-class="placeholder--mocha"
-          style="--item-aspect: 0.8;"
-        ></div>
+      <section class="project-detail__gallery"></section>
+      <section class="project-detail__credits" aria-label="Crédits du projet">
+        <h2 class="project-detail__credits-title">Crédits</h2>
+        <ul class="project-detail__credits-list"></ul>
       </section>
     </main>
+    <footer class="site-footer">
+      <small>
+        Site dev by
+        <a href="https://www.motion333.com" target="_blank" rel="noopener">Motion</a>
+      </small>
+    </footer>
     <script src="script.js"></script>
   </body>
 </html>
