@@ -1,8 +1,7 @@
-Titre de Projet: Titre de Projet 01
+Titre de Projet: YOA - CHANSON TRISTE
 Infos additionelles: Nom de Prod, 2025
 Vimeo: https://vimeo.com/123456789
 Paragraphe:
-Ce texte décrit le projet 01 avec quelques détails fictifs pour illustrer la mise en page.
+Ce texte décrit le projet 01.
 Crédits:
-Réalisateur — Nom Exemple
-Producteur — Nom Exemple
+
