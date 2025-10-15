@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Titre de Projet — Adèle Farges</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@100..900&family=Raleway:ital,wght@0,100..900;1,100..900&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="project-detail-page">
+    
+    <header class="topbar">
+      <div class="topbar__inner">
+        <div class="topbar__identity">
+          <a class="topbar__title" href="index.html">Adèle Farges</a>
+          <span class="topbar__subtitle">DIRECTRICE DE PRODUCTION</span>
+        </div>
+        <nav class="topbar__nav" aria-label="Catégories de projets">
+          <button type="button" class="topbar__nav-link" data-category-select="film">FILM</button>
+          <button type="button" class="topbar__nav-link" data-category-select="photo">PHOTO</button>
+          <button type="button" class="topbar__nav-link" data-category-select="evenementiel">ÉVÉNEMENTIEL</button>
+        </nav>
+        <a class="topbar__about" href="about.html" aria-label="À propos d'Adèle Farges">
+          <svg class="icon icon--info" viewBox="0 0 24 24" role="img" aria-hidden="true">
+            <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.8"></circle>
+            <line x1="12" y1="10" x2="12" y2="16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></line>
+            <circle cx="12" cy="7" r="1.2" fill="currentColor"></circle>
+          </svg>
+        </a>
+      </div>
+    </header>
+    <main class="project-detail" data-project="project-06">
+      <div class="project-hero">
+        <div class="project-hero__media placeholder">
+          <button
+            class="project-hero__play"
+            type="button"
+            aria-label="Lire la vidéo du projet"
+          ></button>
+          <div class="project-hero__video" hidden></div>
+        </div>
+      </div>
+      <section class="project-detail__body">
+        <div class="project-detail__heading">
+          <a class="project-detail__back" href="index.html" aria-label="Retourner au portfolio">
+            <svg class="icon icon--back" viewBox="0 0 24 24" role="img" aria-hidden="true">
+              <polyline points="14 6 8 12 14 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></polyline>
+              <line x1="9" y1="12" x2="20" y2="12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></line>
+            </svg>
+          </a>
+          <div class="project-detail__heading-text">
+            <h1 class="project-detail__title">TITRE DE PROJET</h1>
+            <span class="project-detail__meta">Nom de Prod, 2025</span>
+          </div>
+        </div>
+        <p class="project-detail__description">
+          Cette section présente une description détaillée du projet, incluant son périmètre,
+          ses objectifs et ses principaux livrables. Elle expose les activités prévues, les
+          méthodologies retenues ainsi que les résultats attendus, tout en mettant en avant le
+          rôle et la participation du client tout au long du processus. L’implication du client —
+          qu’il s’agisse de retours, de prises de décision ou de collaboration — sera essentielle
+          pour garantir la réussite du projet et son alignement avec ses besoins.
+        </p>
+      </section>
+      <section class="project-detail__gallery"></section>
+      <section class="project-detail__credits" aria-label="Crédits du projet">
+        <h2 class="project-detail__credits-title">Crédits</h2>
+        <ul class="project-detail__credits-list"></ul>
+      </section>
+    </main>
+    <footer class="site-footer">
+      <small>
+        Site dev by
+        <a href="https://www.motion333.com" target="_blank" rel="noopener">Motion</a>
+      </small>
+    </footer>
+    <script src="script.js"></script>
+  </body>
+</html>
