@@ -1764,195 +1764,18 @@
     window.addEventListener('touchstart', cancelScrollAnimation, {
       passive: true,
     });
-
-    const intro = document.querySelector('.intro');
-    const introTitle = intro ? intro.querySelector('.intro__title') : null;
-    const introRole = intro ? intro.querySelector('.intro__role') : null;
-    const introCategories = intro
-      ? Array.from(intro.querySelectorAll('.intro__category'))
-      : [];
-
-    let introSequenceStarted = false;
-    const startIntroSequence = () => {
-      if (introSequenceStarted || !intro) {
-        return;
-      }
-      introSequenceStarted = true;
-
-      const elements = [];
-      if (introTitle) {
-        introTitle.classList.remove('is-visible');
-        elements.push(introTitle);
-      }
-      if (introRole) {
-        introRole.classList.remove('is-visible');
-        elements.push(introRole);
-      }
-      introCategories.forEach((category) => {
-        category.classList.remove('is-visible');
-        elements.push(category);
-      });
-
-      if (shouldReduceMotion) {
-        elements.forEach((element) => {
-          element.classList.add('is-visible');
-        });
-        return;
-      }
-
-      elements.forEach((element, index) => {
-        window.setTimeout(() => {
-          element.classList.add('is-visible');
-        }, 150 + index * 180);
-      });
-    };
-
-    const hideIntroElement = () => {
-      if (intro && !intro.classList.contains('intro--hidden')) {
-        intro.classList.add('intro--hidden');
-      }
-    };
-
-    let landingSelection = null;
-    let landingTransitionStarted = false;
-    let landingFinished = false;
-
-    const ensureLandingSelection = () => {
-      if (landingSelection && CATEGORY_KEYS.includes(landingSelection)) {
-        return landingSelection;
-      }
-
+    const resolveInitialCategory = () => {
       if (initialHashCategory && CATEGORY_KEYS.includes(initialHashCategory)) {
-        landingSelection = initialHashCategory;
-        return landingSelection;
+        return initialHashCategory;
       }
 
       const storedCategory = readStoredCategory();
-      if (storedCategory) {
-        landingSelection = storedCategory;
-        return landingSelection;
+      if (storedCategory && CATEGORY_KEYS.includes(storedCategory)) {
+        return storedCategory;
       }
 
-      landingSelection = CATEGORY_KEYS[0];
-      return landingSelection;
+      return CATEGORY_KEYS[0];
     };
-
-    const finishLanding = () => {
-      if (landingFinished) {
-        return;
-      }
-      landingFinished = true;
-
-      if (topbar) {
-        topbar.classList.remove('topbar--landing');
-      }
-      if (body) {
-        body.classList.remove('is-landing');
-      }
-
-      const targetCategory = ensureLandingSelection();
-      if (targetCategory) {
-        const activateCategory = () => {
-          requestCategoryActivation(targetCategory, { initial: true, force: true });
-        };
-
-        if (!returnScrollReady) {
-          const onRestored = () => {
-            activateCategory();
-          };
-          try {
-            document.addEventListener(RETURN_SCROLL_EVENT, onRestored, {
-              once: true,
-            });
-          } catch (error) {
-            activateCategory();
-          }
-        } else {
-          activateCategory();
-        }
-      }
-      landingSelection = null;
-    };
-
-    const beginLandingTransition = (category) => {
-      if (category && CATEGORY_KEYS.includes(category)) {
-        landingSelection = category;
-      }
-
-      if (landingTransitionStarted) {
-        return;
-      }
-      landingTransitionStarted = true;
-
-      if (!intro || !introTitle || !titleLink || shouldReduceMotion) {
-        hideIntroElement();
-        finishLanding();
-        return;
-      }
-
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          if (!intro || intro.classList.contains('intro--hidden')) {
-            finishLanding();
-            return;
-          }
-
-          const introRect = introTitle.getBoundingClientRect();
-          const targetRect = titleLink.getBoundingClientRect();
-
-          const introCenterX = introRect.left + introRect.width / 2;
-          const introCenterY = introRect.top + introRect.height / 2;
-          const targetCenterX = targetRect.left + targetRect.width / 2;
-          const targetCenterY = targetRect.top + targetRect.height / 2;
-
-          const deltaX = targetCenterX - introCenterX;
-          const deltaY = targetCenterY - introCenterY;
-          const scale = introRect.width > 0 ? targetRect.width / introRect.width : 1;
-
-          intro.style.setProperty('--intro-translate-x', `${deltaX}px`);
-          intro.style.setProperty('--intro-translate-y', `${deltaY}px`);
-          intro.style.setProperty('--intro-scale', `${scale}`);
-
-          intro.classList.add('intro--running');
-
-          const INTRO_FADE_DELAY_MS = 1150;
-          window.setTimeout(() => {
-            if (intro && !intro.classList.contains('intro--hidden')) {
-              intro.classList.add('intro--fade');
-            }
-          }, INTRO_FADE_DELAY_MS);
-        });
-      });
-    };
-
-    const shouldSkipLanding = intro && pendingReturnScroll !== null;
-
-    if (shouldSkipLanding) {
-      introSequenceStarted = true;
-      if (introTitle) {
-        introTitle.classList.add('is-visible');
-      }
-      if (introRole) {
-        introRole.classList.add('is-visible');
-      }
-      introCategories.forEach((category) => {
-        category.classList.add('is-visible');
-      });
-      hideIntroElement();
-      finishLanding();
-    } else if (intro) {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(startIntroSequence);
-      });
-      intro.addEventListener('transitionend', (event) => {
-        if (event.target === intro && event.propertyName === 'opacity') {
-          hideIntroElement();
-          finishLanding();
-        }
-      });
-    } else {
-      finishLanding();
-    }
 
     const handleCategoryButtonClick = (event) => {
       const button = event.currentTarget;
@@ -1976,12 +1799,7 @@
         return;
       }
 
-      if (body && body.classList.contains('is-landing')) {
-        beginLandingTransition(category);
-      } else {
-        landingSelection = category;
-        requestCategoryActivation(category, { userInitiated: true });
-      }
+      requestCategoryActivation(category, { userInitiated: true });
     };
 
     allCategoryButtons.forEach((button) => {
@@ -2084,7 +1902,6 @@
 
           const showNewCategory = () => {
             activeCategory = category;
-            landingSelection = category;
             updateCategoryButtonState(category);
             applyBodyCategory(category);
             storeLastCategory(category);
@@ -2893,8 +2710,6 @@
 
           if (shouldReduceMotion) {
             cancelScrollAnimation();
-            hideIntroElement();
-            finishLanding();
             trackStates.forEach((state) => {
               state.offset = 0;
               state.speed = 0;
@@ -2937,19 +2752,12 @@
         return;
       }
 
-      const targetCategory = ensureLandingSelection();
+      const targetCategory = resolveInitialCategory();
       if (!targetCategory) {
         return;
       }
 
-      if (body && body.classList.contains('is-landing')) {
-        const shouldAutoStart = Boolean(initialHashCategory) || pendingReturnScroll !== null;
-        if (shouldAutoStart) {
-          beginLandingTransition(targetCategory);
-        }
-      } else {
-        requestCategoryActivation(targetCategory, { initial: true, force: true });
-      }
+      requestCategoryActivation(targetCategory, { initial: true, force: true });
     };
 
     if (isHomePage) {
