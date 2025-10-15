@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Informations – Adèle Farges</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles/main.css" />
+</head>
+<body class="info-page">
+  <header class="site-header">
+    <a class="brand" href="index.html" aria-label="Retour à l’accueil">
+      <span aria-hidden="true">AF</span>
+    </a>
+    <nav class="site-nav" aria-label="Navigation principale">
+      <a class="nav-link" href="index.html#projets">Projets</a>
+      <a class="nav-link" href="index.html#apropos">À propos</a>
+      <a class="nav-link" href="info.html" aria-current="page">Info</a>
+    </nav>
+    <button class="mode-toggle" type="button" aria-label="Basculer le thème" title="Basculer le thème" aria-pressed="false">
+      <svg class="mode-icon" viewBox="0 0 24 24" role="img" aria-hidden="true">
+        <path class="sun" d="M12 4.75a1 1 0 0 1-1-1V2.5a1 1 0 1 1 2 0v1.25a1 1 0 0 1-1 1zm0 16a1 1 0 0 1-1 1v1.25a1 1 0 0 1 2 0V21.5a1 1 0 0 1-1-1zm7.071-11.321.884-.884a1 1 0 1 0-1.414-1.414l-.884.884a1 1 0 0 0 1.414 1.414zM6.443 17.679l-.884.884a1 1 0 1 0 1.414 1.414l.884-.884a1 1 0 1 0-1.414-1.414zM21.5 11h-1.25a1 1 0 1 0 0 2h1.25a1 1 0 0 0 0-2zm-16 1a1 1 0 0 0-1-1H3.25a1 1 0 1 0 0 2H4.5a1 1 0 0 0 1-1zm12.536 6.679a1 1 0 0 0 1.414 0l.884-.884a1 1 0 1 0-1.414-1.414l-.884.884a1 1 0 0 0 0 1.414zM6.443 6.321a1 1 0 0 0 0-1.414l-.884-.884A1 1 0 0 0 4.145 5.437l.884.884a1 1 0 0 0 1.414 0z" />
+        <path class="moon" d="M12.5 3a1 1 0 0 0-1 .8 8.5 8.5 0 1 0 9.7 9.7 1 1 0 0 0-1.21-1.17 5.5 5.5 0 0 1-6.32-6.32A1 1 0 0 0 12.5 3z" />
+      </svg>
+    </button>
+  </header>
+
+  <main class="info-main">
+    <section class="info-hero" aria-labelledby="info-title">
+      <p class="info-kicker">Collaborons</p>
+      <h1 id="info-title">Discutons ensemble de vos projets</h1>
+      <p class="info-subtitle">Je travaille avec des studios, agences et créateurs qui souhaitent bâtir des expériences mémorables.</p>
+    </section>
+
+    <section class="info-contact" aria-labelledby="contact-title">
+      <h2 id="contact-title">Contact</h2>
+      <div class="contact-details">
+        <p class="contact-item">+33 6 00 00 00 00</p>
+        <p class="contact-item">bonjour@adelefarges.com</p>
+      </div>
+      <a class="cta" href="mailto:bonjour@adelefarges.com">Écrire un message</a>
+    </section>
+
+    <section class="info-services" aria-labelledby="services-title">
+      <h2 id="services-title">Services</h2>
+      <ul class="services-list">
+        <li>Direction artistique &amp; identité de marque</li>
+        <li>Design d’expérience et scénographie</li>
+        <li>Direction photo et vidéo</li>
+        <li>Accompagnement stratégique</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>&copy; <span id="year"></span> Adèle Farges. Tous droits réservés.</p>
+    <a class="footer-link" href="index.html">Retour à l’accueil</a>
+  </footer>
+
+  <script src="scripts/theme.js" type="module"></script>
+</body>
+</html>

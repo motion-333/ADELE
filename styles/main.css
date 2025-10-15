@@ -1,0 +1,492 @@
+:root {
+  --bg: #0f0f10;
+  --text: #f9f4ef;
+  --muted: rgba(249, 244, 239, 0.7);
+  --accent: #f15bb5;
+  --accent-strong: #7209b7;
+  --card-bg: rgba(249, 244, 239, 0.06);
+  --border: rgba(249, 244, 239, 0.15);
+  --shadow: 0 25px 55px rgba(0, 0, 0, 0.35);
+  --transition-fast: 180ms ease;
+  --transition-slow: 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+[data-theme="light"] {
+  --bg: #f6f5f2;
+  --text: #1e1b18;
+  --muted: rgba(30, 27, 24, 0.64);
+  --accent: #ff8fab;
+  --accent-strong: #d81159;
+  --card-bg: rgba(30, 27, 24, 0.06);
+  --border: rgba(30, 27, 24, 0.16);
+  --shadow: 0 25px 45px rgba(30, 27, 24, 0.18);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  transition: background-color var(--transition-slow), color var(--transition-fast);
+}
+
+body {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+main {
+  flex: 1;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: clamp(1.25rem, 3vw, 2rem) clamp(1.5rem, 5vw, 4rem);
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--border);
+}
+
+.brand {
+  font-family: "Dela Gothic One", sans-serif;
+  font-size: 1.25rem;
+  letter-spacing: 0.08em;
+  padding: 0.4rem 0.85rem;
+  border-radius: 999px;
+  background: var(--accent-strong);
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform var(--transition-fast);
+}
+
+.brand:hover {
+  transform: rotate(-6deg) scale(1.05);
+}
+
+.site-nav {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.nav-link {
+  position: relative;
+  padding: 0.6rem 1.4rem;
+  border-radius: 999px;
+  font-family: "Dela Gothic One", sans-serif;
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+  font-weight: 800;
+  background: var(--text);
+  color: var(--bg);
+  transition: background-color var(--transition-fast), color var(--transition-fast), transform var(--transition-fast),
+    font-weight var(--transition-fast);
+  border: 2px solid var(--text);
+}
+
+.nav-link:hover,
+.nav-link:focus-visible,
+.nav-link[aria-current="page"] {
+  background: transparent;
+  color: transparent;
+  transform: translateY(-1px);
+  -webkit-text-stroke: 1px var(--text);
+  border-color: var(--text);
+  font-weight: 600;
+}
+
+.mode-toggle {
+  border: 2px solid var(--text);
+  background: var(--text);
+  color: var(--bg);
+  padding: 0.55rem 0.9rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color var(--transition-fast), color var(--transition-fast), transform var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+.mode-toggle:hover,
+.mode-toggle:focus-visible {
+  background: transparent;
+  transform: translateY(-1px);
+}
+
+.mode-toggle:hover .mode-icon,
+.mode-toggle:focus-visible .mode-icon {
+  fill: none;
+  stroke: var(--text);
+  stroke-width: 1.6;
+}
+
+.mode-icon {
+  width: 1.35rem;
+  height: 1.35rem;
+  display: block;
+  fill: var(--bg);
+  stroke: none;
+  transition: fill var(--transition-fast), stroke var(--transition-fast);
+}
+
+.mode-icon .sun,
+.mode-icon .moon {
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+}
+
+.mode-icon .moon {
+  opacity: 0;
+  transform: scale(0.85);
+}
+
+[data-theme="light"] .mode-icon .sun {
+  opacity: 0;
+  transform: scale(0.85);
+}
+
+[data-theme="light"] .mode-icon .moon {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.hero {
+  position: relative;
+  min-height: clamp(32rem, 80vh, 48rem);
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: clamp(3rem, 8vw, 6rem) clamp(1.5rem, 6vw, 5rem);
+  overflow: hidden;
+}
+
+.hero-overlay {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 30%, color-mix(in srgb, var(--accent) 45%, transparent), transparent 60%);
+  opacity: 0;
+  animation: overlayFade 2.4s ease forwards;
+}
+
+.hero-content {
+  position: relative;
+  max-width: 60rem;
+  display: grid;
+  gap: 1.5rem;
+  justify-items: center;
+  animation: contentRise 1.8s var(--transition-slow);
+}
+
+.hero-kicker {
+  text-transform: uppercase;
+  letter-spacing: 0.4em;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.hero-title {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: clamp(0.4rem, 3vw, 1.5rem);
+  font-family: "Dela Gothic One", sans-serif;
+  font-size: clamp(3.8rem, 9vw, 6rem);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  font-weight: 800;
+  transition: font-weight var(--transition-fast);
+}
+
+.title-segment {
+  position: relative;
+  display: inline-block;
+  transform: translateY(120%);
+  opacity: 0;
+  animation: titleSlide 1.6s var(--transition-slow) forwards;
+  transition: transform var(--transition-fast), font-weight var(--transition-fast);
+}
+
+.title-segment:nth-child(2) {
+  animation-delay: 0.25s;
+}
+
+.hero-title:hover,
+.hero-title:focus {
+  font-weight: 600;
+}
+
+.hero-subtitle {
+  margin: 0;
+  font-size: clamp(1rem, 2.2vw, 1.35rem);
+  color: var(--muted);
+  max-width: 38rem;
+}
+
+.cta {
+  padding: 0.85rem 1.8rem;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--bg);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), background-color var(--transition-fast);
+  box-shadow: var(--shadow);
+}
+
+.cta:hover,
+.cta:focus-visible {
+  transform: translateY(-2px);
+  background: var(--accent-strong);
+}
+
+.projects,
+.about,
+.info-main {
+  padding: clamp(3rem, 8vw, 6rem) clamp(1.5rem, 6vw, 5rem);
+  display: grid;
+  gap: 2.5rem;
+}
+
+.section-heading {
+  max-width: 50rem;
+}
+
+.section-heading h2 {
+  font-family: "Dela Gothic One", sans-serif;
+  font-size: clamp(2.2rem, 4vw, 3.2rem);
+  margin-bottom: 0.75rem;
+  letter-spacing: 0.02em;
+}
+
+.section-heading p {
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+.project-grid {
+  display: grid;
+  gap: 2rem;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+}
+
+.project-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 1.5rem;
+  padding: 2rem;
+  display: grid;
+  gap: 1rem;
+  transition: transform var(--transition-fast), border-color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.project-card:hover {
+  transform: translateY(-6px);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--card-bg) 70%, var(--accent) 30%);
+}
+
+.project-title {
+  margin: 0;
+  font-family: "Dela Gothic One", sans-serif;
+  font-size: 1.6rem;
+  letter-spacing: 0.03em;
+  font-weight: 800;
+  transition: font-weight var(--transition-fast);
+}
+
+.project-card:hover .project-title,
+.project-card:focus-within .project-title {
+  font-weight: 600;
+}
+
+.project-link {
+  justify-self: flex-start;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.about-content {
+  display: grid;
+  gap: 1.5rem;
+  color: var(--muted);
+  font-size: 1.05rem;
+  line-height: 1.8;
+  max-width: 48rem;
+}
+
+.site-footer {
+  padding: 2rem clamp(1.5rem, 6vw, 4rem);
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+
+.footer-link {
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.info-page .info-hero {
+  display: grid;
+  gap: 1.5rem;
+  justify-items: start;
+}
+
+.info-hero h1 {
+  font-family: "Dela Gothic One", sans-serif;
+  font-size: clamp(2.4rem, 5vw, 4rem);
+  letter-spacing: 0.015em;
+  white-space: nowrap;
+  font-weight: 800;
+  transition: font-weight var(--transition-fast);
+}
+
+.info-hero h1:hover,
+.info-hero h1:focus {
+  font-weight: 600;
+}
+
+.info-hero .info-subtitle {
+  color: var(--muted);
+  max-width: 36rem;
+  font-size: 1.05rem;
+  line-height: 1.8;
+}
+
+.info-contact,
+.info-services {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 1.5rem;
+  padding: clamp(2rem, 4vw, 3rem);
+  display: grid;
+  gap: 1.5rem;
+}
+
+.contact-details {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.contact-item {
+  margin: 0;
+  font-size: 1.1rem;
+  letter-spacing: 0.03em;
+}
+
+.services-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.75rem;
+  color: var(--muted);
+  font-size: 1.05rem;
+}
+
+@media (max-width: 768px) {
+  .site-header {
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+
+  .site-nav {
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .mode-toggle {
+    order: 3;
+  }
+
+  .info-hero h1 {
+    font-size: clamp(1.4rem, 6vw, 2.4rem);
+  }
+}
+
+@media (max-width: 480px) {
+  .info-hero h1 {
+    font-size: clamp(1.2rem, 5vw, 2rem);
+  }
+}
+
+@keyframes overlayFade {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes contentRise {
+  0% {
+    transform: translateY(40px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes titleSlide {
+  0% {
+    transform: translateY(140%);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.nav-link,
+.mode-toggle {
+  font-weight: 700;
+}
+
+.nav-link:hover,
+.nav-link:focus-visible,
+.nav-link[aria-current="page"],
+.mode-toggle:hover,
+.mode-toggle:focus-visible {
+  font-weight: 500;
+}

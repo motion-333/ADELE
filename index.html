@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Adèle Farges – Portfolio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles/main.css" />
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="index.html" aria-label="Retour à l’accueil">
+      <span aria-hidden="true">AF</span>
+    </a>
+    <nav class="site-nav" aria-label="Navigation principale">
+      <a class="nav-link" href="#projets">Projets</a>
+      <a class="nav-link" href="#apropos">À propos</a>
+      <a class="nav-link" href="info.html">Info</a>
+    </nav>
+    <button class="mode-toggle" type="button" aria-label="Basculer le thème" title="Basculer le thème" aria-pressed="false">
+      <svg class="mode-icon" viewBox="0 0 24 24" role="img" aria-hidden="true">
+        <path class="sun" d="M12 4.75a1 1 0 0 1-1-1V2.5a1 1 0 1 1 2 0v1.25a1 1 0 0 1-1 1zm0 16a1 1 0 0 1-1 1v1.25a1 1 0 0 1 2 0V21.5a1 1 0 0 1-1-1zm7.071-11.321.884-.884a1 1 0 1 0-1.414-1.414l-.884.884a1 1 0 0 0 1.414 1.414zM6.443 17.679l-.884.884a1 1 0 1 0 1.414 1.414l.884-.884a1 1 0 1 0-1.414-1.414zM21.5 11h-1.25a1 1 0 1 0 0 2h1.25a1 1 0 0 0 0-2zm-16 1a1 1 0 0 0-1-1H3.25a1 1 0 1 0 0 2H4.5a1 1 0 0 0 1-1zm12.536 6.679a1 1 0 0 0 1.414 0l.884-.884a1 1 0 1 0-1.414-1.414l-.884.884a1 1 0 0 0 0 1.414zM6.443 6.321a1 1 0 0 0 0-1.414l-.884-.884A1 1 0 0 0 4.145 5.437l.884.884a1 1 0 0 0 1.414 0z" />
+        <path class="moon" d="M12.5 3a1 1 0 0 0-1 .8 8.5 8.5 0 1 0 9.7 9.7 1 1 0 0 0-1.21-1.17 5.5 5.5 0 0 1-6.32-6.32A1 1 0 0 0 12.5 3z" />
+      </svg>
+    </button>
+  </header>
+
+  <main>
+    <section class="hero" id="accueil">
+      <div class="hero-overlay" aria-hidden="true"></div>
+      <div class="hero-content">
+        <p class="hero-kicker">Directrice Artistique &amp; Designer</p>
+        <h1 class="hero-title" aria-label="Adèle Farges">
+          <span class="title-segment">Adèle</span>
+          <span class="title-segment">Farges</span>
+        </h1>
+        <p class="hero-subtitle">Créatrice d’identités visuelles immersives pour les marques audacieuses.</p>
+        <a class="cta" href="#projets">Voir les projets</a>
+      </div>
+    </section>
+
+    <section class="projects" id="projets" aria-labelledby="projects-title">
+      <div class="section-heading">
+        <h2 id="projects-title">Projets sélectionnés</h2>
+        <p>Une sélection de collaborations qui mêlent storytelling et design expérientiel.</p>
+      </div>
+      <div class="project-grid">
+        <article class="project-card">
+          <h3 class="project-title">Mirage Sonore</h3>
+          <p>Direction artistique pour un festival d’arts numériques avec une identité lumineuse et modulable.</p>
+          <a class="project-link" href="#">Découvrir</a>
+        </article>
+        <article class="project-card">
+          <h3 class="project-title">Atelier Vif</h3>
+          <p>Création d’un univers chromatique pour une maison d’édition indépendante.</p>
+          <a class="project-link" href="#">Découvrir</a>
+        </article>
+        <article class="project-card">
+          <h3 class="project-title">Nocturne</h3>
+          <p>Identité sonore et visuelle pour une série de performances immersives.</p>
+          <a class="project-link" href="#">Découvrir</a>
+        </article>
+      </div>
+    </section>
+
+    <section class="about" id="apropos" aria-labelledby="about-title">
+      <div class="section-heading">
+        <h2 id="about-title">À propos</h2>
+        <p>J’accompagne les marques, les artistes et les institutions pour façonner des expériences visuelles sensibles et vibrantes.</p>
+      </div>
+      <div class="about-content">
+        <p>Chaque collaboration est un terrain de jeu où la stratégie se mêle à l’émotion. De la conception d’identités à la création d’environnements interactifs, je cultive une approche pluridisciplinaire nourrie par la typographie, la couleur et le mouvement.</p>
+        <p>Basée à Paris, je travaille avec des équipes internationales et j’interviens sur des projets digitaux, print et événementiels.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>&copy; <span id="year"></span> Adèle Farges. Tous droits réservés.</p>
+    <a class="footer-link" href="info.html">Contact &amp; informations</a>
+  </footer>
+
+  <script src="scripts/theme.js" type="module"></script>
+</body>
+</html>
