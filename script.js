@@ -11,6 +11,7 @@
   document.addEventListener('DOMContentLoaded', async () => {
     const titleLink = document.querySelector('.topbar__title');
     const aboutLink = document.querySelector('.topbar__about');
+    const themeToggle = document.querySelector('.topbar__theme-toggle');
     const isHomePage = document.querySelector('.portfolio') !== null;
     const body = document.body || document.documentElement;
     const topbar = document.querySelector('.topbar');
@@ -138,6 +139,108 @@
         ? window.matchMedia('(prefers-reduced-motion: reduce)')
         : { matches: false, addEventListener: null, addListener: null };
     shouldReduceMotion = reduceMotionMedia.matches;
+
+    const prefersLightMedia =
+      typeof window.matchMedia === 'function'
+        ? window.matchMedia('(prefers-color-scheme: light)')
+        : null;
+    const THEME_STORAGE_KEY = 'adele:theme-preference';
+    const THEME_DARK = 'dark';
+    const THEME_LIGHT = 'light';
+
+    const readStoredTheme = () => {
+      if (!window.localStorage) {
+        return null;
+      }
+
+      try {
+        const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
+        if (stored === THEME_DARK || stored === THEME_LIGHT) {
+          return stored;
+        }
+      } catch (error) {
+        return null;
+      }
+
+      return null;
+    };
+
+    const syncThemeToggleState = (theme) => {
+      if (!themeToggle) {
+        return;
+      }
+
+      const label = theme === THEME_LIGHT ? 'Activer le mode sombre' : 'Activer le mode clair';
+      themeToggle.setAttribute('aria-label', label);
+      themeToggle.setAttribute('aria-pressed', theme === THEME_LIGHT ? 'true' : 'false');
+      themeToggle.setAttribute('data-theme', theme);
+    };
+
+    const applyTheme = (theme, options = {}) => {
+      const normalized = theme === THEME_LIGHT ? THEME_LIGHT : THEME_DARK;
+
+      if (body) {
+        body.classList.remove('theme-light', 'theme-dark');
+        body.classList.add(`theme-${normalized}`);
+      }
+
+      syncThemeToggleState(normalized);
+
+      if (options.store === false) {
+        return;
+      }
+
+      try {
+        if (window.localStorage) {
+          window.localStorage.setItem(THEME_STORAGE_KEY, normalized);
+        }
+      } catch (error) {
+        /* ignore storage errors */
+      }
+    };
+
+    const resolvePreferredTheme = () => {
+      const stored = readStoredTheme();
+      if (stored === THEME_DARK || stored === THEME_LIGHT) {
+        return stored;
+      }
+
+      if (prefersLightMedia && prefersLightMedia.matches) {
+        return THEME_LIGHT;
+      }
+
+      return THEME_DARK;
+    };
+
+    applyTheme(resolvePreferredTheme(), { store: false });
+
+    if (themeToggle) {
+      themeToggle.addEventListener('click', () => {
+        const currentTheme = body && body.classList.contains('theme-light') ? THEME_LIGHT : THEME_DARK;
+        const nextTheme = currentTheme === THEME_LIGHT ? THEME_DARK : THEME_LIGHT;
+        applyTheme(nextTheme);
+      });
+    }
+
+    if (prefersLightMedia) {
+      const handleSchemeChange = (event) => {
+        if (readStoredTheme()) {
+          return;
+        }
+
+        applyTheme(event.matches ? THEME_LIGHT : THEME_DARK, { store: false });
+      };
+
+      try {
+        if (typeof prefersLightMedia.addEventListener === 'function') {
+          prefersLightMedia.addEventListener('change', handleSchemeChange);
+        } else if (typeof prefersLightMedia.addListener === 'function') {
+          prefersLightMedia.addListener(handleSchemeChange);
+        }
+      } catch (error) {
+        /* ignore media listener errors */
+      }
+    }
 
     const fontsReadyPromise =
       document.fonts && document.fonts.ready && typeof document.fonts.ready.then === 'function'
@@ -1661,195 +1764,18 @@
     window.addEventListener('touchstart', cancelScrollAnimation, {
       passive: true,
     });
-
-    const intro = document.querySelector('.intro');
-    const introTitle = intro ? intro.querySelector('.intro__title') : null;
-    const introRole = intro ? intro.querySelector('.intro__role') : null;
-    const introCategories = intro
-      ? Array.from(intro.querySelectorAll('.intro__category'))
-      : [];
-
-    let introSequenceStarted = false;
-    const startIntroSequence = () => {
-      if (introSequenceStarted || !intro) {
-        return;
-      }
-      introSequenceStarted = true;
-
-      const elements = [];
-      if (introTitle) {
-        introTitle.classList.remove('is-visible');
-        elements.push(introTitle);
-      }
-      if (introRole) {
-        introRole.classList.remove('is-visible');
-        elements.push(introRole);
-      }
-      introCategories.forEach((category) => {
-        category.classList.remove('is-visible');
-        elements.push(category);
-      });
-
-      if (shouldReduceMotion) {
-        elements.forEach((element) => {
-          element.classList.add('is-visible');
-        });
-        return;
-      }
-
-      elements.forEach((element, index) => {
-        window.setTimeout(() => {
-          element.classList.add('is-visible');
-        }, 150 + index * 180);
-      });
-    };
-
-    const hideIntroElement = () => {
-      if (intro && !intro.classList.contains('intro--hidden')) {
-        intro.classList.add('intro--hidden');
-      }
-    };
-
-    let landingSelection = null;
-    let landingTransitionStarted = false;
-    let landingFinished = false;
-
-    const ensureLandingSelection = () => {
-      if (landingSelection && CATEGORY_KEYS.includes(landingSelection)) {
-        return landingSelection;
-      }
-
+    const resolveInitialCategory = () => {
       if (initialHashCategory && CATEGORY_KEYS.includes(initialHashCategory)) {
-        landingSelection = initialHashCategory;
-        return landingSelection;
+        return initialHashCategory;
       }
 
       const storedCategory = readStoredCategory();
-      if (storedCategory) {
-        landingSelection = storedCategory;
-        return landingSelection;
+      if (storedCategory && CATEGORY_KEYS.includes(storedCategory)) {
+        return storedCategory;
       }
 
-      landingSelection = CATEGORY_KEYS[0];
-      return landingSelection;
+      return CATEGORY_KEYS[0];
     };
-
-    const finishLanding = () => {
-      if (landingFinished) {
-        return;
-      }
-      landingFinished = true;
-
-      if (topbar) {
-        topbar.classList.remove('topbar--landing');
-      }
-      if (body) {
-        body.classList.remove('is-landing');
-      }
-
-      const targetCategory = ensureLandingSelection();
-      if (targetCategory) {
-        const activateCategory = () => {
-          requestCategoryActivation(targetCategory, { initial: true, force: true });
-        };
-
-        if (!returnScrollReady) {
-          const onRestored = () => {
-            activateCategory();
-          };
-          try {
-            document.addEventListener(RETURN_SCROLL_EVENT, onRestored, {
-              once: true,
-            });
-          } catch (error) {
-            activateCategory();
-          }
-        } else {
-          activateCategory();
-        }
-      }
-      landingSelection = null;
-    };
-
-    const beginLandingTransition = (category) => {
-      if (category && CATEGORY_KEYS.includes(category)) {
-        landingSelection = category;
-      }
-
-      if (landingTransitionStarted) {
-        return;
-      }
-      landingTransitionStarted = true;
-
-      if (!intro || !introTitle || !titleLink || shouldReduceMotion) {
-        hideIntroElement();
-        finishLanding();
-        return;
-      }
-
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          if (!intro || intro.classList.contains('intro--hidden')) {
-            finishLanding();
-            return;
-          }
-
-          const introRect = introTitle.getBoundingClientRect();
-          const targetRect = titleLink.getBoundingClientRect();
-
-          const introCenterX = introRect.left + introRect.width / 2;
-          const introCenterY = introRect.top + introRect.height / 2;
-          const targetCenterX = targetRect.left + targetRect.width / 2;
-          const targetCenterY = targetRect.top + targetRect.height / 2;
-
-          const deltaX = targetCenterX - introCenterX;
-          const deltaY = targetCenterY - introCenterY;
-          const scale = introRect.width > 0 ? targetRect.width / introRect.width : 1;
-
-          intro.style.setProperty('--intro-translate-x', `${deltaX}px`);
-          intro.style.setProperty('--intro-translate-y', `${deltaY}px`);
-          intro.style.setProperty('--intro-scale', `${scale}`);
-
-          intro.classList.add('intro--running');
-
-          const INTRO_FADE_DELAY_MS = 1150;
-          window.setTimeout(() => {
-            if (intro && !intro.classList.contains('intro--hidden')) {
-              intro.classList.add('intro--fade');
-            }
-          }, INTRO_FADE_DELAY_MS);
-        });
-      });
-    };
-
-    const shouldSkipLanding = intro && pendingReturnScroll !== null;
-
-    if (shouldSkipLanding) {
-      introSequenceStarted = true;
-      if (introTitle) {
-        introTitle.classList.add('is-visible');
-      }
-      if (introRole) {
-        introRole.classList.add('is-visible');
-      }
-      introCategories.forEach((category) => {
-        category.classList.add('is-visible');
-      });
-      hideIntroElement();
-      finishLanding();
-    } else if (intro) {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(startIntroSequence);
-      });
-      intro.addEventListener('transitionend', (event) => {
-        if (event.target === intro && event.propertyName === 'opacity') {
-          hideIntroElement();
-          finishLanding();
-        }
-      });
-    } else {
-      finishLanding();
-    }
 
     const handleCategoryButtonClick = (event) => {
       const button = event.currentTarget;
@@ -1873,12 +1799,7 @@
         return;
       }
 
-      if (body && body.classList.contains('is-landing')) {
-        beginLandingTransition(category);
-      } else {
-        landingSelection = category;
-        requestCategoryActivation(category, { userInitiated: true });
-      }
+      requestCategoryActivation(category, { userInitiated: true });
     };
 
     allCategoryButtons.forEach((button) => {
@@ -1981,7 +1902,6 @@
 
           const showNewCategory = () => {
             activeCategory = category;
-            landingSelection = category;
             updateCategoryButtonState(category);
             applyBodyCategory(category);
             storeLastCategory(category);
@@ -2790,8 +2710,6 @@
 
           if (shouldReduceMotion) {
             cancelScrollAnimation();
-            hideIntroElement();
-            finishLanding();
             trackStates.forEach((state) => {
               state.offset = 0;
               state.speed = 0;
@@ -2834,19 +2752,12 @@
         return;
       }
 
-      const targetCategory = ensureLandingSelection();
+      const targetCategory = resolveInitialCategory();
       if (!targetCategory) {
         return;
       }
 
-      if (body && body.classList.contains('is-landing')) {
-        const shouldAutoStart = Boolean(initialHashCategory) || pendingReturnScroll !== null;
-        if (shouldAutoStart) {
-          beginLandingTransition(targetCategory);
-        }
-      } else {
-        requestCategoryActivation(targetCategory, { initial: true, force: true });
-      }
+      requestCategoryActivation(targetCategory, { initial: true, force: true });
     };
 
     if (isHomePage) {
