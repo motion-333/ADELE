@@ -11,6 +11,7 @@
   document.addEventListener('DOMContentLoaded', async () => {
     const titleLink = document.querySelector('.topbar__title');
     const aboutLink = document.querySelector('.topbar__about');
+    const themeToggle = document.querySelector('.topbar__theme-toggle');
     const isHomePage = document.querySelector('.portfolio') !== null;
     const body = document.body || document.documentElement;
     const topbar = document.querySelector('.topbar');
@@ -138,6 +139,108 @@
         ? window.matchMedia('(prefers-reduced-motion: reduce)')
         : { matches: false, addEventListener: null, addListener: null };
     shouldReduceMotion = reduceMotionMedia.matches;
+
+    const prefersLightMedia =
+      typeof window.matchMedia === 'function'
+        ? window.matchMedia('(prefers-color-scheme: light)')
+        : null;
+    const THEME_STORAGE_KEY = 'adele:theme-preference';
+    const THEME_DARK = 'dark';
+    const THEME_LIGHT = 'light';
+
+    const readStoredTheme = () => {
+      if (!window.localStorage) {
+        return null;
+      }
+
+      try {
+        const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
+        if (stored === THEME_DARK || stored === THEME_LIGHT) {
+          return stored;
+        }
+      } catch (error) {
+        return null;
+      }
+
+      return null;
+    };
+
+    const syncThemeToggleState = (theme) => {
+      if (!themeToggle) {
+        return;
+      }
+
+      const label = theme === THEME_LIGHT ? 'Activer le mode sombre' : 'Activer le mode clair';
+      themeToggle.setAttribute('aria-label', label);
+      themeToggle.setAttribute('aria-pressed', theme === THEME_LIGHT ? 'true' : 'false');
+      themeToggle.setAttribute('data-theme', theme);
+    };
+
+    const applyTheme = (theme, options = {}) => {
+      const normalized = theme === THEME_LIGHT ? THEME_LIGHT : THEME_DARK;
+
+      if (body) {
+        body.classList.remove('theme-light', 'theme-dark');
+        body.classList.add(`theme-${normalized}`);
+      }
+
+      syncThemeToggleState(normalized);
+
+      if (options.store === false) {
+        return;
+      }
+
+      try {
+        if (window.localStorage) {
+          window.localStorage.setItem(THEME_STORAGE_KEY, normalized);
+        }
+      } catch (error) {
+        /* ignore storage errors */
+      }
+    };
+
+    const resolvePreferredTheme = () => {
+      const stored = readStoredTheme();
+      if (stored === THEME_DARK || stored === THEME_LIGHT) {
+        return stored;
+      }
+
+      if (prefersLightMedia && prefersLightMedia.matches) {
+        return THEME_LIGHT;
+      }
+
+      return THEME_DARK;
+    };
+
+    applyTheme(resolvePreferredTheme(), { store: false });
+
+    if (themeToggle) {
+      themeToggle.addEventListener('click', () => {
+        const currentTheme = body && body.classList.contains('theme-light') ? THEME_LIGHT : THEME_DARK;
+        const nextTheme = currentTheme === THEME_LIGHT ? THEME_DARK : THEME_LIGHT;
+        applyTheme(nextTheme);
+      });
+    }
+
+    if (prefersLightMedia) {
+      const handleSchemeChange = (event) => {
+        if (readStoredTheme()) {
+          return;
+        }
+
+        applyTheme(event.matches ? THEME_LIGHT : THEME_DARK, { store: false });
+      };
+
+      try {
+        if (typeof prefersLightMedia.addEventListener === 'function') {
+          prefersLightMedia.addEventListener('change', handleSchemeChange);
+        } else if (typeof prefersLightMedia.addListener === 'function') {
+          prefersLightMedia.addListener(handleSchemeChange);
+        }
+      } catch (error) {
+        /* ignore media listener errors */
+      }
+    }
 
     const fontsReadyPromise =
       document.fonts && document.fonts.ready && typeof document.fonts.ready.then === 'function'

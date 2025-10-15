@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Dela+Gothic+One&display=swap');
+
 :root {
   color-scheme: dark;
   --color-bg: #101013;
@@ -11,6 +13,11 @@
   --color-icon: #f0ead6;
   --color-shadow: rgba(0, 0, 0, 0.55);
   --color-shadow-soft: rgba(0, 0, 0, 0.4);
+  --color-pill-fill: var(--color-text);
+  --color-pill-text: var(--color-bg);
+  --color-pill-stroke: var(--color-text);
+  --color-toggle-bg: var(--color-surface);
+  --color-toggle-border: transparent;
 }
 
 * {
@@ -35,10 +42,35 @@ body {
   flex-direction: column;
   -ms-overflow-style: none;
   scrollbar-width: none;
+  transition: background 0.45s ease, color 0.45s ease;
 }
 
 body.is-landing {
   overflow: hidden;
+}
+
+body.theme-dark {
+  color-scheme: dark;
+}
+
+body.theme-light {
+  color-scheme: light;
+  --color-bg: #f7f2e9;
+  --color-surface: #ffffff;
+  --color-overlay: rgba(255, 255, 255, 0.82);
+  --color-border: rgba(16, 16, 19, 0.1);
+  --color-border-strong: rgba(16, 16, 19, 0.35);
+  --color-text: #1a1a1f;
+  --color-text-subtle: rgba(26, 26, 31, 0.72);
+  --color-text-muted: rgba(26, 26, 31, 0.56);
+  --color-icon: #1a1a1f;
+  --color-shadow: rgba(16, 16, 19, 0.18);
+  --color-shadow-soft: rgba(16, 16, 19, 0.12);
+  --color-pill-fill: #1a1a1f;
+  --color-pill-text: #f7f2e9;
+  --color-pill-stroke: #1a1a1f;
+  --color-toggle-bg: rgba(26, 26, 31, 0.08);
+  --color-toggle-border: rgba(26, 26, 31, 0.25);
 }
 
 body::-webkit-scrollbar {
@@ -73,31 +105,33 @@ body::-webkit-scrollbar {
 
 .intro__title {
   font-size: clamp(1.4rem, calc((100vw - 4rem) / 12.5), 8.5rem);
-  font-family: 'Raleway', 'Outfit', 'DM Sans', system-ui, -apple-system,
-    BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  font-weight: 900;
-  font-variation-settings: 'wght' 900;
-  letter-spacing: 0.12em;
+  font-family: 'Dela Gothic One', 'Raleway', 'Outfit', 'DM Sans', system-ui,
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-weight: 400;
+  letter-spacing: 0.24em;
   text-transform: uppercase;
   line-height: 1;
   color: var(--color-text);
   transform: translate3d(0, 0, 0) scale(1);
   transition:
     transform 1.1s cubic-bezier(0.65, 0, 0.35, 1) 0.25s,
-    opacity 0.55s ease;
+    opacity 0.55s ease,
+    letter-spacing 0.8s ease;
   will-change: transform;
   animation: intro-title-weight 1.5s ease forwards;
 }
 
 @keyframes intro-title-weight {
   from {
-    font-variation-settings: 'wght' 900;
-    font-weight: 900;
+    letter-spacing: 0.34em;
+    opacity: 0;
+    transform: translate3d(0, 0, 0) scale(1.08);
   }
 
   to {
-    font-variation-settings: 'wght' 250;
-    font-weight: 250;
+    letter-spacing: 0.1em;
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
   }
 }
 
@@ -257,14 +291,20 @@ a {
 
 .topbar__title {
   font-size: clamp(1.25rem, 2.8vw, 2.25rem);
-  font-family: 'Raleway', 'Outfit', 'DM Sans', system-ui, -apple-system,
-    BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  font-weight: 650;
-  font-variation-settings: 'wght' 650;
+  font-family: 'Dela Gothic One', 'Raleway', 'Outfit', 'DM Sans', system-ui,
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-weight: 400;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   cursor: pointer;
   line-height: 1;
+  transition: letter-spacing 0.3s ease, font-weight 0.3s ease;
+}
+
+.topbar__title:hover,
+.topbar__title:focus-visible {
+  font-weight: 300;
+  letter-spacing: 0.16em;
 }
 
 .topbar__subtitle {
@@ -281,7 +321,7 @@ a {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: clamp(1rem, 4vw, 3rem);
+  gap: clamp(0.75rem, 3vw, 2rem);
   transition: opacity 0.4s ease;
 }
 
@@ -291,52 +331,96 @@ a {
 }
 
 .topbar__nav-link {
-  position: relative;
-  background: none;
-  border: none;
-  padding: 0.25rem 0;
-  font-family: 'Outfit', 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont,
-    'Segoe UI', sans-serif;
-  font-weight: 500;
-  letter-spacing: 0.18em;
+  border: 2px solid var(--color-pill-fill);
+  border-radius: 999px;
+  background: var(--color-pill-fill);
+  color: var(--color-pill-text);
+  padding: 0.45rem clamp(1.05rem, 3vw, 1.6rem);
+  font-family: 'Dela Gothic One', 'Raleway', 'Outfit', 'DM Sans', system-ui,
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-weight: 400;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  font-size: clamp(0.75rem, 2vw, 1.05rem);
-  color: var(--color-text-muted);
+  font-size: clamp(0.78rem, 2vw, 1.1rem);
   cursor: pointer;
-  transition: color 0.3s ease;
-}
-
-.topbar__nav-link::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 2px;
-  background: currentColor;
-  transform: scaleX(0);
-  transform-origin: center;
-  transition: transform 0.3s ease;
+  transition:
+    background 0.3s ease,
+    color 0.3s ease,
+    border-color 0.3s ease,
+    box-shadow 0.3s ease,
+    font-weight 0.25s ease,
+    letter-spacing 0.25s ease,
+    -webkit-text-stroke 0.3s ease;
+  -webkit-text-stroke: 0 transparent;
+  box-shadow: 0 8px 20px var(--color-shadow-soft);
 }
 
 .topbar__nav-link:hover,
 .topbar__nav-link:focus-visible {
-  color: var(--color-text);
+  background: transparent;
+  border-color: var(--color-pill-stroke);
+  color: var(--color-pill-stroke);
+  font-weight: 300;
+  letter-spacing: 0.16em;
+  box-shadow: 0 12px 26px var(--color-shadow);
 }
 
-.topbar__nav-link:hover::after,
-.topbar__nav-link:focus-visible::after,
-.topbar__nav-link.is-active::after {
-  transform: scaleX(1);
-}
-
-.topbar__nav-link.is-active {
-  color: var(--color-text);
+@supports (-webkit-text-stroke: 1px currentColor) {
+  .topbar__nav-link:hover,
+  .topbar__nav-link:focus-visible {
+    color: transparent;
+    -webkit-text-stroke: 1.3px var(--color-pill-stroke);
+  }
 }
 
 .topbar__nav-link:focus-visible {
-  outline: 2px solid var(--color-border-strong);
-  outline-offset: 6px;
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-border-strong), 0 12px 26px var(--color-shadow);
+}
+
+.topbar__nav-link.is-active {
+  background: var(--color-pill-fill);
+  color: var(--color-pill-text);
+  border-color: transparent;
+  box-shadow: 0 12px 28px var(--color-shadow);
+}
+
+.topbar__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: clamp(0.6rem, 2vw, 1.1rem);
+}
+
+.topbar__theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: clamp(2.4rem, 5vw, 2.85rem);
+  height: clamp(2.4rem, 5vw, 2.85rem);
+  border-radius: 999px;
+  border: 2px solid var(--color-toggle-border);
+  background: var(--color-toggle-bg);
+  color: var(--color-icon);
+  cursor: pointer;
+  transition:
+    background 0.3s ease,
+    border-color 0.3s ease,
+    box-shadow 0.3s ease,
+    transform 0.3s ease;
+  box-shadow: 0 10px 24px var(--color-shadow-soft);
+}
+
+.topbar__theme-toggle:hover,
+.topbar__theme-toggle:focus-visible {
+  border-color: var(--color-pill-stroke);
+  background: transparent;
+  transform: translateY(-1px);
+  box-shadow: 0 14px 30px var(--color-shadow);
+}
+
+.topbar__theme-toggle:focus-visible {
+  outline: none;
 }
 
 .topbar__about {
@@ -382,6 +466,10 @@ a {
   .topbar__about {
     justify-self: center;
   }
+
+  .topbar__actions {
+    justify-content: center;
+  }
 }
 
 .icon {
@@ -402,6 +490,39 @@ a {
 .icon circle,
 .icon polyline {
   transition: stroke 0.3s ease, fill 0.3s ease;
+}
+
+.icon--theme {
+  width: clamp(1.4rem, 3vw, 1.55rem);
+  height: clamp(1.4rem, 3vw, 1.55rem);
+}
+
+.icon--theme__sun {
+  fill: currentColor;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.icon--theme__moon {
+  fill: currentColor;
+  opacity: 1;
+  transition: opacity 0.3s ease;
+}
+
+.icon--theme__rays line {
+  stroke: currentColor;
+  stroke-width: 1.6;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+body.theme-light .icon--theme__sun,
+body.theme-light .icon--theme__rays line {
+  opacity: 1;
+}
+
+body.theme-light .icon--theme__moon {
+  opacity: 0;
 }
 
 .portfolio {
@@ -787,11 +908,18 @@ body.is-transitioning {
 
   .project-detail__title {
     font-size: clamp(1.8rem, 4vw, 3.2rem);
-    font-family: 'Outfit', 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont,
-      'Segoe UI', sans-serif;
-    font-weight: 900;
-    letter-spacing: -0.01em;
+    font-family: 'Dela Gothic One', 'Outfit', 'DM Sans', system-ui,
+      -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-weight: 400;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
+    transition: font-weight 0.3s ease, letter-spacing 0.3s ease;
+  }
+
+  .project-detail__heading:hover .project-detail__title,
+  .project-detail__heading:focus-within .project-detail__title {
+    font-weight: 300;
+    letter-spacing: 0.14em;
   }
 
   .project-detail__meta {
@@ -952,18 +1080,25 @@ body.is-transitioning {
 
 .project-title {
   font-size: clamp(1.05rem, 3vw, 1.95rem);
-  font-family: 'Outfit', 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont,
-    'Segoe UI', sans-serif;
-  font-weight: 900;
-  letter-spacing: -0.01em;
+  font-family: 'Dela Gothic One', 'Outfit', 'DM Sans', system-ui, -apple-system,
+    BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  transition: font-weight 0.3s ease, letter-spacing 0.3s ease;
 }
 
 .project-meta {
   font-size: clamp(0.95rem, 2vw, 1.35rem);
   font-family: 'Outfit', 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont,
-    'Segoe UI', sans-serif;
+  'Segoe UI', sans-serif;
   font-weight: 500;
   color: var(--color-text-subtle);
+}
+
+.project:is(:hover, :focus-within) .project-title {
+  font-weight: 300;
+  letter-spacing: 0.12em;
 }
 
 @media (hover: none) {
@@ -1000,6 +1135,32 @@ body.is-transitioning {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--color-text);
+}
+
+.about-page__line--headline {
+  font-family: 'Dela Gothic One', 'Outfit', 'DM Sans', system-ui,
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-weight: 400;
+  letter-spacing: 0.12em;
+  white-space: nowrap;
+}
+
+.about-page__line--contact {
+  font-size: clamp(1rem, 2.1vw, 1.4rem);
+  letter-spacing: 0.1em;
+}
+
+.about-page__line--contact a {
+  color: inherit;
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  transition: border-color 0.3s ease;
+}
+
+.about-page__line--contact a:hover,
+.about-page__line--contact a:focus-visible {
+  border-color: var(--color-pill-stroke);
+  outline: none;
 }
 
 .site-footer {
