@@ -575,6 +575,21 @@
           } else {
             track.removeAttribute('data-media-source');
           }
+
+          const manifestMedia = Array.isArray(entry.media) ? entry.media : [];
+          if (manifestMedia.length) {
+            const resolvedManifest = manifestMedia
+              .map((item) => resolveMediaPath(directory, item))
+              .filter(Boolean);
+
+            if (resolvedManifest.length) {
+              track.setAttribute('data-media-manifest', JSON.stringify(resolvedManifest));
+            } else {
+              track.removeAttribute('data-media-manifest');
+            }
+          } else {
+            track.removeAttribute('data-media-manifest');
+          }
         }
 
         sectionLookup.set(id, section);
@@ -1180,6 +1195,22 @@
           const track = section.querySelector('.media-track');
           if (track) {
             track.setAttribute('data-media-source', metadata.mediaDirectory);
+
+            const manifestEntry = projectManifestCache.get(projectId);
+            const manifestList =
+              manifestEntry && Array.isArray(manifestEntry.media) ? manifestEntry.media : [];
+            if (manifestList.length) {
+              const resolvedManifest = manifestList
+                .map((item) => resolveMediaPath(metadata.mediaDirectory, item))
+                .filter(Boolean);
+              if (resolvedManifest.length) {
+                track.setAttribute('data-media-manifest', JSON.stringify(resolvedManifest));
+              } else {
+                track.removeAttribute('data-media-manifest');
+              }
+            } else {
+              track.removeAttribute('data-media-manifest');
+            }
           }
         })
       );
@@ -1208,6 +1239,24 @@
         detail.setAttribute('data-vimeo', metadata.vimeo);
       } else {
         detail.removeAttribute('data-vimeo');
+      }
+
+      const detailManifestEntry = projectManifestCache.get(projectId);
+      const detailManifestList =
+        detailManifestEntry && Array.isArray(detailManifestEntry.media)
+          ? detailManifestEntry.media
+          : [];
+      if (detailManifestList.length) {
+        const resolvedManifest = detailManifestList
+          .map((item) => resolveMediaPath(metadata.mediaDirectory, item))
+          .filter(Boolean);
+        if (resolvedManifest.length) {
+          detail.setAttribute('data-media-manifest', JSON.stringify(resolvedManifest));
+        } else {
+          detail.removeAttribute('data-media-manifest');
+        }
+      } else {
+        detail.removeAttribute('data-media-manifest');
       }
 
       const titleEl = detail.querySelector('.project-detail__title');
@@ -2083,7 +2132,7 @@
       return normalized;
     }
 
-    const sanitizeFileEntry = (entry) => {
+    function sanitizeFileEntry(entry) {
       if (entry === null || entry === undefined) {
         return null;
       }
@@ -2098,9 +2147,9 @@
       value = value.replace(/^\.\/+/, '');
       value = value.replace(/^\/+/, '');
       return value;
-    };
+    }
 
-    const resolveMediaPath = (directory, file) => {
+    function resolveMediaPath(directory, file) {
       const sanitizedFile = sanitizeFileEntry(file);
       if (!sanitizedFile) {
         return null;
@@ -2118,7 +2167,7 @@
       }
       relative = relative.replace(/^\/+/, '');
       return `${dir}${relative}`;
-    };
+    }
 
     const extractFileCandidate = (value) => {
       if (typeof value === 'string') {
@@ -2245,6 +2294,19 @@
       }
 
       const inlineList = [];
+
+      const manifestAttr = readStringAttribute(container, 'data-media-manifest');
+      if (manifestAttr) {
+        try {
+          const parsed = JSON.parse(manifestAttr);
+          const fromAttribute = parseListFromData(parsed);
+          fromAttribute.forEach((entry) => {
+            inlineList.push(entry);
+          });
+        } catch (error) {
+          /* ignore malformed attribute */
+        }
+      }
 
       const manifestScript = container.querySelector('script[data-media-manifest]');
       if (manifestScript) {
