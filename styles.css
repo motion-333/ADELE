@@ -255,7 +255,16 @@ a {
 
 .topbar__theme-toggle .icon,
 .topbar__about .icon {
-  color: currentColor;
+  color: inherit;
+}
+
+.topbar__theme-toggle .icon--theme__sun,
+.topbar__theme-toggle .icon--theme__moon {
+  fill: currentColor;
+}
+
+.topbar__theme-toggle .icon--theme__rays line {
+  stroke: currentColor;
 }
 
 .topbar__theme-toggle .icon {
@@ -493,6 +502,104 @@ body.category-evenementiel .project[data-category='evenementiel'] {
 
 body.is-transitioning {
   overflow: hidden;
+}
+
+.lightbox {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(1.5rem, 4vw, 3rem);
+  background: rgba(26, 26, 31, 0.82);
+  backdrop-filter: blur(20px);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.35s ease, visibility 0.35s ease;
+  z-index: 260;
+}
+
+.lightbox.is-active {
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.lightbox.is-visible {
+  opacity: 1;
+}
+
+.lightbox__content {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: min(92vw, 1000px);
+  transform: scale(0.94);
+  transition: transform 0.35s ease;
+}
+
+.lightbox.is-visible .lightbox__content {
+  transform: scale(1);
+}
+
+.lightbox__media {
+  position: relative;
+  width: 100%;
+  max-height: min(82vh, 900px);
+  aspect-ratio: var(--item-aspect, 1.5);
+  background-color: var(--color-bg);
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  border-radius: 8px;
+  box-shadow: 0 24px 48px var(--color-shadow-soft);
+  overflow: hidden;
+}
+
+.lightbox__media .placeholder__video {
+  object-fit: contain;
+  background: transparent;
+}
+
+.lightbox__close {
+  position: absolute;
+  top: clamp(0.6rem, 2vw, 1.25rem);
+  right: clamp(0.6rem, 2vw, 1.25rem);
+  width: clamp(2.4rem, 6vw, 3rem);
+  height: clamp(2.4rem, 6vw, 3rem);
+  border-radius: 999px;
+  border: 2px solid var(--color-pill-stroke);
+  background: var(--color-pill-fill);
+  color: var(--color-pill-text);
+  font-family: 'Dela Gothic One', 'Outfit', 'DM Sans', system-ui, -apple-system,
+    BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: clamp(1.1rem, 3.5vw, 1.5rem);
+  letter-spacing: 0.08em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.25s ease, color 0.25s ease, border-color 0.25s ease,
+    transform 0.25s ease;
+}
+
+.lightbox__close span {
+  display: inline-block;
+  transform: translateY(-1px);
+}
+
+.lightbox__close:hover,
+.lightbox__close:focus-visible {
+  background: transparent;
+  color: var(--color-pill-stroke);
+  border-color: var(--color-pill-stroke);
+  outline: none;
+  transform: scale(1.05);
+}
+
+.lightbox__close:active {
+  transform: scale(0.96);
 }
 
 .media-strip__control {
@@ -770,6 +877,9 @@ body.is-transitioning {
   font-family: 'Outfit', 'DM Sans', system-ui, -apple-system, BlinkMacSystemFont,
     'Segoe UI', sans-serif;
   font-weight: 200;
+  text-align: center;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .project-detail__gallery {
@@ -916,7 +1026,7 @@ body.is-transitioning {
   text-transform: uppercase;
   color: var(--color-cream);
   mix-blend-mode: difference;
-  filter: saturate(0.65) brightness(1.05);
+  filter: contrast(0.92) brightness(1.08) saturate(0.75);
   transition: opacity 0.3s ease;
 }
 
@@ -927,7 +1037,7 @@ body.is-transitioning {
   font-weight: 500;
   color: var(--color-text-subtle);
   mix-blend-mode: difference;
-  filter: saturate(0.65) brightness(1.05);
+  filter: contrast(0.92) brightness(1.05) saturate(0.75);
 }
 
 .project:is(:hover, :focus-within) .project-title {
