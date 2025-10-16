@@ -268,6 +268,110 @@
 
     const projectMetadataCache = new Map();
 
+    function deriveCategoryMediaDirectory(category, projectId) {
+      if (!projectId) {
+        return null;
+      }
+
+      const normalizedCategory = category ? `${category}`.trim().toLowerCase() : '';
+      if (!normalizedCategory) {
+        return null;
+      }
+
+      const categoryRoot =
+        CATEGORY_DIRECTORY_LOOKUP[normalizedCategory] ||
+        normalizeDirectoryPath(normalizedCategory);
+      if (!categoryRoot) {
+        return null;
+      }
+
+      return normalizeDirectoryPath(`${categoryRoot}${projectId}/images`);
+    }
+
+    function deriveManifestMediaDirectory(entry) {
+      if (!entry) {
+        return null;
+      }
+
+      const list = Array.isArray(entry.media) ? entry.media : [];
+      for (let index = 0; index < list.length; index += 1) {
+        const raw = list[index];
+        if (raw === null || raw === undefined) {
+          continue;
+        }
+
+        let value = `${raw}`.trim();
+        if (!value) {
+          continue;
+        }
+
+        value = value.replace(/\\/g, '/');
+        if (/^https?:\/\//i.test(value)) {
+          continue;
+        }
+
+        value = value.replace(/^\.\/+/, '');
+        value = value.replace(/^\/+/, '');
+
+        const parts = value.split('/');
+        if (parts.length <= 1) {
+          continue;
+        }
+
+        parts.pop();
+        const directory = parts.join('/');
+        if (directory) {
+          return normalizeDirectoryPath(directory);
+        }
+      }
+
+      const fallbackCategory = entry.category ? `${entry.category}`.trim().toLowerCase() : '';
+      if (fallbackCategory) {
+        const derived = deriveCategoryMediaDirectory(fallbackCategory, entry.id);
+        if (derived) {
+          return derived;
+        }
+      }
+
+      return null;
+    }
+
+    function determineProjectMediaDirectory(
+      projectId,
+      category,
+      manifestEntry,
+      explicitDirectory
+    ) {
+      const manifestDirectory = deriveManifestMediaDirectory(manifestEntry);
+      if (manifestDirectory) {
+        return manifestDirectory;
+      }
+
+      if (explicitDirectory) {
+        const normalizedExplicit = normalizeDirectoryPath(explicitDirectory);
+        if (normalizedExplicit) {
+          return normalizedExplicit;
+        }
+      }
+
+      const resolvedCategory = category
+        ? `${category}`.trim().toLowerCase()
+        : manifestEntry && manifestEntry.category
+        ? `${manifestEntry.category}`.trim().toLowerCase()
+        : '';
+
+      const categoryDirectory = deriveCategoryMediaDirectory(resolvedCategory, projectId);
+      if (categoryDirectory) {
+        return categoryDirectory;
+      }
+
+      if (projectId) {
+        return normalizeDirectoryPath(`${projectId}/images`);
+      }
+
+      return null;
+    }
+
     const PROJECT_MANIFEST_URL = 'pub/project-index.json';
     const projectManifestCache = new Map();
     let projectManifestPromise = null;
@@ -461,6 +565,16 @@
           section.setAttribute('data-category', category);
         } else {
           section.removeAttribute('data-category');
+        }
+
+        const track = section.querySelector('.media-track');
+        if (track) {
+          const directory = determineProjectMediaDirectory(id, category, entry, null);
+          if (directory) {
+            track.setAttribute('data-media-source', directory);
+          } else {
+            track.removeAttribute('data-media-source');
+          }
         }
 
         sectionLookup.set(id, section);
@@ -1007,41 +1121,12 @@
 
       if (manifestEntry) {
         const fallbackCategory = manifestCategory || null;
-        const categoryRoot =
-          fallbackCategory &&
-          (CATEGORY_DIRECTORY_LOOKUP[fallbackCategory] || normalizeDirectoryPath(fallbackCategory));
-        const baseDir = categoryRoot
-          ? normalizeDirectoryPath(`${categoryRoot}${projectId}`)
-          : null;
-
-        const manifestMediaDirectory = (() => {
-          if (baseDir) {
-            return normalizeDirectoryPath(`${baseDir}images`);
-          }
-
-          if (Array.isArray(manifestEntry.media)) {
-            for (let index = 0; index < manifestEntry.media.length; index += 1) {
-              const candidate = sanitizeFileEntry(manifestEntry.media[index]);
-              if (!candidate || /^https?:\/\//i.test(candidate)) {
-                continue;
-              }
-
-              const normalized = candidate.replace(/^\/+/, '');
-              const parts = normalized.split('/');
-              if (parts.length <= 1) {
-                continue;
-              }
-
-              parts.pop();
-              const directoryCandidate = parts.join('/');
-              if (directoryCandidate) {
-                return normalizeDirectoryPath(directoryCandidate);
-              }
-            }
-          }
-
-          return null;
-        })();
+        const manifestMediaDirectory = determineProjectMediaDirectory(
+          projectId,
+          fallbackCategory,
+          manifestEntry,
+          null
+        );
 
         const fallbackMetadata = {
           id: projectId,
@@ -2322,14 +2407,20 @@
 
         const projectId = readStringAttribute(section, 'data-project');
         const directoryAttr = readStringAttribute(track, 'data-media-source');
-        const directory = directoryAttr || (projectId ? `${projectId}/images/` : null);
+        const categoryAttr = readStringAttribute(section, 'data-category');
+        const manifestEntry = projectManifestCache.get(projectId);
+        const directory = determineProjectMediaDirectory(
+          projectId,
+          categoryAttr,
+          manifestEntry,
+          directoryAttr
+        );
         const detailLink =
           readStringAttribute(track, 'data-detail-link') ||
           readStringAttribute(section, 'data-detail-link') ||
           (projectId ? `${projectId}.html` : '#');
 
         const inlineList = collectInlineMediaList(track);
-        const manifestEntry = projectManifestCache.get(projectId);
         const manifestList =
           manifestEntry && Array.isArray(manifestEntry.media) ? manifestEntry.media : [];
         const fallbackList = (() => {
