@@ -246,6 +246,7 @@ a {
 .topbar__about:focus-visible {
   background: transparent;
   color: var(--color-pill-stroke);
+  border-color: var(--color-pill-stroke);
 }
 
 .topbar__theme-toggle:focus-visible,
@@ -259,37 +260,14 @@ a {
   color: inherit;
 }
 
-body.theme-dark .topbar__theme-toggle .icon {
-  color: var(--color-anthracite);
-}
-
-body.theme-light .topbar__theme-toggle .icon {
-  color: var(--color-cream);
-}
-
-body.theme-dark .topbar__theme-toggle .icon--theme__sun,
-body.theme-dark .topbar__theme-toggle .icon--theme__moon {
-  fill: var(--color-anthracite);
-  stroke: var(--color-anthracite);
-}
-
-body.theme-light .topbar__theme-toggle .icon--theme__sun,
-body.theme-light .topbar__theme-toggle .icon--theme__moon {
-  fill: var(--color-cream);
-  stroke: var(--color-cream);
-}
-
-body.theme-dark .topbar__theme-toggle .icon--theme__rays line {
-  stroke: var(--color-anthracite);
-}
-
-body.theme-light .topbar__theme-toggle .icon--theme__rays line {
-  stroke: var(--color-cream);
-}
-
 .topbar__theme-toggle .icon--theme__sun,
 .topbar__theme-toggle .icon--theme__moon {
   fill: currentColor;
+  stroke: currentColor;
+}
+
+.topbar__theme-toggle .icon--theme__sun {
+  stroke-width: 0;
 }
 
 .topbar__theme-toggle .icon--theme__rays line {
@@ -297,31 +275,7 @@ body.theme-light .topbar__theme-toggle .icon--theme__rays line {
 }
 
 .topbar__theme-toggle .icon--theme__moon {
-  stroke: transparent;
-  stroke-width: 0;
-}
-
-body.theme-dark .topbar__theme-toggle {
-  background: var(--color-cream);
-  color: var(--color-anthracite);
-  border-color: var(--color-cream);
-}
-
-body.theme-dark .topbar__theme-toggle:hover,
-body.theme-dark .topbar__theme-toggle:focus-visible {
-  background: rgba(243, 234, 219, 0.92);
-  color: var(--color-anthracite);
-  border-color: var(--color-cream);
-}
-
-body.theme-dark .topbar__theme-toggle .icon--theme__moon {
-  stroke: currentColor;
   stroke-width: 1.6;
-}
-
-body.theme-light .topbar__theme-toggle:hover,
-body.theme-light .topbar__theme-toggle:focus-visible {
-  color: var(--color-cream);
 }
 
 .topbar__theme-toggle .icon {
@@ -636,7 +590,8 @@ body.is-transitioning {
   display: inline-flex;
   align-items: flex-start;
   justify-content: center;
-  max-width: min(92vw, 1100px);
+  gap: clamp(0.75rem, 2.5vw, 1.8rem);
+  max-width: min(94vw, 1180px);
   transform: scale(0.94);
   transition: transform 0.35s ease;
 }
@@ -651,31 +606,42 @@ body.is-transitioning {
   align-items: center;
   justify-content: center;
   max-width: 100%;
-  max-height: min(82vh, 900px);
+  width: auto;
+  height: min(82vh, 900px);
   background: none;
   border-radius: 0;
   box-shadow: none;
   overflow: visible;
+  order: 1;
 }
 
 .lightbox__media .placeholder__video {
+  position: relative;
+  inset: auto;
+  width: auto;
+  height: 100%;
   object-fit: contain;
   background: transparent;
   pointer-events: auto;
 }
 
+.lightbox__media.placeholder--video::before,
+.lightbox__media.placeholder--video::after {
+  display: none;
+}
+
 .lightbox__media img,
 .lightbox__media video {
   display: block;
-  max-width: 100%;
-  max-height: min(82vh, 900px);
+  height: 100%;
+  width: auto;
+  max-width: min(92vw, 1080px);
+  object-fit: contain;
 }
 
 .lightbox__close {
-  position: absolute;
-  top: 0;
-  right: 0;
-  transform: translate(50%, -50%) scale(var(--lightbox-close-scale));
+  position: static;
+  transform: scale(var(--lightbox-close-scale));
   width: clamp(2.2rem, 5vw, 2.8rem);
   height: clamp(2.2rem, 5vw, 2.8rem);
   border-radius: 999px;
@@ -694,6 +660,8 @@ body.is-transitioning {
     opacity 0.3s ease;
   --lightbox-close-scale: 1;
   will-change: transform;
+  align-self: flex-start;
+  order: 2;
 }
 
 .lightbox__close:hover,
@@ -1167,6 +1135,8 @@ body.is-transitioning {
   z-index: 2;
   color: var(--color-light-grey);
   text-align: left;
+  mix-blend-mode: difference;
+  isolation: isolate;
 }
 
 .media-strip:hover + .project-heading,
@@ -1182,10 +1152,16 @@ body.is-transitioning {
   font-weight: 400;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--color-cream);
+  color: #ffffff;
+  -webkit-text-fill-color: #ffffff;
+  -webkit-text-stroke: 0.04em rgba(243, 234, 219, 0.92);
+  paint-order: stroke fill;
   mix-blend-mode: difference;
-  filter: contrast(0.82) brightness(1.1) saturate(0.95);
-  opacity: 0.94;
+  filter: contrast(0.9) brightness(1.08) saturate(0.95);
+  text-shadow:
+    0 0 1px rgba(243, 234, 219, 0.65),
+    0 0 12px rgba(0, 0, 0, 0.35);
+  opacity: 0.96;
   transition: opacity 0.3s ease;
 }
 

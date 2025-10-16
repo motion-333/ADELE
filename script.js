@@ -303,6 +303,31 @@
       return `${value}`.replace(/^\s*[-–—•*·]+\s*/, '').trim();
     };
 
+    const extractYouTubeId = (input) => {
+      if (!input) {
+        return null;
+      }
+
+      const source = `${input}`.trim();
+      if (!source) {
+        return null;
+      }
+
+      const directMatch = source.match(
+        /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/|live\/)|youtu\.be\/)([A-Za-z0-9_-]{6,})/i
+      );
+      if (directMatch && directMatch[1]) {
+        return directMatch[1];
+      }
+
+      const queryMatch = source.match(/[?&]v=([A-Za-z0-9_-]{6,})/i);
+      if (queryMatch && queryMatch[1]) {
+        return queryMatch[1];
+      }
+
+      return null;
+    };
+
     const normalizeVimeoUrl = (value) => {
       if (!value) {
         return null;
@@ -311,6 +336,11 @@
       const raw = `${value}`.trim();
       if (!raw) {
         return null;
+      }
+
+      const youtubeId = extractYouTubeId(raw);
+      if (youtubeId) {
+        return `https://www.youtube.com/embed/${youtubeId}`;
       }
 
       const extractId = (input) => {
@@ -358,11 +388,58 @@
       try {
         const base = window.location && window.location.origin ? window.location.origin : 'https://example.com';
         const parsed = new URL(url, base);
-        parsed.searchParams.set('autoplay', '1');
-        parsed.searchParams.set('muted', '0');
-        parsed.searchParams.set('playsinline', '1');
+        const host = parsed.hostname ? parsed.hostname.toLowerCase() : '';
+
+        if (host.includes('youtube.com') || host.includes('youtu.be')) {
+          const pathParts = parsed.pathname.split('/').filter(Boolean);
+          let videoId = null;
+          if (host.includes('youtu.be')) {
+            videoId = pathParts[0] || null;
+          } else if (pathParts.length >= 2 && ['embed', 'shorts', 'live'].includes(pathParts[0])) {
+            videoId = pathParts[1];
+          }
+          if (!videoId) {
+            videoId = parsed.searchParams.get('v');
+          }
+
+          parsed.searchParams.set('autoplay', '1');
+          parsed.searchParams.set('loop', '1');
+          if (videoId) {
+            parsed.searchParams.set('playlist', videoId);
+          }
+          parsed.searchParams.set('controls', '0');
+          parsed.searchParams.set('modestbranding', '1');
+          parsed.searchParams.set('showinfo', '0');
+          parsed.searchParams.set('rel', '0');
+          parsed.searchParams.set('mute', '0');
+          parsed.searchParams.set('playsinline', '1');
+          parsed.searchParams.delete('muted');
+        } else {
+          parsed.searchParams.set('autoplay', '1');
+          parsed.searchParams.set('muted', '0');
+          parsed.searchParams.set('playsinline', '1');
+        }
         return parsed.toString();
       } catch (error) {
+        const youtubeId = extractYouTubeId(url);
+        if (youtubeId) {
+          const baseUrl = url.includes('youtube.com') || url.includes('youtu.be')
+            ? `https://www.youtube.com/embed/${youtubeId}`
+            : `https://www.youtube.com/embed/${youtubeId}`;
+          const params = new URLSearchParams({
+            autoplay: '1',
+            loop: '1',
+            playlist: youtubeId,
+            controls: '0',
+            modestbranding: '1',
+            showinfo: '0',
+            rel: '0',
+            mute: '0',
+            playsinline: '1',
+          });
+          return `${baseUrl}?${params.toString()}`;
+        }
+
         const hasQuery = url.includes('?');
         const separator = hasQuery ? '&' : '?';
         return `${url}${separator}autoplay=1&muted=0&playsinline=1`;
@@ -916,8 +993,10 @@
 
       if (controls) {
         videoElement.setAttribute('controls', '');
+        videoElement.removeAttribute('aria-hidden');
       } else {
         videoElement.removeAttribute('controls');
+        videoElement.setAttribute('aria-hidden', 'true');
       }
 
       videoElement.play().catch(() => {
