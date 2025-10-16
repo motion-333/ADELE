@@ -1,5 +1,58 @@
 (function () {
-  if (document.documentElement && document.documentElement.classList) {
+  const rootElement = document.documentElement;
+  const THEME_STORAGE_KEY = 'adele:theme';
+
+  const readStoredTheme = () => {
+    try {
+      if (!window.localStorage) {
+        return null;
+      }
+      return window.localStorage.getItem(THEME_STORAGE_KEY);
+    } catch (error) {
+      return null;
+    }
+  };
+
+  const writeStoredTheme = (value) => {
+    try {
+      if (!window.localStorage) {
+        return;
+      }
+      window.localStorage.setItem(THEME_STORAGE_KEY, value);
+    } catch (error) {
+      /* ignore storage errors */
+    }
+  };
+
+  const detectSystemTheme = () => {
+    if (typeof window.matchMedia !== 'function') {
+      return null;
+    }
+    try {
+      return window.matchMedia('(prefers-color-scheme: light)').matches
+        ? 'light'
+        : 'dark';
+    } catch (error) {
+      return null;
+    }
+  };
+
+  const initialTheme = (() => {
+    const stored = readStoredTheme();
+    if (stored === 'light' || stored === 'dark') {
+      return stored;
+    }
+    const system = detectSystemTheme();
+    return system === 'light' ? 'light' : 'dark';
+  })();
+
+  if (rootElement) {
+    rootElement.dataset.theme = initialTheme;
+    rootElement.style.colorScheme = initialTheme === 'light' ? 'light' : 'dark';
+    rootElement.classList.add('has-js');
+  }
+
+  if (!rootElement && document.documentElement && document.documentElement.classList) {
     document.documentElement.classList.add('has-js');
   }
 
@@ -11,10 +64,116 @@
   document.addEventListener('DOMContentLoaded', async () => {
     const titleLink = document.querySelector('.topbar__title');
     const aboutLink = document.querySelector('.topbar__about');
-    const themeToggle = document.querySelector('.topbar__theme-toggle');
     const isHomePage = document.querySelector('.portfolio') !== null;
     const body = document.body || document.documentElement;
     const topbar = document.querySelector('.topbar');
+    const storedThemePreference = readStoredTheme();
+    let hasManualThemeSelection = storedThemePreference === 'light' || storedThemePreference === 'dark';
+    let currentTheme = initialTheme;
+    let themeToggleButton = null;
+
+    const updateThemeToggleVisuals = (theme) => {
+      if (!themeToggleButton) {
+        return;
+      }
+
+      const label = theme === 'light' ? 'Activer le mode sombre' : 'Activer le mode clair';
+      themeToggleButton.setAttribute('aria-label', label);
+      themeToggleButton.setAttribute('title', label);
+      themeToggleButton.setAttribute('data-theme-state', theme);
+    };
+
+    const applyTheme = (theme, options = {}) => {
+      const desired = theme === 'light' ? 'light' : 'dark';
+      const force = Boolean(options.force);
+      if (!force && currentTheme === desired) {
+        return desired;
+      }
+
+      currentTheme = desired;
+      if (rootElement) {
+        rootElement.dataset.theme = desired;
+        rootElement.style.colorScheme = desired === 'light' ? 'light' : 'dark';
+      }
+
+      if (options.persist !== false) {
+        writeStoredTheme(desired);
+        hasManualThemeSelection = true;
+      }
+
+      updateThemeToggleVisuals(desired);
+      return desired;
+    };
+
+    const ensureTopbarActions = () => {
+      const existing = document.querySelector('.topbar__actions');
+      if (existing) {
+        return existing;
+      }
+
+      const reference = document.querySelector('.topbar__about');
+      if (!reference || !reference.parentNode) {
+        return null;
+      }
+
+      const actions = document.createElement('div');
+      actions.className = 'topbar__actions';
+      reference.parentNode.insertBefore(actions, reference);
+      actions.appendChild(reference);
+      return actions;
+    };
+
+    const createThemeToggle = () => {
+      const actions = ensureTopbarActions();
+      if (!actions) {
+        return null;
+      }
+
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'topbar__theme-toggle';
+      button.innerHTML = `
+        <svg class="icon icon--theme" viewBox="0 0 24 24" role="img" aria-hidden="true">
+          <circle cx="12" cy="12" r="6.5" fill="none" stroke="currentColor" stroke-width="1.6"></circle>
+          <path d="M12 5a7 7 0 0 0 0 14 7 7 0 0 1 0-14z" fill="currentColor" stroke="none"></path>
+        </svg>
+      `;
+      actions.appendChild(button);
+      return button;
+    };
+
+    themeToggleButton = createThemeToggle();
+    if (themeToggleButton) {
+      themeToggleButton.addEventListener('click', (event) => {
+        event.preventDefault();
+        const nextTheme = currentTheme === 'light' ? 'dark' : 'light';
+        applyTheme(nextTheme);
+      });
+    }
+
+    updateThemeToggleVisuals(currentTheme);
+    applyTheme(currentTheme, { persist: false, force: true });
+
+    const themeMediaQuery =
+      typeof window.matchMedia === 'function'
+        ? window.matchMedia('(prefers-color-scheme: light)')
+        : null;
+
+    const handleThemePreferenceChange = (event) => {
+      if (!event) {
+        return;
+      }
+      if (hasManualThemeSelection) {
+        return;
+      }
+      applyTheme(event.matches ? 'light' : 'dark', { persist: false, force: true });
+    };
+
+    if (themeMediaQuery && typeof themeMediaQuery.addEventListener === 'function') {
+      themeMediaQuery.addEventListener('change', handleThemePreferenceChange);
+    } else if (themeMediaQuery && typeof themeMediaQuery.addListener === 'function') {
+      themeMediaQuery.addListener(handleThemePreferenceChange);
+    }
     const CATEGORY_KEYS = ['film', 'photo', 'evenementiel'];
     const categoryClassNames = CATEGORY_KEYS.map((key) => `category-${key}`);
     const allCategoryButtons = Array.from(
@@ -139,108 +298,6 @@
         ? window.matchMedia('(prefers-reduced-motion: reduce)')
         : { matches: false, addEventListener: null, addListener: null };
     shouldReduceMotion = reduceMotionMedia.matches;
-
-    const prefersLightMedia =
-      typeof window.matchMedia === 'function'
-        ? window.matchMedia('(prefers-color-scheme: light)')
-        : null;
-    const THEME_STORAGE_KEY = 'adele:theme-preference';
-    const THEME_DARK = 'dark';
-    const THEME_LIGHT = 'light';
-
-    const readStoredTheme = () => {
-      if (!window.localStorage) {
-        return null;
-      }
-
-      try {
-        const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
-        if (stored === THEME_DARK || stored === THEME_LIGHT) {
-          return stored;
-        }
-      } catch (error) {
-        return null;
-      }
-
-      return null;
-    };
-
-    const syncThemeToggleState = (theme) => {
-      if (!themeToggle) {
-        return;
-      }
-
-      const label = theme === THEME_LIGHT ? 'Activer le mode sombre' : 'Activer le mode clair';
-      themeToggle.setAttribute('aria-label', label);
-      themeToggle.setAttribute('aria-pressed', theme === THEME_LIGHT ? 'true' : 'false');
-      themeToggle.setAttribute('data-theme', theme);
-    };
-
-    const applyTheme = (theme, options = {}) => {
-      const normalized = theme === THEME_LIGHT ? THEME_LIGHT : THEME_DARK;
-
-      if (body) {
-        body.classList.remove('theme-light', 'theme-dark');
-        body.classList.add(`theme-${normalized}`);
-      }
-
-      syncThemeToggleState(normalized);
-
-      if (options.store === false) {
-        return;
-      }
-
-      try {
-        if (window.localStorage) {
-          window.localStorage.setItem(THEME_STORAGE_KEY, normalized);
-        }
-      } catch (error) {
-        /* ignore storage errors */
-      }
-    };
-
-    const resolvePreferredTheme = () => {
-      const stored = readStoredTheme();
-      if (stored === THEME_DARK || stored === THEME_LIGHT) {
-        return stored;
-      }
-
-      if (prefersLightMedia && prefersLightMedia.matches) {
-        return THEME_LIGHT;
-      }
-
-      return THEME_DARK;
-    };
-
-    applyTheme(resolvePreferredTheme(), { store: false });
-
-    if (themeToggle) {
-      themeToggle.addEventListener('click', () => {
-        const currentTheme = body && body.classList.contains('theme-light') ? THEME_LIGHT : THEME_DARK;
-        const nextTheme = currentTheme === THEME_LIGHT ? THEME_DARK : THEME_LIGHT;
-        applyTheme(nextTheme);
-      });
-    }
-
-    if (prefersLightMedia) {
-      const handleSchemeChange = (event) => {
-        if (readStoredTheme()) {
-          return;
-        }
-
-        applyTheme(event.matches ? THEME_LIGHT : THEME_DARK, { store: false });
-      };
-
-      try {
-        if (typeof prefersLightMedia.addEventListener === 'function') {
-          prefersLightMedia.addEventListener('change', handleSchemeChange);
-        } else if (typeof prefersLightMedia.addListener === 'function') {
-          prefersLightMedia.addListener(handleSchemeChange);
-        }
-      } catch (error) {
-        /* ignore media listener errors */
-      }
-    }
 
     const fontsReadyPromise =
       document.fonts && document.fonts.ready && typeof document.fonts.ready.then === 'function'
@@ -669,54 +726,15 @@
     };
 
     const dimensionCache = new Map();
-    const mediaReadyCache = new Map();
+    const imageReadyCache = new Map();
 
     const ensureImageReady = (src) => {
       if (!src) {
         return Promise.resolve();
       }
 
-      if (mediaReadyCache.has(src)) {
-        return mediaReadyCache.get(src);
-      }
-
-      const extension = getMediaExtension(src);
-
-      if (extension && VIDEO_EXTENSIONS.has(extension)) {
-        const videoPromise = new Promise((resolve) => {
-          const video = document.createElement('video');
-          let settled = false;
-
-          const finalize = () => {
-            if (settled) {
-              return;
-            }
-            settled = true;
-            resolve(true);
-          };
-
-          video.preload = 'metadata';
-          video.muted = true;
-          video.playsInline = true;
-          video.addEventListener('loadeddata', finalize, { once: true });
-          video.addEventListener('error', finalize, { once: true });
-          video.src = src;
-          try {
-            video.load();
-          } catch (error) {
-            /* ignore */
-          }
-          if (video.readyState >= 2) {
-            finalize();
-          }
-        });
-
-        mediaReadyCache.set(src, videoPromise);
-        videoPromise.catch(() => {
-          mediaReadyCache.delete(src);
-        });
-
-        return videoPromise;
+      if (imageReadyCache.has(src)) {
+        return imageReadyCache.get(src);
       }
 
       const promise = new Promise((resolve) => {
@@ -758,9 +776,9 @@
         }
       });
 
-      mediaReadyCache.set(src, promise);
+      imageReadyCache.set(src, promise);
       promise.catch(() => {
-        mediaReadyCache.delete(src);
+        imageReadyCache.delete(src);
       });
 
       return promise;
@@ -772,44 +790,6 @@
       }
       if (dimensionCache.has(src)) {
         return dimensionCache.get(src);
-      }
-
-      const extension = getMediaExtension(src);
-
-      if (extension && VIDEO_EXTENSIONS.has(extension)) {
-        const videoPromise = new Promise((resolve) => {
-          const video = document.createElement('video');
-          const finalize = () => {
-            const width = video.videoWidth || 0;
-            const height = video.videoHeight || 0;
-            if (!width || !height) {
-              resolve(null);
-            } else {
-              resolve({ width, height });
-            }
-          };
-          video.preload = 'metadata';
-          video.addEventListener('loadedmetadata', finalize, { once: true });
-          video.addEventListener('error', () => {
-            resolve(null);
-          });
-          video.src = src;
-          try {
-            video.load();
-          } catch (error) {
-            /* ignore */
-          }
-          if (video.readyState >= 1 && video.videoWidth && video.videoHeight) {
-            finalize();
-          }
-        });
-
-        dimensionCache.set(src, videoPromise);
-        videoPromise.catch(() => {
-          dimensionCache.delete(src);
-        });
-
-        return videoPromise;
       }
 
       const promise = new Promise((resolve) => {
@@ -865,53 +845,6 @@
       }
     };
 
-    const syncPlaceholderVideo = (element, src) => {
-      if (!element) {
-        return;
-      }
-
-      const videoSrc = src ? src.trim() : '';
-      let videoElement = element.querySelector('video.placeholder__video');
-
-      if (!videoSrc) {
-        if (videoElement) {
-          try {
-            videoElement.pause();
-          } catch (error) {
-            /* ignore */
-          }
-          videoElement.remove();
-        }
-        return;
-      }
-
-      if (!videoElement) {
-        videoElement = document.createElement('video');
-        videoElement.className = 'placeholder__video';
-        videoElement.muted = true;
-        videoElement.loop = true;
-        videoElement.autoplay = true;
-        videoElement.playsInline = true;
-        videoElement.preload = 'metadata';
-        videoElement.setAttribute('aria-hidden', 'true');
-        element.appendChild(videoElement);
-      }
-
-      if (videoElement.getAttribute('data-src') !== videoSrc) {
-        videoElement.setAttribute('data-src', videoSrc);
-        videoElement.src = videoSrc;
-        try {
-          videoElement.load();
-        } catch (error) {
-          /* ignore */
-        }
-      }
-
-      videoElement.play().catch(() => {
-        /* no-op */
-      });
-    };
-
     const initializeMediaElement = (element) => {
       if (!element) {
         return;
@@ -919,38 +852,46 @@
 
       const still = readStringAttribute(element, 'data-still');
       const animated = readStringAttribute(element, 'data-animated');
-      const video = readStringAttribute(element, 'data-video');
+      const videoSource = readStringAttribute(element, 'data-video');
       const aspectAttr = parseNumeric(element.getAttribute('data-aspect'));
 
-      const updateVideoClass = () => {
-        const currentStill = readStringAttribute(element, 'data-still');
-        const currentAnimated = readStringAttribute(element, 'data-animated');
-        const currentVideo = readStringAttribute(element, 'data-video');
-        if (currentVideo && !currentStill && !currentAnimated) {
-          element.classList.add('placeholder--video');
-        } else {
-          element.classList.remove('placeholder--video');
-        }
-      };
-
       const applyCurrentMedia = () => {
-        const currentStill = readStringAttribute(element, 'data-still');
-        const currentAnimated = readStringAttribute(element, 'data-animated');
-        const currentVideo = readStringAttribute(element, 'data-video');
-        const stillSource = currentStill || currentAnimated || '';
-        const animatedSource = currentAnimated || currentStill || '';
-        applyMediaVariables(element, stillSource, animatedSource);
-        syncPlaceholderVideo(element, currentVideo);
-        updateVideoClass();
+        applyMediaVariables(element, still, animated || still);
       };
 
       applyCurrentMedia();
+
+      if (videoSource) {
+        element.classList.add('placeholder--video');
+        let videoElement = element.querySelector('video');
+        if (!videoElement) {
+          videoElement = document.createElement('video');
+          videoElement.setAttribute('playsinline', '');
+          videoElement.setAttribute('muted', '');
+          videoElement.setAttribute('loop', '');
+          videoElement.autoplay = true;
+          videoElement.muted = true;
+          videoElement.loop = true;
+          videoElement.playsInline = true;
+          videoElement.preload = 'auto';
+          videoElement.controls = false;
+          element.appendChild(videoElement);
+        }
+
+        if (still) {
+          videoElement.setAttribute('poster', still);
+        }
+
+        if (videoElement.src !== videoSource) {
+          videoElement.src = videoSource;
+        }
+      }
 
       if (Number.isFinite(aspectAttr) && aspectAttr > 0) {
         element.style.setProperty('--item-aspect', `${aspectAttr}`);
       }
 
-      const primarySource = still || animated || video || null;
+      const primarySource = still || animated || null;
       if (primarySource) {
         ensureImageReady(primarySource)
           .then(() => {
@@ -960,14 +901,10 @@
 
             const currentStill = readStringAttribute(element, 'data-still');
             const currentAnimated = readStringAttribute(element, 'data-animated');
-            const currentVideo = readStringAttribute(element, 'data-video');
             if (still && currentStill !== still) {
               return;
             }
             if (!still && animated && currentAnimated !== animated) {
-              return;
-            }
-            if (!still && !animated && video && currentVideo !== video) {
               return;
             }
 
@@ -983,306 +920,6 @@
           /* ignore */
         });
       }
-      if (video) {
-        ensureImageReady(video).catch(() => {
-          /* ignore */
-        });
-      }
-    };
-
-    const LIGHTBOX_TRANSITION_MS = 360;
-    let lightboxElements = null;
-    let lightboxHideTimer = null;
-    let lastFocusedBeforeLightbox = null;
-
-    const resetLightboxMedia = (media) => {
-      if (!media) {
-        return;
-      }
-
-      media.removeAttribute('data-still');
-      media.removeAttribute('data-animated');
-      media.removeAttribute('data-video');
-      media.removeAttribute('data-aspect');
-      media.style.removeProperty('--item-aspect');
-      media.style.removeProperty(MEDIA_IMAGE_VAR);
-      media.style.removeProperty(MEDIA_ANIMATED_VAR);
-      media.classList.remove('placeholder--video', 'lightbox__media--video', 'lightbox__media--image');
-
-      Array.from(media.querySelectorAll('.placeholder__video, .lightbox__asset')).forEach(
-        (node) => {
-          if (!node || node.parentNode !== media) {
-            return;
-          }
-
-          try {
-            if (node.tagName && node.tagName.toLowerCase() === 'video') {
-              node.pause();
-              node.removeAttribute('src');
-              if (typeof node.load === 'function') {
-                node.load();
-              }
-            }
-          } catch (error) {
-            /* ignore */
-          }
-
-          node.remove();
-        }
-      );
-    };
-
-    const handleLightboxKeydown = (event) => {
-      if (event.key !== 'Escape') {
-        return;
-      }
-
-      event.preventDefault();
-      closeLightbox();
-    };
-
-    const ensureLightboxElements = () => {
-      if (lightboxElements) {
-        return lightboxElements;
-      }
-
-      const overlay = document.createElement('div');
-      overlay.className = 'lightbox';
-      overlay.setAttribute('aria-hidden', 'true');
-
-      const content = document.createElement('div');
-      content.className = 'lightbox__content';
-      content.setAttribute('role', 'dialog');
-      content.setAttribute('aria-modal', 'true');
-      content.setAttribute('aria-label', 'Agrandissement du visuel du projet');
-
-      const closeButton = document.createElement('button');
-      closeButton.type = 'button';
-      closeButton.className = 'lightbox__close';
-      closeButton.setAttribute('aria-label', 'Fermer la visionneuse');
-      const closeIcon = document.createElement('span');
-      closeIcon.className = 'lightbox__close-icon';
-      closeIcon.setAttribute('aria-hidden', 'true');
-      closeButton.appendChild(closeIcon);
-
-      const media = document.createElement('div');
-      media.className = 'lightbox__media';
-      media.setAttribute('aria-hidden', 'true');
-
-      content.appendChild(closeButton);
-      content.appendChild(media);
-      overlay.appendChild(content);
-      document.body.appendChild(overlay);
-
-      overlay.addEventListener('click', (event) => {
-        if (event.target === overlay) {
-          closeLightbox();
-        }
-      });
-
-      closeButton.addEventListener('click', () => {
-        closeLightbox();
-      });
-
-      overlay.addEventListener('transitionend', (event) => {
-        if (event.target !== overlay) {
-          return;
-        }
-
-        if (!overlay.classList.contains('is-visible')) {
-          overlay.classList.remove('is-active');
-        }
-      });
-
-      lightboxElements = { overlay, content, closeButton, media };
-      return lightboxElements;
-    };
-
-    const renderLightboxMedia = (media) => {
-      if (!media) {
-        return;
-      }
-
-      const still = readStringAttribute(media, 'data-still');
-      const animated = readStringAttribute(media, 'data-animated');
-      const video = readStringAttribute(media, 'data-video');
-
-      const cleanupNodes = media.querySelectorAll('.lightbox__asset, .placeholder__video');
-      cleanupNodes.forEach((node) => {
-        if (!node || node.parentNode !== media) {
-          return;
-        }
-
-        try {
-          if (node.tagName && node.tagName.toLowerCase() === 'video') {
-            node.pause();
-            node.removeAttribute('src');
-            if (typeof node.load === 'function') {
-              node.load();
-            }
-          }
-        } catch (error) {
-          /* ignore */
-        }
-
-        node.remove();
-      });
-
-      media.classList.remove('placeholder--video', 'lightbox__media--video', 'lightbox__media--image');
-
-      const sources = new Set();
-      if (still) {
-        sources.add(still);
-      }
-      if (animated) {
-        sources.add(animated);
-      }
-      if (video) {
-        sources.add(video);
-      }
-
-      sources.forEach((src) => {
-        ensureImageReady(src).catch(() => {
-          /* ignore */
-        });
-      });
-
-      const hasStandaloneVideo = !!video && !still && !animated;
-
-      if (hasStandaloneVideo) {
-        media.classList.add('lightbox__media--video');
-
-        const videoElement = document.createElement('video');
-        videoElement.className = 'lightbox__asset lightbox__asset--video';
-        videoElement.muted = true;
-        videoElement.loop = true;
-        videoElement.autoplay = true;
-        videoElement.playsInline = true;
-        videoElement.preload = 'metadata';
-        videoElement.setAttribute('aria-hidden', 'true');
-
-        try {
-          videoElement.src = video;
-          videoElement.load();
-        } catch (error) {
-          /* ignore */
-        }
-
-        media.appendChild(videoElement);
-
-        videoElement.play().catch(() => {
-          /* ignore */
-        });
-
-        return;
-      }
-
-      const imageSource = animated || still || video;
-      if (!imageSource) {
-        return;
-      }
-
-      media.classList.add('lightbox__media--image');
-
-      const imageElement = document.createElement('img');
-      imageElement.className = 'lightbox__asset lightbox__asset--image';
-      imageElement.alt = '';
-      imageElement.decoding = 'async';
-      imageElement.loading = 'lazy';
-      imageElement.src = imageSource;
-
-      media.appendChild(imageElement);
-    };
-
-    const closeLightbox = () => {
-      const elements = ensureLightboxElements();
-      const { overlay, media, content } = elements;
-
-      if (!overlay.classList.contains('is-active')) {
-        return;
-      }
-
-      overlay.classList.remove('is-visible');
-      overlay.setAttribute('aria-hidden', 'true');
-
-      if (lightboxHideTimer) {
-        clearTimeout(lightboxHideTimer);
-        lightboxHideTimer = null;
-      }
-
-      lightboxHideTimer = window.setTimeout(() => {
-        overlay.classList.remove('is-active');
-        resetLightboxMedia(media);
-        content.setAttribute('aria-label', 'Agrandissement du visuel du projet');
-      }, LIGHTBOX_TRANSITION_MS);
-
-      document.removeEventListener('keydown', handleLightboxKeydown);
-
-      if (lastFocusedBeforeLightbox && typeof lastFocusedBeforeLightbox.focus === 'function') {
-        try {
-          lastFocusedBeforeLightbox.focus({ preventScroll: true });
-        } catch (error) {
-          /* ignore */
-        }
-      }
-
-      lastFocusedBeforeLightbox = null;
-    };
-
-    const openLightboxFromElement = (sourceElement) => {
-      if (!sourceElement) {
-        return;
-      }
-
-      const elements = ensureLightboxElements();
-      const { overlay, content, closeButton, media } = elements;
-
-      if (lightboxHideTimer) {
-        clearTimeout(lightboxHideTimer);
-        lightboxHideTimer = null;
-      }
-
-      resetLightboxMedia(media);
-
-      const still = readStringAttribute(sourceElement, 'data-still');
-      const animated = readStringAttribute(sourceElement, 'data-animated');
-      const video = readStringAttribute(sourceElement, 'data-video');
-      const aspect = readStringAttribute(sourceElement, 'data-aspect');
-      const label = sourceElement.getAttribute('aria-label');
-
-      if (still) {
-        media.setAttribute('data-still', still);
-      }
-      if (animated) {
-        media.setAttribute('data-animated', animated);
-      }
-      if (video) {
-        media.setAttribute('data-video', video);
-      }
-      if (aspect) {
-        media.setAttribute('data-aspect', aspect);
-      }
-
-      if (label) {
-        content.setAttribute('aria-label', label);
-      }
-
-      renderLightboxMedia(media);
-
-      overlay.classList.add('is-active');
-      overlay.setAttribute('aria-hidden', 'false');
-      lastFocusedBeforeLightbox = document.activeElement;
-
-      requestAnimationFrame(() => {
-        overlay.classList.add('is-visible');
-        try {
-          closeButton.focus({ preventScroll: true });
-        } catch (error) {
-          /* ignore focus errors */
-        }
-      });
-
-      document.addEventListener('keydown', handleLightboxKeydown);
     };
 
 
@@ -1445,31 +1082,7 @@
       animateLoopResetProgress = null;
     }
 
-    const IMAGE_EXTENSIONS = new Set(['png', 'gif', 'jpg', 'jpeg', 'webp']);
-    const VIDEO_EXTENSIONS = new Set(['mp4', 'webm', 'mov']);
-    const SUPPORTED_MEDIA_EXTENSIONS = new Set([
-      ...IMAGE_EXTENSIONS,
-      ...VIDEO_EXTENSIONS,
-    ]);
-    const MEDIA_EXTENSION_PATTERN = /\.([^.?#]+)(?=[?#]?)/i;
-
-    const getMediaExtension = (src) => {
-      if (!src) {
-        return null;
-      }
-      const match = `${src}`.match(MEDIA_EXTENSION_PATTERN);
-      return match && match[1] ? match[1].toLowerCase() : null;
-    };
-
-    const isImageSource = (src) => {
-      const extension = getMediaExtension(src);
-      return extension ? IMAGE_EXTENSIONS.has(extension) : false;
-    };
-
-    const isVideoSource = (src) => {
-      const extension = getMediaExtension(src);
-      return extension ? VIDEO_EXTENSIONS.has(extension) : false;
-    };
+    const SUPPORTED_MEDIA_EXTENSIONS = new Set(['png', 'gif', 'mp4']);
 
     function normalizeDirectoryPath(path) {
       if (!path) {
@@ -1574,7 +1187,7 @@
         matches.add(match[1]);
         match = anchorRegex.exec(text);
       }
-      const pathRegex = /[\w\-./%]+\.(?:png|gif|jpe?g|webp|mp4|webm|mov)(?=["'\s>/]|$)/gi;
+      const pathRegex = /[\w\-./%]+\.(?:png|gif)(?=["'\s>/]|$)/gi;
       let pathMatch = pathRegex.exec(text);
       while (pathMatch) {
         matches.add(pathMatch[0]);
@@ -1667,7 +1280,7 @@
       }
 
       const inlinePlaceholders = Array.from(
-        container.querySelectorAll('[data-still], [data-animated], [data-video]')
+        container.querySelectorAll('[data-still], [data-animated]')
       );
       inlinePlaceholders.forEach((node) => {
         const still = readStringAttribute(node, 'data-still');
@@ -1677,10 +1290,6 @@
         }
         if (animated) {
           inlineList.push(animated);
-        }
-        const video = readStringAttribute(node, 'data-video');
-        if (video) {
-          inlineList.push(video);
         }
       });
 
@@ -1702,8 +1311,9 @@
           return;
         }
 
-        const extension = getMediaExtension(resolved);
-        if (!extension || !SUPPORTED_MEDIA_EXTENSIONS.has(extension)) {
+        const extensionMatch = resolved.match(/\.([^.?#]+)(?=[?#]?)/);
+        const extension = extensionMatch ? extensionMatch[1].toLowerCase() : '';
+        if (!SUPPORTED_MEDIA_EXTENSIONS.has(extension)) {
           return;
         }
 
@@ -1714,39 +1324,34 @@
 
         const pathWithoutQuery = relative.split(/[?#]/)[0] || relative;
         const baseKey = pathWithoutQuery.replace(/(\.[^./?#]+)$/, '');
-        if (!groups.has(baseKey)) {
+        if (groups.has(baseKey)) {
+          const existing = groups.get(baseKey);
+          if (extension === 'png' && !existing.png) {
+            existing.png = relative;
+          } else if (extension === 'gif' && !existing.gif) {
+            existing.gif = relative;
+          } else if (extension === 'mp4' && !existing.mp4) {
+            existing.mp4 = relative;
+          }
+        } else {
           groups.set(baseKey, {
             order: index,
-            still: null,
-            animated: null,
-            video: null,
+            png: extension === 'png' ? relative : null,
+            gif: extension === 'gif' ? relative : null,
+            mp4: extension === 'mp4' ? relative : null,
           });
-        }
-
-        const entry = groups.get(baseKey);
-        if (IMAGE_EXTENSIONS.has(extension)) {
-          if (extension === 'gif') {
-            if (!entry.animated) {
-              entry.animated = relative;
-            }
-            if (!entry.still) {
-              entry.still = relative;
-            }
-          } else if (!entry.still) {
-            entry.still = relative;
-          }
-        } else if (VIDEO_EXTENSIONS.has(extension)) {
-          if (!entry.video) {
-            entry.video = relative;
-          }
         }
       });
 
       const ordered = Array.from(groups.values()).sort((a, b) => a.order - b.order);
       const results = await Promise.all(
         ordered.map(async (entry) => {
+          const still = entry.png || entry.gif || null;
+          const animated = entry.gif || null;
+          const video = entry.mp4 || null;
+
           let aspect = null;
-          const sizeSource = entry.still || entry.animated || entry.video;
+          const sizeSource = entry.png || entry.gif;
           if (sizeSource) {
             try {
               const dimensions = await loadImageDimensions(sizeSource);
@@ -1759,17 +1364,15 @@
           }
 
           return {
-            still: entry.still,
-            animated: entry.animated,
-            video: entry.video,
+            still,
+            animated,
+            video,
             aspect,
           };
         })
       );
 
-      return results.filter(
-        (item) => item && (item.still || item.animated || item.video)
-      );
+      return results.filter((item) => item && (item.still || item.animated || item.video));
     };
 
     const projectMediaCache = new Map();
@@ -1847,30 +1450,10 @@
               return [];
             }
 
-            const sliderEntries = entries
-              .map((entry) => {
-                if (!entry) {
-                  return null;
-                }
-
-                const stillImage = isImageSource(entry.still) ? entry.still : null;
-                const animatedImage = isImageSource(entry.animated)
-                  ? entry.animated
-                  : null;
-
-                if (!stillImage && !animatedImage) {
-                  return null;
-                }
-
-                return {
-                  still: stillImage,
-                  animated: animatedImage,
-                  aspect: entry.aspect,
-                };
-              })
-              .filter(Boolean);
-
-            sliderEntries.forEach((entry) => {
+            entries.forEach((entry) => {
+              if (!entry || (!entry.still && !entry.animated)) {
+                return;
+              }
               const placeholder = document.createElement('a');
               placeholder.className = 'placeholder';
               placeholder.href = detailLink || '#';
@@ -1910,32 +1493,15 @@
         const hero = detail.querySelector('.project-hero__media');
         const gallery = detail.querySelector('.project-detail__gallery');
 
-        const detailTitleElement = detail.querySelector('.project-detail__title');
-        const detailTitleText = detailTitleElement
-          ? detailTitleElement.textContent.trim()
-          : '';
-
-        const lightboxLabel = detailTitleText
-          ? `Agrandir ${detailTitleText}`
-          : 'Agrandir le visuel du projet';
-
         const detailTask = loadProjectMediaEntries(projectId, directory, inlineList)
           .then((entries) => {
             if (hero) {
               if (entries && entries.length) {
                 const heroEntry =
                   entries.find((entry) => entry && (entry.still || entry.animated)) ||
-                  entries[0];
-                const heroHasImage =
-                  !!(heroEntry && (heroEntry.still || heroEntry.animated));
-                const defaultStill = heroHasImage
-                  ? heroEntry.still || heroEntry.animated || ''
-                  : '';
-                const defaultAnimated = heroHasImage
-                  ? heroEntry.animated || heroEntry.still || ''
-                  : '';
-                const defaultVideo =
-                  heroEntry && !heroHasImage && heroEntry.video ? heroEntry.video : '';
+                  null;
+                const defaultStill = heroEntry ? heroEntry.still || heroEntry.animated || '' : '';
+                const defaultAnimated = heroEntry ? heroEntry.animated || heroEntry.still || '' : '';
                 const defaultAspect =
                   heroEntry && Number.isFinite(heroEntry.aspect) && heroEntry.aspect > 0
                     ? `${heroEntry.aspect}`
@@ -1961,15 +1527,6 @@
                   hero.removeAttribute('data-animated');
                 }
 
-                if (defaultVideo) {
-                  hero.setAttribute('data-default-video', defaultVideo);
-                  hero.setAttribute('data-video', defaultVideo);
-                  mediaReadyPromises.push(ensureImageReady(defaultVideo));
-                } else {
-                  hero.removeAttribute('data-default-video');
-                  hero.removeAttribute('data-video');
-                }
-
                 if (defaultAspect) {
                   hero.setAttribute('data-default-aspect', defaultAspect);
                   hero.setAttribute('data-aspect', defaultAspect);
@@ -1980,11 +1537,9 @@
               } else {
                 hero.removeAttribute('data-default-still');
                 hero.removeAttribute('data-default-animated');
-                hero.removeAttribute('data-default-video');
                 hero.removeAttribute('data-default-aspect');
                 hero.removeAttribute('data-still');
                 hero.removeAttribute('data-animated');
-                hero.removeAttribute('data-video');
                 hero.removeAttribute('data-aspect');
               }
             }
@@ -1994,7 +1549,6 @@
               if (entries && entries.length) {
                 const heroStill = hero ? readStringAttribute(hero, 'data-still') : null;
                 const heroAnimated = hero ? readStringAttribute(hero, 'data-animated') : null;
-                const heroVideo = hero ? readStringAttribute(hero, 'data-video') : null;
                 const heroCandidates = new Set();
                 if (heroStill) {
                   heroCandidates.add(heroStill);
@@ -2002,72 +1556,37 @@
                 if (heroAnimated) {
                   heroCandidates.add(heroAnimated);
                 }
-                if (heroVideo) {
-                  heroCandidates.add(heroVideo);
-                }
+
+                const galleryItemLabel = projectTitleText
+                  ? `Agrandir ${projectTitleText}`
+                  : 'Agrandir le visuel du projet';
 
                 entries.forEach((entry) => {
-                  if (!entry) {
+                  const candidateKey = entry.still || entry.animated;
+                  if (!entry.video && candidateKey && heroCandidates.has(candidateKey)) {
                     return;
                   }
 
-                  const stillMatchesHero =
-                    !!(entry.still && heroCandidates.has(entry.still));
-                  const animatedMatchesHero =
-                    !!(entry.animated && heroCandidates.has(entry.animated));
-                  const videoMatchesHero =
-                    !!(entry.video && heroCandidates.has(entry.video));
-
-                  const createGalleryItem = (options) => {
-                    const { still, animated, video, aspect } = options;
-                    const item = document.createElement('div');
-                    const classes = ['project-detail__item', 'placeholder'];
-                    if (video && !still && !animated) {
-                      classes.push('placeholder--video');
-                    }
-                    item.className = classes.join(' ');
-                    item.tabIndex = 0;
-                    item.setAttribute('role', 'button');
-                    item.setAttribute('aria-label', lightboxLabel);
-                    if (still) {
-                      item.setAttribute('data-still', still);
-                      mediaReadyPromises.push(ensureImageReady(still));
-                    }
-                    if (animated) {
-                      item.setAttribute('data-animated', animated);
-                      mediaReadyPromises.push(ensureImageReady(animated));
-                    }
-                    if (video) {
-                      item.setAttribute('data-video', video);
-                      mediaReadyPromises.push(ensureImageReady(video));
-                    }
-                    if (Number.isFinite(aspect) && aspect > 0) {
-                      item.setAttribute('data-aspect', `${aspect}`);
-                    }
-                    gallery.appendChild(item);
-                  };
-
-                  const includeImage =
-                    (!!entry.still && !stillMatchesHero) ||
-                    (!!entry.animated && !animatedMatchesHero);
-
-                  if (includeImage) {
-                    createGalleryItem({
-                      still: !stillMatchesHero ? entry.still : null,
-                      animated: !animatedMatchesHero ? entry.animated : null,
-                      video: null,
-                      aspect: entry.aspect,
-                    });
+                  const item = document.createElement('div');
+                  item.className = 'project-detail__item placeholder';
+                  item.setAttribute('tabindex', '0');
+                  item.setAttribute('role', 'button');
+                  item.setAttribute('aria-label', galleryItemLabel);
+                  if (entry.still) {
+                    item.setAttribute('data-still', entry.still);
+                    mediaReadyPromises.push(ensureImageReady(entry.still));
                   }
-
-                  if (entry.video && !videoMatchesHero) {
-                    createGalleryItem({
-                      still: null,
-                      animated: null,
-                      video: entry.video,
-                      aspect: entry.aspect,
-                    });
+                  if (entry.animated) {
+                    item.setAttribute('data-animated', entry.animated);
+                    mediaReadyPromises.push(ensureImageReady(entry.animated));
                   }
+                  if (entry.video) {
+                    item.setAttribute('data-video', entry.video);
+                  }
+                  if (Number.isFinite(entry.aspect) && entry.aspect > 0) {
+                    item.setAttribute('data-aspect', `${entry.aspect}`);
+                  }
+                  gallery.appendChild(item);
                 });
               }
             }
@@ -2195,9 +1714,6 @@
         if (payload.animated && typeof payload.animated === 'string') {
           data.animated = payload.animated;
         }
-        if (payload.video && typeof payload.video === 'string') {
-          data.video = payload.video;
-        }
         if (Number.isFinite(payload.aspect) && payload.aspect > 0) {
           data.aspect = payload.aspect;
         }
@@ -2230,10 +1746,9 @@
         const parsed = JSON.parse(raw);
         const still = parsed && typeof parsed.still === 'string' ? parsed.still : null;
         const animated = parsed && typeof parsed.animated === 'string' ? parsed.animated : null;
-        const video = parsed && typeof parsed.video === 'string' ? parsed.video : null;
         const aspectCandidate = parsed && typeof parsed.aspect === 'number' ? parsed.aspect : null;
         const aspect = Number.isFinite(aspectCandidate) ? aspectCandidate : null;
-        return { still, animated, video, aspect };
+        return { still, animated, aspect };
       } catch (error) {
         return null;
       }
@@ -2353,18 +1868,195 @@
     window.addEventListener('touchstart', cancelScrollAnimation, {
       passive: true,
     });
-    const resolveInitialCategory = () => {
+
+    const intro = document.querySelector('.intro');
+    const introTitle = intro ? intro.querySelector('.intro__title') : null;
+    const introRole = intro ? intro.querySelector('.intro__role') : null;
+    const introCategories = intro
+      ? Array.from(intro.querySelectorAll('.intro__category'))
+      : [];
+
+    let introSequenceStarted = false;
+    const startIntroSequence = () => {
+      if (introSequenceStarted || !intro) {
+        return;
+      }
+      introSequenceStarted = true;
+
+      const elements = [];
+      if (introTitle) {
+        introTitle.classList.remove('is-visible');
+        elements.push(introTitle);
+      }
+      if (introRole) {
+        introRole.classList.remove('is-visible');
+        elements.push(introRole);
+      }
+      introCategories.forEach((category) => {
+        category.classList.remove('is-visible');
+        elements.push(category);
+      });
+
+      if (shouldReduceMotion) {
+        elements.forEach((element) => {
+          element.classList.add('is-visible');
+        });
+        return;
+      }
+
+      elements.forEach((element, index) => {
+        window.setTimeout(() => {
+          element.classList.add('is-visible');
+        }, 150 + index * 180);
+      });
+    };
+
+    const hideIntroElement = () => {
+      if (intro && !intro.classList.contains('intro--hidden')) {
+        intro.classList.add('intro--hidden');
+      }
+    };
+
+    let landingSelection = null;
+    let landingTransitionStarted = false;
+    let landingFinished = false;
+
+    const ensureLandingSelection = () => {
+      if (landingSelection && CATEGORY_KEYS.includes(landingSelection)) {
+        return landingSelection;
+      }
+
       if (initialHashCategory && CATEGORY_KEYS.includes(initialHashCategory)) {
-        return initialHashCategory;
+        landingSelection = initialHashCategory;
+        return landingSelection;
       }
 
       const storedCategory = readStoredCategory();
-      if (storedCategory && CATEGORY_KEYS.includes(storedCategory)) {
-        return storedCategory;
+      if (storedCategory) {
+        landingSelection = storedCategory;
+        return landingSelection;
       }
 
-      return CATEGORY_KEYS[0];
+      landingSelection = CATEGORY_KEYS[0];
+      return landingSelection;
     };
+
+    const finishLanding = () => {
+      if (landingFinished) {
+        return;
+      }
+      landingFinished = true;
+
+      if (topbar) {
+        topbar.classList.remove('topbar--landing');
+      }
+      if (body) {
+        body.classList.remove('is-landing');
+      }
+
+      const targetCategory = ensureLandingSelection();
+      if (targetCategory) {
+        const activateCategory = () => {
+          requestCategoryActivation(targetCategory, { initial: true, force: true });
+        };
+
+        if (!returnScrollReady) {
+          const onRestored = () => {
+            activateCategory();
+          };
+          try {
+            document.addEventListener(RETURN_SCROLL_EVENT, onRestored, {
+              once: true,
+            });
+          } catch (error) {
+            activateCategory();
+          }
+        } else {
+          activateCategory();
+        }
+      }
+      landingSelection = null;
+    };
+
+    const beginLandingTransition = (category) => {
+      if (category && CATEGORY_KEYS.includes(category)) {
+        landingSelection = category;
+      }
+
+      if (landingTransitionStarted) {
+        return;
+      }
+      landingTransitionStarted = true;
+
+      if (!intro || !introTitle || !titleLink || shouldReduceMotion) {
+        hideIntroElement();
+        finishLanding();
+        return;
+      }
+
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (!intro || intro.classList.contains('intro--hidden')) {
+            finishLanding();
+            return;
+          }
+
+          const introRect = introTitle.getBoundingClientRect();
+          const targetRect = titleLink.getBoundingClientRect();
+
+          const introCenterX = introRect.left + introRect.width / 2;
+          const introCenterY = introRect.top + introRect.height / 2;
+          const targetCenterX = targetRect.left + targetRect.width / 2;
+          const targetCenterY = targetRect.top + targetRect.height / 2;
+
+          const deltaX = targetCenterX - introCenterX;
+          const deltaY = targetCenterY - introCenterY;
+          const scale = introRect.width > 0 ? targetRect.width / introRect.width : 1;
+
+          intro.style.setProperty('--intro-translate-x', `${deltaX}px`);
+          intro.style.setProperty('--intro-translate-y', `${deltaY}px`);
+          intro.style.setProperty('--intro-scale', `${scale}`);
+
+          intro.classList.add('intro--running');
+
+          const INTRO_FADE_DELAY_MS = 1150;
+          window.setTimeout(() => {
+            if (intro && !intro.classList.contains('intro--hidden')) {
+              intro.classList.add('intro--fade');
+            }
+          }, INTRO_FADE_DELAY_MS);
+        });
+      });
+    };
+
+    const shouldSkipLanding = intro && pendingReturnScroll !== null;
+
+    if (shouldSkipLanding) {
+      introSequenceStarted = true;
+      if (introTitle) {
+        introTitle.classList.add('is-visible');
+      }
+      if (introRole) {
+        introRole.classList.add('is-visible');
+      }
+      introCategories.forEach((category) => {
+        category.classList.add('is-visible');
+      });
+      hideIntroElement();
+      finishLanding();
+    } else if (intro) {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(startIntroSequence);
+      });
+      intro.addEventListener('transitionend', (event) => {
+        if (event.target === intro && event.propertyName === 'opacity') {
+          hideIntroElement();
+          finishLanding();
+        }
+      });
+    } else {
+      finishLanding();
+    }
 
     const handleCategoryButtonClick = (event) => {
       const button = event.currentTarget;
@@ -2388,7 +2080,12 @@
         return;
       }
 
-      requestCategoryActivation(category, { userInitiated: true });
+      if (body && body.classList.contains('is-landing')) {
+        beginLandingTransition(category);
+      } else {
+        landingSelection = category;
+        requestCategoryActivation(category, { userInitiated: true });
+      }
     };
 
     allCategoryButtons.forEach((button) => {
@@ -2491,6 +2188,7 @@
 
           const showNewCategory = () => {
             activeCategory = category;
+            landingSelection = category;
             updateCategoryButtonState(category);
             applyBodyCategory(category);
             storeLastCategory(category);
@@ -2744,18 +2442,15 @@
           const projectId = anchor.getAttribute('data-project');
           const heroStill = readStringAttribute(anchor, 'data-still');
           const heroAnimated = readStringAttribute(anchor, 'data-animated');
-          const heroVideo = readStringAttribute(anchor, 'data-video');
           const heroAspect = parseNumeric(anchor.getAttribute('data-aspect'));
 
-          const storedStill = heroStill || heroAnimated || heroVideo || null;
+          const storedStill = heroStill || heroAnimated || null;
           const storedAnimated = heroAnimated || null;
-          const storedVideo = heroVideo || null;
 
-          if (projectId && (storedStill || storedAnimated || storedVideo)) {
+          if (projectId && (storedStill || storedAnimated)) {
             storeHeroData(projectId, {
               still: storedStill,
               animated: storedAnimated,
-              video: storedVideo,
               aspect: Number.isFinite(heroAspect) && heroAspect > 0 ? heroAspect : HERO_ASPECT,
             });
           }
@@ -2776,7 +2471,7 @@
 
           isProjectNavigationActive = true;
 
-          const preloadSource = heroStill || heroAnimated || heroVideo || null;
+          const preloadSource = heroStill || heroAnimated || null;
           let preloadPromise = Promise.resolve();
           if (preloadSource) {
             preloadPromise = Promise.race([
@@ -3302,6 +2997,8 @@
 
           if (shouldReduceMotion) {
             cancelScrollAnimation();
+            hideIntroElement();
+            finishLanding();
             trackStates.forEach((state) => {
               state.offset = 0;
               state.speed = 0;
@@ -3344,12 +3041,19 @@
         return;
       }
 
-      const targetCategory = resolveInitialCategory();
+      const targetCategory = ensureLandingSelection();
       if (!targetCategory) {
         return;
       }
 
-      requestCategoryActivation(targetCategory, { initial: true, force: true });
+      if (body && body.classList.contains('is-landing')) {
+        const shouldAutoStart = Boolean(initialHashCategory) || pendingReturnScroll !== null;
+        if (shouldAutoStart) {
+          beginLandingTransition(targetCategory);
+        }
+      } else {
+        requestCategoryActivation(targetCategory, { initial: true, force: true });
+      }
     };
 
     if (isHomePage) {
@@ -3365,6 +3069,8 @@
     const projectDetail = document.querySelector('.project-detail');
     if (projectDetail) {
       const backLink = projectDetail.querySelector('.project-detail__back');
+      const projectTitleElement = projectDetail.querySelector('.project-detail__title');
+      const projectTitleText = projectTitleElement ? projectTitleElement.textContent.trim() : '';
       if (backLink) {
         backLink.addEventListener('click', (event) => {
           event.preventDefault();
@@ -3386,18 +3092,14 @@
         ? {
             still: readStringAttribute(heroFrame, 'data-default-still'),
             animated: readStringAttribute(heroFrame, 'data-default-animated'),
-            video: readStringAttribute(heroFrame, 'data-default-video'),
             aspect: parseNumeric(heroFrame.getAttribute('data-default-aspect')),
           }
-        : { still: null, animated: null, video: null, aspect: null };
+        : { still: null, animated: null, aspect: null };
 
       const storedHero = readHeroData(projectId) || {};
       const storedStill = storedHero.still || null;
       const storedAnimated = storedHero.animated || null;
-      const storedVideo = storedHero.video || null;
 
-      const hasStoredImage = storedStill || storedAnimated;
-      const hasDefaultImage = heroDefaults.still || heroDefaults.animated;
       const heroStill =
         storedStill ||
         storedAnimated ||
@@ -3407,10 +3109,9 @@
       const heroAnimated =
         storedAnimated ||
         heroDefaults.animated ||
-        heroStill ||
-        null;
-      const heroVideo =
-        !hasStoredImage && !hasDefaultImage ? storedVideo || heroDefaults.video || null : null;
+        storedStill ||
+        heroDefaults.still ||
+        heroStill;
 
       if (heroFrame) {
         if (heroStill) {
@@ -3425,25 +3126,15 @@
           heroFrame.removeAttribute('data-animated');
         }
 
-        if (heroVideo) {
-          heroFrame.setAttribute('data-video', heroVideo);
-        } else {
-          heroFrame.removeAttribute('data-video');
-        }
-
         heroFrame.setAttribute('data-aspect', `${HERO_ASPECT}`);
         heroFrame.style.setProperty('--hero-aspect', `${HERO_ASPECT}`);
         applyMediaVariables(heroFrame, heroStill, heroAnimated);
-        syncPlaceholderVideo(heroFrame, heroVideo);
 
         if (heroStill) {
           ensureImageReady(heroStill).catch(() => {});
         }
         if (heroAnimated && heroAnimated !== heroStill) {
           ensureImageReady(heroAnimated).catch(() => {});
-        }
-        if (heroVideo) {
-          ensureImageReady(heroVideo).catch(() => {});
         }
       }
 
@@ -3574,9 +3265,6 @@
         if (heroDefaults.animated) {
           defaultSources.add(heroDefaults.animated);
         }
-        if (heroDefaults.video) {
-          defaultSources.add(heroDefaults.video);
-        }
 
         if (defaultSources.size) {
           const matchesSelected = Array.from(heroSources).some((src) =>
@@ -3589,21 +3277,21 @@
             ).some((item) => {
               const stillAttr = readStringAttribute(item, 'data-still');
               const animatedAttr = readStringAttribute(item, 'data-animated');
-              const videoAttr = readStringAttribute(item, 'data-video');
               return (
                 (stillAttr && defaultSources.has(stillAttr)) ||
-                (animatedAttr && defaultSources.has(animatedAttr)) ||
-                (videoAttr && defaultSources.has(videoAttr))
+                (animatedAttr && defaultSources.has(animatedAttr))
               );
             });
 
             if (!hasDefaultEntry) {
               const fallbackItem = document.createElement('div');
-              const fallbackClasses = ['project-detail__item', 'placeholder'];
-              if (heroDefaults.video && !heroDefaults.still && !heroDefaults.animated) {
-                fallbackClasses.push('placeholder--video');
-              }
-              fallbackItem.className = fallbackClasses.join(' ');
+              fallbackItem.className = 'project-detail__item placeholder';
+              fallbackItem.setAttribute('tabindex', '0');
+              fallbackItem.setAttribute('role', 'button');
+              const fallbackLabel = projectTitleText
+                ? `Agrandir ${projectTitleText}`
+                : 'Agrandir le visuel du projet';
+              fallbackItem.setAttribute('aria-label', fallbackLabel);
 
               if (heroDefaults.still) {
                 fallbackItem.setAttribute('data-still', heroDefaults.still);
@@ -3617,29 +3305,226 @@
                 }
               }
 
-              if (heroDefaults.video) {
-                fallbackItem.setAttribute('data-video', heroDefaults.video);
-                if (
-                  heroDefaults.video !== heroDefaults.still &&
-                  heroDefaults.video !== heroDefaults.animated
-                ) {
-                  ensureImageReady(heroDefaults.video).catch(() => {});
-                }
-              }
-
               if (Number.isFinite(heroDefaults.aspect) && heroDefaults.aspect > 0) {
                 fallbackItem.setAttribute('data-aspect', `${heroDefaults.aspect}`);
               }
-
-              fallbackItem.tabIndex = 0;
-              fallbackItem.setAttribute('role', 'button');
-              fallbackItem.setAttribute('aria-label', lightboxLabel);
 
               gallery.insertBefore(fallbackItem, gallery.firstChild);
               initializeMediaElement(fallbackItem);
             }
           }
         }
+
+        let projectLightbox = null;
+
+        const ensureProjectLightbox = () => {
+          if (projectLightbox) {
+            return projectLightbox;
+          }
+
+          const overlay = document.createElement('div');
+          overlay.className = 'project-lightbox';
+          overlay.setAttribute('aria-hidden', 'true');
+          overlay.setAttribute('role', 'dialog');
+          overlay.setAttribute('aria-modal', 'true');
+
+          const content = document.createElement('div');
+          content.className = 'project-lightbox__content';
+
+          const mediaContainer = document.createElement('div');
+          mediaContainer.className = 'project-lightbox__media';
+
+          const closeButton = document.createElement('button');
+          closeButton.type = 'button';
+          closeButton.className = 'project-lightbox__close';
+          closeButton.setAttribute('aria-label', 'Fermer la visionneuse');
+
+          const closeIcon = document.createElement('span');
+          closeIcon.className = 'project-lightbox__close-icon';
+          closeButton.appendChild(closeIcon);
+
+          content.appendChild(mediaContainer);
+          content.appendChild(closeButton);
+          overlay.appendChild(content);
+          document.body.appendChild(overlay);
+
+          let triggerElement = null;
+
+          const clearMedia = () => {
+            const mediaNode = mediaContainer.firstChild;
+            if (mediaNode && mediaNode.tagName === 'VIDEO') {
+              try {
+                mediaNode.pause();
+              } catch (error) {
+                /* ignore */
+              }
+              try {
+                mediaNode.currentTime = 0;
+              } catch (error) {
+                /* ignore */
+              }
+            }
+            while (mediaContainer.firstChild) {
+              mediaContainer.removeChild(mediaContainer.firstChild);
+            }
+          };
+
+          const close = () => {
+            if (!overlay.classList.contains('is-visible')) {
+              return;
+            }
+
+            overlay.classList.remove('is-visible');
+            overlay.setAttribute('aria-hidden', 'true');
+            window.setTimeout(() => {
+              clearMedia();
+              if (triggerElement && typeof triggerElement.focus === 'function') {
+                try {
+                  triggerElement.focus({ preventScroll: true });
+                } catch (error) {
+                  triggerElement.focus();
+                }
+              }
+              triggerElement = null;
+            }, 200);
+          };
+
+          const open = (payload, sourceElement) => {
+            if (!payload || !payload.src) {
+              return;
+            }
+
+            triggerElement = sourceElement || document.activeElement || null;
+            clearMedia();
+
+            let node = null;
+            if (payload.type === 'video') {
+              const video = document.createElement('video');
+              video.src = payload.src;
+              video.autoplay = true;
+              video.loop = true;
+              video.muted = true;
+              video.playsInline = true;
+              video.controls = true;
+              video.setAttribute('playsinline', '');
+              video.setAttribute('muted', '');
+              video.setAttribute('loop', '');
+              if (payload.poster) {
+                video.setAttribute('poster', payload.poster);
+              }
+              if (payload.alt) {
+                video.setAttribute('aria-label', payload.alt);
+              }
+              node = video;
+            } else {
+              const image = document.createElement('img');
+              image.src = payload.src;
+              image.alt = payload.alt || '';
+              image.loading = 'lazy';
+              node = image;
+            }
+
+            if (!node) {
+              return;
+            }
+
+            mediaContainer.appendChild(node);
+            overlay.classList.add('is-visible');
+            overlay.setAttribute('aria-hidden', 'false');
+            window.requestAnimationFrame(() => {
+              closeButton.focus({ preventScroll: true });
+            });
+          };
+
+          const handleKeydown = (event) => {
+            if (event.key === 'Escape' && overlay.classList.contains('is-visible')) {
+              event.preventDefault();
+              close();
+            }
+          };
+
+          const handleOverlayClick = (event) => {
+            if (event.target === overlay) {
+              close();
+            }
+          };
+
+          closeButton.addEventListener('click', (event) => {
+            event.preventDefault();
+            close();
+          });
+
+          overlay.addEventListener('click', handleOverlayClick);
+          document.addEventListener('keydown', handleKeydown);
+
+          projectLightbox = {
+            open,
+            close,
+          };
+
+          return projectLightbox;
+        };
+
+        const openLightboxForItem = (item) => {
+          if (!item) {
+            return;
+          }
+
+          const videoSrc = readStringAttribute(item, 'data-video');
+          const animatedSrc = readStringAttribute(item, 'data-animated');
+          const stillSrc = readStringAttribute(item, 'data-still');
+          const altText = projectTitleText
+            ? `${projectTitleText} — visuel du projet`
+            : 'Visuel du projet';
+
+          if (videoSrc) {
+            ensureProjectLightbox().open(
+              {
+                type: 'video',
+                src: videoSrc,
+                poster: animatedSrc || stillSrc || null,
+                alt: altText,
+              },
+              item
+            );
+            return;
+          }
+
+          const imageSource = animatedSrc || stillSrc;
+          if (!imageSource) {
+            return;
+          }
+
+          ensureProjectLightbox().open(
+            {
+              type: 'image',
+              src: imageSource,
+              alt: altText,
+            },
+            item
+          );
+        };
+
+        gallery.addEventListener('click', (event) => {
+          const item = event.target.closest('.project-detail__item');
+          if (!item) {
+            return;
+          }
+          event.preventDefault();
+          openLightboxForItem(item);
+        });
+
+        gallery.addEventListener('keydown', (event) => {
+          if (!ACTION_KEYS.has(event.key)) {
+            return;
+          }
+          const item = event.target.closest('.project-detail__item');
+          if (!item) {
+            return;
+          }
+          event.preventDefault();
+          openLightboxForItem(item);
+        });
 
         const parseAspectValue = (raw) => {
           if (raw === null || raw === undefined) {
@@ -3801,34 +3686,6 @@
 
         window.addEventListener('load', () => {
           scheduleMasonryLayout();
-        });
-
-        const handleGalleryLightbox = (target) => {
-          if (!target || !target.classList) {
-            return;
-          }
-          openLightboxFromElement(target);
-        };
-
-        gallery.addEventListener('click', (event) => {
-          const target = event.target.closest('.project-detail__item');
-          if (!target) {
-            return;
-          }
-          event.preventDefault();
-          handleGalleryLightbox(target);
-        });
-
-        gallery.addEventListener('keydown', (event) => {
-          if (!ACTION_KEYS.has(event.key)) {
-            return;
-          }
-          const target = event.target.closest('.project-detail__item');
-          if (!target) {
-            return;
-          }
-          event.preventDefault();
-          handleGalleryLightbox(target);
         });
       }
     }

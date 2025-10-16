@@ -12,8 +12,21 @@
     />
     <link rel="stylesheet" href="styles.css" />
   </head>
-  <body class="theme-dark">
-    <header class="topbar">
+  <body class="is-landing">
+    <div class="intro" aria-hidden="true">
+      <div class="intro__content">
+        <span class="intro__title">Adèle Farges</span>
+        <div class="intro__meta">
+          <span class="intro__role">DIRECTRICE DE PRODUCTION</span>
+          <nav class="intro__categories" aria-label="Types de projets">
+            <button type="button" class="intro__category" data-category-select="film">FILM</button>
+            <button type="button" class="intro__category" data-category-select="photo">PHOTO</button>
+            <button type="button" class="intro__category" data-category-select="evenementiel">ÉVÉNEMENTIEL</button>
+          </nav>
+        </div>
+      </div>
+    </div>
+    <header class="topbar topbar--landing">
       <div class="topbar__inner">
         <div class="topbar__identity">
           <a class="topbar__title" href="index.html">Adèle Farges</a>
@@ -24,38 +37,13 @@
           <button type="button" class="topbar__nav-link" data-category-select="photo">PHOTO</button>
           <button type="button" class="topbar__nav-link" data-category-select="evenementiel">ÉVÉNEMENTIEL</button>
         </nav>
-        <div class="topbar__actions">
-          <button
-            type="button"
-            class="topbar__theme-toggle"
-            aria-label="Activer le mode clair"
-          >
-            <svg class="icon icon--theme" viewBox="0 0 32 32" role="img" aria-hidden="true">
-              <circle class="icon--theme__sun" cx="16" cy="16" r="7"></circle>
-              <path
-                class="icon--theme__moon"
-                d="M20.5 24.5a8.5 8.5 0 0 1 0-17 8.5 8.5 0 1 0 0 17Z"
-              ></path>
-              <g class="icon--theme__rays" stroke-linecap="round">
-                <line x1="16" y1="3" x2="16" y2="6"></line>
-                <line x1="16" y1="26" x2="16" y2="29"></line>
-                <line x1="3" y1="16" x2="6" y2="16"></line>
-                <line x1="26" y1="16" x2="29" y2="16"></line>
-                <line x1="7.6" y1="7.6" x2="9.8" y2="9.8"></line>
-                <line x1="22.2" y1="22.2" x2="24.4" y2="24.4"></line>
-                <line x1="7.6" y1="24.4" x2="9.8" y2="22.2"></line>
-                <line x1="22.2" y1="9.8" x2="24.4" y2="7.6"></line>
-              </g>
-            </svg>
-          </button>
-          <a class="topbar__about" href="about.html" aria-label="À propos d'Adèle Farges">
-            <svg class="icon icon--info" viewBox="0 0 24 24" role="img" aria-hidden="true">
+        <a class="topbar__about" href="about.html" aria-label="À propos d'Adèle Farges">
+          <svg class="icon icon--info" viewBox="0 0 24 24" role="img" aria-hidden="true">
             <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.8"></circle>
             <line x1="12" y1="10" x2="12" y2="16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></line>
             <circle cx="12" cy="7" r="1.2" fill="currentColor"></circle>
-            </svg>
-          </a>
-        </div>
+          </svg>
+        </a>
       </div>
     </header>
     <div class="scroll-progress" aria-hidden="true">
