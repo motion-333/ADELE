@@ -865,13 +865,18 @@
       }
     };
 
-    const syncPlaceholderVideo = (element, src) => {
+    const syncPlaceholderVideo = (element, src, options = {}) => {
       if (!element) {
         return;
       }
 
       const videoSrc = src ? src.trim() : '';
       let videoElement = element.querySelector('video.placeholder__video');
+      const {
+        muted = true,
+        controls = false,
+        playsInline = true,
+      } = options;
 
       if (!videoSrc) {
         if (videoElement) {
@@ -888,10 +893,8 @@
       if (!videoElement) {
         videoElement = document.createElement('video');
         videoElement.className = 'placeholder__video';
-        videoElement.muted = true;
         videoElement.loop = true;
         videoElement.autoplay = true;
-        videoElement.playsInline = true;
         videoElement.preload = 'metadata';
         videoElement.setAttribute('aria-hidden', 'true');
         element.appendChild(videoElement);
@@ -905,6 +908,16 @@
         } catch (error) {
           /* ignore */
         }
+      }
+
+      videoElement.muted = muted;
+      videoElement.volume = muted ? 0 : 1;
+      videoElement.playsInline = playsInline;
+
+      if (controls) {
+        videoElement.setAttribute('controls', '');
+      } else {
+        videoElement.removeAttribute('controls');
       }
 
       videoElement.play().catch(() => {
@@ -921,6 +934,33 @@
       const animated = readStringAttribute(element, 'data-animated');
       const video = readStringAttribute(element, 'data-video');
       const aspectAttr = parseNumeric(element.getAttribute('data-aspect'));
+      const isLightboxMedia = element.classList.contains('lightbox__media');
+
+      const ensureLightboxImage = (source) => {
+        const imageSource = source ? source.trim() : '';
+        let imageElement = element.querySelector('img.lightbox__image');
+
+        if (!imageSource) {
+          if (imageElement) {
+            imageElement.remove();
+          }
+          return;
+        }
+
+        if (!imageElement) {
+          imageElement = document.createElement('img');
+          imageElement.className = 'lightbox__image';
+          imageElement.alt = '';
+          imageElement.setAttribute('aria-hidden', 'true');
+          imageElement.decoding = 'async';
+          imageElement.loading = 'eager';
+          element.appendChild(imageElement);
+        }
+
+        if (imageElement.getAttribute('src') !== imageSource) {
+          imageElement.src = imageSource;
+        }
+      };
 
       const updateVideoClass = () => {
         const currentStill = readStringAttribute(element, 'data-still');
@@ -939,6 +979,25 @@
         const currentVideo = readStringAttribute(element, 'data-video');
         const stillSource = currentStill || currentAnimated || '';
         const animatedSource = currentAnimated || currentStill || '';
+        if (isLightboxMedia) {
+          const imageSource = currentVideo ? '' : animatedSource || stillSource;
+          if (currentVideo) {
+            ensureLightboxImage(null);
+            syncPlaceholderVideo(element, currentVideo, {
+              muted: false,
+              controls: true,
+              playsInline: true,
+            });
+          } else {
+            syncPlaceholderVideo(element, null);
+            ensureLightboxImage(imageSource);
+          }
+          element.style.removeProperty(MEDIA_IMAGE_VAR);
+          element.style.removeProperty(MEDIA_ANIMATED_VAR);
+          updateVideoClass();
+          return;
+        }
+
         applyMediaVariables(element, stillSource, animatedSource);
         syncPlaceholderVideo(element, currentVideo);
         updateVideoClass();
@@ -946,8 +1005,10 @@
 
       applyCurrentMedia();
 
-      if (Number.isFinite(aspectAttr) && aspectAttr > 0) {
+      if (Number.isFinite(aspectAttr) && aspectAttr > 0 && !isLightboxMedia) {
         element.style.setProperty('--item-aspect', `${aspectAttr}`);
+      } else if (isLightboxMedia) {
+        element.style.removeProperty('--item-aspect');
       }
 
       const primarySource = still || animated || video || null;
@@ -1008,6 +1069,27 @@
       media.style.removeProperty(MEDIA_IMAGE_VAR);
       media.style.removeProperty(MEDIA_ANIMATED_VAR);
       media.classList.remove('placeholder--video');
+      const existingImage = media.querySelector('img.lightbox__image');
+      if (existingImage) {
+        existingImage.remove();
+      }
+      const existingVideo = media.querySelector('video.placeholder__video');
+      if (existingVideo) {
+        try {
+          existingVideo.pause();
+        } catch (error) {
+          /* ignore */
+        }
+        existingVideo.muted = true;
+        existingVideo.removeAttribute('data-src');
+        existingVideo.removeAttribute('src');
+        try {
+          existingVideo.load();
+        } catch (error) {
+          /* ignore */
+        }
+        existingVideo.remove();
+      }
       syncPlaceholderVideo(media, null);
     };
 

@@ -260,31 +260,31 @@ a {
 }
 
 body.theme-dark .topbar__theme-toggle .icon {
-  color: var(--color-cream);
+  color: var(--color-anthracite);
 }
 
 body.theme-light .topbar__theme-toggle .icon {
-  color: var(--color-anthracite);
+  color: var(--color-cream);
 }
 
 body.theme-dark .topbar__theme-toggle .icon--theme__sun,
 body.theme-dark .topbar__theme-toggle .icon--theme__moon {
-  fill: var(--color-cream);
-  stroke: var(--color-cream);
-}
-
-body.theme-light .topbar__theme-toggle .icon--theme__sun,
-body.theme-light .topbar__theme-toggle .icon--theme__moon {
   fill: var(--color-anthracite);
   stroke: var(--color-anthracite);
 }
 
-body.theme-dark .topbar__theme-toggle .icon--theme__rays line {
+body.theme-light .topbar__theme-toggle .icon--theme__sun,
+body.theme-light .topbar__theme-toggle .icon--theme__moon {
+  fill: var(--color-cream);
   stroke: var(--color-cream);
 }
 
-body.theme-light .topbar__theme-toggle .icon--theme__rays line {
+body.theme-dark .topbar__theme-toggle .icon--theme__rays line {
   stroke: var(--color-anthracite);
+}
+
+body.theme-light .topbar__theme-toggle .icon--theme__rays line {
+  stroke: var(--color-cream);
 }
 
 .topbar__theme-toggle .icon--theme__sun,
@@ -302,21 +302,26 @@ body.theme-light .topbar__theme-toggle .icon--theme__rays line {
 }
 
 body.theme-dark .topbar__theme-toggle {
-  background: var(--color-anthracite);
-  color: var(--color-cream);
+  background: var(--color-cream);
+  color: var(--color-anthracite);
   border-color: var(--color-cream);
 }
 
 body.theme-dark .topbar__theme-toggle:hover,
 body.theme-dark .topbar__theme-toggle:focus-visible {
-  background: transparent;
-  color: var(--color-cream);
+  background: rgba(243, 234, 219, 0.92);
+  color: var(--color-anthracite);
   border-color: var(--color-cream);
 }
 
 body.theme-dark .topbar__theme-toggle .icon--theme__moon {
   stroke: currentColor;
   stroke-width: 1.6;
+}
+
+body.theme-light .topbar__theme-toggle:hover,
+body.theme-light .topbar__theme-toggle:focus-visible {
+  color: var(--color-cream);
 }
 
 .topbar__theme-toggle .icon {
@@ -537,6 +542,11 @@ body.category-evenementiel .project[data-category='evenementiel'] {
   opacity: 0;
 }
 
+.project-detail__gallery .placeholder--video::before,
+.project-detail__gallery .placeholder--video::after {
+  display: none;
+}
+
 .portfolio .placeholder {
   border-radius: 3px;
 }
@@ -623,10 +633,10 @@ body.is-transitioning {
 
 .lightbox__content {
   position: relative;
-  display: flex;
-  align-items: center;
+  display: inline-flex;
+  align-items: flex-start;
   justify-content: center;
-  width: min(92vw, 1000px);
+  max-width: min(92vw, 1100px);
   transform: scale(0.94);
   transition: transform 0.35s ease;
 }
@@ -637,33 +647,41 @@ body.is-transitioning {
 
 .lightbox__media {
   position: relative;
-  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
   max-height: min(82vh, 900px);
-  aspect-ratio: var(--item-aspect, 1.5);
-  background-color: var(--color-bg);
-  background-size: contain;
-  background-repeat: no-repeat;
-  background-position: center;
-  border-radius: 8px;
-  box-shadow: 0 24px 48px var(--color-shadow-soft);
-  overflow: hidden;
+  background: none;
+  border-radius: 0;
+  box-shadow: none;
+  overflow: visible;
 }
 
 .lightbox__media .placeholder__video {
   object-fit: contain;
   background: transparent;
+  pointer-events: auto;
+}
+
+.lightbox__media img,
+.lightbox__media video {
+  display: block;
+  max-width: 100%;
+  max-height: min(82vh, 900px);
 }
 
 .lightbox__close {
   position: absolute;
-  top: clamp(0.6rem, 2vw, 1.25rem);
-  right: clamp(0.6rem, 2vw, 1.25rem);
-  width: clamp(2.4rem, 6vw, 3rem);
-  height: clamp(2.4rem, 6vw, 3rem);
+  top: 0;
+  right: 0;
+  transform: translate(50%, -50%) scale(var(--lightbox-close-scale));
+  width: clamp(2.2rem, 5vw, 2.8rem);
+  height: clamp(2.2rem, 5vw, 2.8rem);
   border-radius: 999px;
-  border: 2px solid var(--color-pill-stroke);
-  background: var(--color-pill-fill);
-  color: var(--color-pill-text);
+  border: none;
+  background: rgba(26, 26, 31, 0.75);
+  color: var(--color-cream);
   font-family: 'Dela Gothic One', 'Outfit', 'DM Sans', system-ui, -apple-system,
     BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: clamp(1.1rem, 3.5vw, 1.5rem);
@@ -672,28 +690,22 @@ body.is-transitioning {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background 0.25s ease, color 0.25s ease, border-color 0.25s ease,
-    transform 0.3s ease;
-  --lightbox-close-scale: 0.9;
-  transform: scale(var(--lightbox-close-scale));
+  transition: background 0.25s ease, color 0.25s ease, transform 0.3s ease,
+    opacity 0.3s ease;
+  --lightbox-close-scale: 1;
   will-change: transform;
 }
 
 .lightbox__close:hover,
 .lightbox__close:focus-visible {
-  background: transparent;
-  color: var(--color-pill-stroke);
-  border-color: var(--color-pill-stroke);
+  background: rgba(26, 26, 31, 0.9);
+  color: var(--color-cream);
   outline: none;
   --lightbox-close-scale: 1.05;
 }
 
 .lightbox__close:active {
   --lightbox-close-scale: 0.96;
-}
-
-:where(.lightbox.is-visible) .lightbox__close {
-  --lightbox-close-scale: 1;
 }
 
 .lightbox__close-icon {
@@ -873,7 +885,7 @@ body.is-transitioning {
   width: 0;
   height: 0;
   margin-left: clamp(0.05rem, 0.4vw, 0.35rem);
-  border-left: clamp(1.1rem, 3vw, 1.6rem) solid var(--color-text);
+  border-left: clamp(1.1rem, 3vw, 1.6rem) solid var(--color-cream);
   border-top: clamp(0.75rem, 2.1vw, 1.15rem) solid transparent;
   border-bottom: clamp(0.75rem, 2.1vw, 1.15rem) solid transparent;
 }
@@ -991,6 +1003,9 @@ body.is-transitioning {
     letter-spacing: 0.08em;
     text-transform: uppercase;
     transition: opacity 0.3s ease;
+    color: var(--color-cream);
+    mix-blend-mode: difference;
+    filter: contrast(0.92) brightness(1.08);
   }
 
   .project-detail__heading:hover .project-detail__title,
@@ -1000,7 +1015,8 @@ body.is-transitioning {
 
   .project-detail__meta {
     font-size: clamp(1rem, 2.2vw, 1.4rem);
-    color: var(--color-text-subtle);
+    color: var(--color-cream);
+    mix-blend-mode: difference;
     display: inline-flex;
     white-space: nowrap;
     align-items: center;
