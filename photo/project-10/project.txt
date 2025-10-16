@@ -1,8 +1,13 @@
-Titre de Projet: Titre de Projet 10
-Infos additionelles: Nom de Prod, 2025
+Titre de Projet: CARRERA X NUMÉRO
+Infos additionelles: Numéro, 2025
 Vimeo: https://vimeo.com/110022334
 Paragraphe:
-Présentation du projet 10. Ajoutez ici les informations importantes pour le lecteur.
+Présentation du projet 10.
 Crédits:
-Production — Nom Exemple
-Etalonnage — Nom Exemple
+Client : Carrera
+Magasine : NUMERO 
+Production HVH
+Photographe: Théo Le Foll
+Productrice: Delphine Landes
+Directrice de production: Adèle Farges
+Assistante de production: Léa Devienne
