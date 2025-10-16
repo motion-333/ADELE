@@ -411,6 +411,9 @@ body.category-evenementiel .project[data-category='evenementiel'] {
   margin-left: calc(50% - 50vw);
   overflow: hidden;
   position: relative;
+  display: flex;
+  align-items: center;
+  height: clamp(210px, 30vw, 360px);
 }
 
 .media-track {
@@ -420,6 +423,7 @@ body.category-evenementiel .project[data-category='evenementiel'] {
   width: max-content;
   will-change: transform;
   transform: translateZ(0);
+  min-height: 100%;
 }
 
 .placeholder {
@@ -512,7 +516,8 @@ body.category-evenementiel .project[data-category='evenementiel'] {
 
 .media-track .placeholder {
   flex: 0 0 clamp(330px, 42vw, 540px);
-  height: clamp(210px, 30vw, 360px);
+  height: 100%;
+  max-height: clamp(210px, 30vw, 360px);
 }
 
 .placeholder:is(:hover, :focus-visible) {
@@ -587,9 +592,10 @@ body.is-transitioning {
 
 .lightbox__content {
   position: relative;
-  display: inline-flex;
+  display: inline-grid;
   align-items: flex-start;
   justify-content: center;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: clamp(0.75rem, 2.5vw, 1.8rem);
   max-width: min(94vw, 1180px);
   transform: scale(0.94);
@@ -612,7 +618,8 @@ body.is-transitioning {
   border-radius: 0;
   box-shadow: none;
   overflow: visible;
-  order: 1;
+  grid-column: 1;
+  justify-self: center;
 }
 
 .lightbox__media .placeholder__video {
@@ -661,7 +668,9 @@ body.is-transitioning {
   --lightbox-close-scale: 1;
   will-change: transform;
   align-self: flex-start;
-  order: 2;
+  justify-self: flex-start;
+  grid-column: 2;
+  grid-row: 1;
 }
 
 .lightbox__close:hover,

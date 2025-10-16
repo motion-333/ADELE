@@ -268,6 +268,185 @@
 
     const projectMetadataCache = new Map();
 
+    const PROJECT_MANIFEST_URL = 'pub/project-index.json';
+    let projectManifestPromise = null;
+
+    const fetchProjectManifest = async () => {
+      if (projectManifestPromise) {
+        return projectManifestPromise;
+      }
+
+      projectManifestPromise = (async () => {
+        if (typeof fetch !== 'function') {
+          return [];
+        }
+
+        try {
+          const response = await fetch(PROJECT_MANIFEST_URL, { cache: 'no-store' });
+          if (!response || !response.ok) {
+            return [];
+          }
+
+          const data = await response.json();
+          if (!Array.isArray(data)) {
+            return [];
+          }
+
+          return data
+            .map((entry) => {
+              if (!entry) {
+                return null;
+              }
+
+              const rawId = entry.id || entry.project || entry.slug || entry.name;
+              const id = rawId ? `${rawId}`.trim() : '';
+              if (!id) {
+                return null;
+              }
+
+              const detailLink = entry.detail || entry.detailLink || entry.href || entry.page;
+              const category = entry.category ? `${entry.category}`.trim() : '';
+
+              return {
+                id,
+                detail: detailLink ? `${detailLink}`.trim() : `${id}.html`,
+                category: category || null,
+              };
+            })
+            .filter(Boolean);
+        } catch (error) {
+          return [];
+        }
+      })();
+
+      return projectManifestPromise;
+    };
+
+    const createProjectSection = (template) => {
+      if (template) {
+        const section = template.cloneNode(true);
+        section.classList.remove('project--clone', 'project--primary', 'is-visible');
+        section.removeAttribute('data-project');
+        section.removeAttribute('data-detail-link');
+        section.removeAttribute('data-category');
+
+        const track = section.querySelector('.media-track');
+        if (track) {
+          track.innerHTML = '';
+          track.removeAttribute('data-media-source');
+        }
+
+        const titleEl = section.querySelector('.project-title');
+        if (titleEl) {
+          titleEl.textContent = 'TITRE DE PROJET';
+        }
+
+        const metaEl = section.querySelector('.project-meta');
+        if (metaEl) {
+          metaEl.textContent = 'Nom de Prod, 2025';
+        }
+
+        return section;
+      }
+
+      const section = document.createElement('section');
+      section.className = 'project';
+
+      const mediaStrip = document.createElement('div');
+      mediaStrip.className = 'media-strip';
+      const mediaTrack = document.createElement('div');
+      mediaTrack.className = 'media-track';
+      mediaStrip.appendChild(mediaTrack);
+
+      const heading = document.createElement('div');
+      heading.className = 'project-heading';
+      const title = document.createElement('h2');
+      title.className = 'project-title';
+      title.textContent = 'TITRE DE PROJET';
+      const meta = document.createElement('span');
+      meta.className = 'project-meta';
+      meta.textContent = 'Nom de Prod, 2025';
+      heading.appendChild(title);
+      heading.appendChild(meta);
+
+      section.appendChild(mediaStrip);
+      section.appendChild(heading);
+
+      return section;
+    };
+
+    const ensureProjectSections = async () => {
+      const projectList = document.querySelector('.projects');
+      if (!projectList) {
+        return [];
+      }
+
+      const manifest = await fetchProjectManifest();
+      if (!manifest.length) {
+        return manifest;
+      }
+
+      const primaryProjects = Array.from(
+        projectList.querySelectorAll('.project:not(.project--clone)')
+      );
+      const template = primaryProjects.length ? primaryProjects[0] : null;
+      const manifestIds = new Set();
+      const sectionLookup = new Map();
+
+      manifest.forEach((entry) => {
+        const { id, detail, category } = entry;
+        if (!id) {
+          return;
+        }
+
+        manifestIds.add(id);
+
+        let section = projectList.querySelector(
+          `.project[data-project="${id}"]:not(.project--clone)`
+        );
+        if (!section) {
+          section = createProjectSection(template);
+          projectList.appendChild(section);
+        }
+
+        if (!section) {
+          return;
+        }
+
+        section.setAttribute('data-project', id);
+        section.setAttribute('data-detail-link', detail || `${id}.html`);
+        if (category) {
+          section.setAttribute('data-category', category);
+        } else {
+          section.removeAttribute('data-category');
+        }
+
+        sectionLookup.set(id, section);
+      });
+
+      primaryProjects.forEach((section) => {
+        const projectId = section.getAttribute('data-project');
+        if (projectId && !manifestIds.has(projectId)) {
+          section.remove();
+        }
+      });
+
+      const ordered = document.createDocumentFragment();
+      manifest.forEach((entry) => {
+        const section = sectionLookup.get(entry.id);
+        if (section) {
+          ordered.appendChild(section);
+        }
+      });
+
+      const cloneProjects = Array.from(projectList.querySelectorAll('.project--clone'));
+      cloneProjects.forEach((clone) => clone.remove());
+
+      projectList.appendChild(ordered);
+
+      return manifest;
+    };
+
     const METADATA_KEY_ALIASES = {
       'titre de projet': 'title',
       'titre': 'title',
@@ -328,6 +507,26 @@
       return null;
     };
 
+    const buildYouTubeEmbedUrl = (videoId) => {
+      if (!videoId) {
+        return null;
+      }
+
+      const params = new URLSearchParams({
+        autoplay: '1',
+        loop: '1',
+        playlist: videoId,
+        controls: '0',
+        modestbranding: '1',
+        showinfo: '0',
+        rel: '0',
+        mute: '0',
+        playsinline: '1',
+      });
+
+      return `https://www.youtube.com/embed/${videoId}?${params.toString()}`;
+    };
+
     const normalizeVimeoUrl = (value) => {
       if (!value) {
         return null;
@@ -385,64 +584,32 @@
         return null;
       }
 
+      const directYouTubeId = extractYouTubeId(url);
+      if (directYouTubeId) {
+        return buildYouTubeEmbedUrl(directYouTubeId);
+      }
+
       try {
         const base = window.location && window.location.origin ? window.location.origin : 'https://example.com';
         const parsed = new URL(url, base);
         const host = parsed.hostname ? parsed.hostname.toLowerCase() : '';
 
         if (host.includes('youtube.com') || host.includes('youtu.be')) {
-          const pathParts = parsed.pathname.split('/').filter(Boolean);
-          let videoId = null;
-          if (host.includes('youtu.be')) {
-            videoId = pathParts[0] || null;
-          } else if (pathParts.length >= 2 && ['embed', 'shorts', 'live'].includes(pathParts[0])) {
-            videoId = pathParts[1];
+          const youtubeId = extractYouTubeId(parsed.href);
+          if (youtubeId) {
+            return buildYouTubeEmbedUrl(youtubeId);
           }
-          if (!videoId) {
-            videoId = parsed.searchParams.get('v');
-          }
-
-          parsed.searchParams.set('autoplay', '1');
-          parsed.searchParams.set('loop', '1');
-          if (videoId) {
-            parsed.searchParams.set('playlist', videoId);
-          }
-          parsed.searchParams.set('controls', '0');
-          parsed.searchParams.set('modestbranding', '1');
-          parsed.searchParams.set('showinfo', '0');
-          parsed.searchParams.set('rel', '0');
-          parsed.searchParams.set('mute', '0');
-          parsed.searchParams.set('playsinline', '1');
-          parsed.searchParams.delete('muted');
-        } else {
-          parsed.searchParams.set('autoplay', '1');
-          parsed.searchParams.set('muted', '0');
-          parsed.searchParams.set('playsinline', '1');
         }
+
+        parsed.searchParams.set('autoplay', '1');
+        parsed.searchParams.set('muted', '0');
+        parsed.searchParams.set('playsinline', '1');
+        parsed.searchParams.set('loop', '1');
         return parsed.toString();
       } catch (error) {
-        const youtubeId = extractYouTubeId(url);
-        if (youtubeId) {
-          const baseUrl = url.includes('youtube.com') || url.includes('youtu.be')
-            ? `https://www.youtube.com/embed/${youtubeId}`
-            : `https://www.youtube.com/embed/${youtubeId}`;
-          const params = new URLSearchParams({
-            autoplay: '1',
-            loop: '1',
-            playlist: youtubeId,
-            controls: '0',
-            modestbranding: '1',
-            showinfo: '0',
-            rel: '0',
-            mute: '0',
-            playsinline: '1',
-          });
-          return `${baseUrl}?${params.toString()}`;
-        }
-
         const hasQuery = url.includes('?');
         const separator = hasQuery ? '&' : '?';
-        return `${url}${separator}autoplay=1&muted=0&playsinline=1`;
+        return `${url}${separator}autoplay=1&muted=0&playsinline=1&loop=1`;
       }
     };
 
@@ -648,7 +815,8 @@
       );
     };
 
-    const homeMetadataPromise = hydrateHomeProjects();
+    const ensureProjectSectionsPromise = ensureProjectSections();
+    const homeMetadataPromise = ensureProjectSectionsPromise.then(() => hydrateHomeProjects());
     const hydrateProjectDetailMetadata = async () => {
       const detail = document.querySelector('.project-detail[data-project]');
       if (!detail) {
@@ -1045,6 +1213,14 @@
         const currentStill = readStringAttribute(element, 'data-still');
         const currentAnimated = readStringAttribute(element, 'data-animated');
         const currentVideo = readStringAttribute(element, 'data-video');
+        if (isLightboxMedia) {
+          if (currentVideo) {
+            element.classList.add('placeholder--video');
+          } else {
+            element.classList.remove('placeholder--video');
+          }
+          return;
+        }
         if (currentVideo && !currentStill && !currentAnimated) {
           element.classList.add('placeholder--video');
         } else {
