@@ -549,6 +549,50 @@
       return null;
     };
 
+    const parseYouTubeTimeValue = (value) => {
+      if (value === null || value === undefined) {
+        return null;
+      }
+
+      const trimmed = `${value}`.trim();
+      if (!trimmed) {
+        return null;
+      }
+
+      if (/^\d+$/.test(trimmed)) {
+        return parseInt(trimmed, 10);
+      }
+
+      const colonParts = trimmed.split(':');
+      if (colonParts.length > 1 && colonParts.every((part) => /^\d+$/.test(part))) {
+        let seconds = 0;
+        let multiplier = 1;
+        for (let index = colonParts.length - 1; index >= 0; index -= 1) {
+          seconds += parseInt(colonParts[index], 10) * multiplier;
+          multiplier *= 60;
+        }
+        return seconds;
+      }
+
+      const timePattern = /^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/i;
+      const timeMatch = trimmed.match(timePattern);
+      if (timeMatch && (timeMatch[1] || timeMatch[2] || timeMatch[3])) {
+        let seconds = 0;
+        if (timeMatch[1]) {
+          seconds += parseInt(timeMatch[1], 10) * 3600;
+        }
+        if (timeMatch[2]) {
+          seconds += parseInt(timeMatch[2], 10) * 60;
+        }
+        if (timeMatch[3]) {
+          seconds += parseInt(timeMatch[3], 10);
+        }
+        return seconds;
+      }
+
+      return null;
+    };
+
     const extractYouTubeIdWithParams = (input) => {
       if (!input) {
         return null;
@@ -628,45 +672,46 @@
         playsinline: '1',
       });
 
-      if (extraParams && typeof extraParams.forEach === 'function') {
-        const protectedKeys = new Set([
-          'autoplay',
-          'loop',
-          'playlist',
-          'controls',
-          'modestbranding',
-          'showinfo',
-          'rel',
-          'mute',
-          'playsinline',
-        ]);
+      let startSeconds = null;
+      let endSeconds = null;
 
+      if (extraParams && typeof extraParams.forEach === 'function') {
         extraParams.forEach((value, key) => {
           if (value === null || value === undefined) {
             return;
           }
+
           const trimmedValue = `${value}`.trim();
           if (!trimmedValue) {
             return;
           }
 
-          if (protectedKeys.has(key)) {
-            if (key === 'playlist') {
-              const existing = params.get('playlist') || '';
-              const items = existing
-                .split(',')
-                .map((item) => item.trim())
-                .filter(Boolean);
-              if (trimmedValue !== videoId && !items.includes(trimmedValue)) {
-                items.push(trimmedValue);
-                params.set('playlist', items.join(','));
-              }
+          const normalizedKey = `${key}`.toLowerCase();
+          if (normalizedKey === 'start' || normalizedKey === 'time_continue') {
+            const parsed = parseYouTubeTimeValue(trimmedValue);
+            if (parsed !== null) {
+              startSeconds = parsed;
             }
-            return;
+          } else if (normalizedKey === 't') {
+            const parsed = parseYouTubeTimeValue(trimmedValue);
+            if (parsed !== null) {
+              startSeconds = parsed;
+            }
+          } else if (normalizedKey === 'end') {
+            const parsed = parseYouTubeTimeValue(trimmedValue);
+            if (parsed !== null) {
+              endSeconds = parsed;
+            }
           }
-
-          params.set(key, trimmedValue);
         });
+      }
+
+      if (Number.isFinite(startSeconds) && startSeconds >= 0) {
+        params.set('start', `${startSeconds}`);
+      }
+
+      if (Number.isFinite(endSeconds) && endSeconds > 0) {
+        params.set('end', `${endSeconds}`);
       }
 
       return `https://www.youtube.com/embed/${videoId}?${params.toString()}`;
@@ -884,8 +929,24 @@
         return projectMetadataCache.get(projectId);
       }
 
-      for (let index = 0; index < CATEGORY_KEYS.length; index += 1) {
-        const category = CATEGORY_KEYS[index];
+      const manifestEntry = projectManifestCache.get(projectId);
+      const categoryOrder = (() => {
+        const ordered = CATEGORY_KEYS.slice();
+        if (manifestEntry && manifestEntry.category) {
+          const normalized = `${manifestEntry.category}`.trim().toLowerCase();
+          if (CATEGORY_KEYS.includes(normalized)) {
+            const currentIndex = ordered.indexOf(normalized);
+            if (currentIndex > 0) {
+              ordered.splice(currentIndex, 1);
+              ordered.unshift(normalized);
+            }
+          }
+        }
+        return ordered;
+      })();
+
+      for (let index = 0; index < categoryOrder.length; index += 1) {
+        const category = categoryOrder[index];
         const categoryRoot = CATEGORY_DIRECTORY_LOOKUP[category] || normalizeDirectoryPath(category);
         const baseDir = normalizeDirectoryPath(`${categoryRoot}${projectId}`);
         const metadataUrl = `${baseDir}project.txt`;
@@ -1960,7 +2021,7 @@
         return [];
       }
 
-      const jsonCandidates = ['index.json', 'manifest.json', '_images.json', '_list.json'];
+      const jsonCandidates = ['_list.json', 'index.json', 'manifest.json', '_images.json'];
       for (let index = 0; index < jsonCandidates.length; index += 1) {
         const candidate = jsonCandidates[index];
         try {
@@ -3936,6 +3997,22 @@
         updateVideoAvailability(null);
       }
 
+      const applyVideoIframeAttributes = (iframe) => {
+        if (!iframe) {
+          return;
+        }
+
+        iframe.setAttribute(
+          'allow',
+          'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share'
+        );
+        iframe.setAttribute('allowfullscreen', '');
+        iframe.setAttribute('frameborder', '0');
+        iframe.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
+        iframe.setAttribute('width', '100%');
+        iframe.setAttribute('height', '100%');
+      };
+
       const ensureVideoIframe = () => {
         if (!heroVideoContainer || !heroVimeoUrl) {
           return null;
@@ -3946,14 +4023,15 @@
 
         if (!iframe) {
           iframe = document.createElement('iframe');
-          iframe.setAttribute('allow', 'autoplay; fullscreen; picture-in-picture');
-          iframe.setAttribute('allowfullscreen', '');
           iframe.setAttribute('title', 'Lecture vidéo du projet');
           iframe.src = autoplayUrl || heroVimeoUrl;
+          applyVideoIframeAttributes(iframe);
           heroVideoContainer.appendChild(iframe);
         } else if (autoplayUrl && iframe.src !== autoplayUrl) {
           iframe.src = autoplayUrl;
         }
+
+        applyVideoIframeAttributes(iframe);
 
         heroVideoContainer.removeAttribute('hidden');
         return iframe;

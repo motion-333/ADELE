@@ -19,6 +19,15 @@ const MEDIA_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.mp
 
 const manifestPath = path.join(ROOT, 'pub', 'project-index.json');
 
+const isDirectory = async (targetPath) => {
+  try {
+    const stats = await fs.stat(targetPath);
+    return stats.isDirectory();
+  } catch (error) {
+    return false;
+  }
+};
+
 const toProjectId = (input) => {
   if (!input) {
     return null;
@@ -87,6 +96,24 @@ const collectMediaFiles = async (basePath) => {
   const collected = await traverse();
   const unique = Array.from(new Set(collected));
   return unique.sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+};
+
+const writeMediaListFile = async (directoryPath, files) => {
+  if (!directoryPath) {
+    return;
+  }
+
+  try {
+    await fs.mkdir(directoryPath, { recursive: true });
+    const targetPath = path.join(directoryPath, '_list.json');
+    const payload = {
+      files: Array.isArray(files) ? files : [],
+    };
+    const serialised = JSON.stringify(payload, null, 2);
+    await fs.writeFile(targetPath, `${serialised}\n`, 'utf8');
+  } catch (error) {
+    /* ignore write issues */
+  }
 };
 
 const sortProjects = (entries) => {
@@ -162,7 +189,12 @@ const collectProjectDirectories = async (htmlEntries = new Map()) => {
             };
 
             const imagesDirectory = path.join(basePath, child.name, 'images');
-            const mediaFiles = await collectMediaFiles(imagesDirectory);
+            let mediaFiles = [];
+            if (await isDirectory(imagesDirectory)) {
+              mediaFiles = await collectMediaFiles(imagesDirectory);
+              await writeMediaListFile(imagesDirectory, mediaFiles);
+            }
+
             if (mediaFiles.length) {
               manifestEntry.media = mediaFiles;
             }
