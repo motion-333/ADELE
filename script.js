@@ -1007,8 +1007,29 @@
       media.style.removeProperty('--item-aspect');
       media.style.removeProperty(MEDIA_IMAGE_VAR);
       media.style.removeProperty(MEDIA_ANIMATED_VAR);
-      media.classList.remove('placeholder--video');
-      syncPlaceholderVideo(media, null);
+      media.classList.remove('placeholder--video', 'lightbox__media--video', 'lightbox__media--image');
+
+      Array.from(media.querySelectorAll('.placeholder__video, .lightbox__asset')).forEach(
+        (node) => {
+          if (!node || node.parentNode !== media) {
+            return;
+          }
+
+          try {
+            if (node.tagName && node.tagName.toLowerCase() === 'video') {
+              node.pause();
+              node.removeAttribute('src');
+              if (typeof node.load === 'function') {
+                node.load();
+              }
+            }
+          } catch (error) {
+            /* ignore */
+          }
+
+          node.remove();
+        }
+      );
     };
 
     const handleLightboxKeydown = (event) => {
@@ -1045,7 +1066,7 @@
       closeButton.appendChild(closeIcon);
 
       const media = document.createElement('div');
-      media.className = 'lightbox__media placeholder';
+      media.className = 'lightbox__media';
       media.setAttribute('aria-hidden', 'true');
 
       content.appendChild(closeButton);
@@ -1075,6 +1096,102 @@
 
       lightboxElements = { overlay, content, closeButton, media };
       return lightboxElements;
+    };
+
+    const renderLightboxMedia = (media) => {
+      if (!media) {
+        return;
+      }
+
+      const still = readStringAttribute(media, 'data-still');
+      const animated = readStringAttribute(media, 'data-animated');
+      const video = readStringAttribute(media, 'data-video');
+
+      const cleanupNodes = media.querySelectorAll('.lightbox__asset, .placeholder__video');
+      cleanupNodes.forEach((node) => {
+        if (!node || node.parentNode !== media) {
+          return;
+        }
+
+        try {
+          if (node.tagName && node.tagName.toLowerCase() === 'video') {
+            node.pause();
+            node.removeAttribute('src');
+            if (typeof node.load === 'function') {
+              node.load();
+            }
+          }
+        } catch (error) {
+          /* ignore */
+        }
+
+        node.remove();
+      });
+
+      media.classList.remove('placeholder--video', 'lightbox__media--video', 'lightbox__media--image');
+
+      const sources = new Set();
+      if (still) {
+        sources.add(still);
+      }
+      if (animated) {
+        sources.add(animated);
+      }
+      if (video) {
+        sources.add(video);
+      }
+
+      sources.forEach((src) => {
+        ensureImageReady(src).catch(() => {
+          /* ignore */
+        });
+      });
+
+      const hasStandaloneVideo = !!video && !still && !animated;
+
+      if (hasStandaloneVideo) {
+        media.classList.add('lightbox__media--video');
+
+        const videoElement = document.createElement('video');
+        videoElement.className = 'lightbox__asset lightbox__asset--video';
+        videoElement.muted = true;
+        videoElement.loop = true;
+        videoElement.autoplay = true;
+        videoElement.playsInline = true;
+        videoElement.preload = 'metadata';
+        videoElement.setAttribute('aria-hidden', 'true');
+
+        try {
+          videoElement.src = video;
+          videoElement.load();
+        } catch (error) {
+          /* ignore */
+        }
+
+        media.appendChild(videoElement);
+
+        videoElement.play().catch(() => {
+          /* ignore */
+        });
+
+        return;
+      }
+
+      const imageSource = animated || still || video;
+      if (!imageSource) {
+        return;
+      }
+
+      media.classList.add('lightbox__media--image');
+
+      const imageElement = document.createElement('img');
+      imageElement.className = 'lightbox__asset lightbox__asset--image';
+      imageElement.alt = '';
+      imageElement.decoding = 'async';
+      imageElement.loading = 'lazy';
+      imageElement.src = imageSource;
+
+      media.appendChild(imageElement);
     };
 
     const closeLightbox = () => {
@@ -1141,9 +1258,6 @@
       }
       if (video) {
         media.setAttribute('data-video', video);
-        media.classList.add('placeholder--video');
-      } else {
-        media.classList.remove('placeholder--video');
       }
       if (aspect) {
         media.setAttribute('data-aspect', aspect);
@@ -1153,7 +1267,7 @@
         content.setAttribute('aria-label', label);
       }
 
-      initializeMediaElement(media);
+      renderLightboxMedia(media);
 
       overlay.classList.add('is-active');
       overlay.setAttribute('aria-hidden', 'false');
