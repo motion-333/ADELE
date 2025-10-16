@@ -15,6 +15,7 @@ const CATEGORY_DIRECTORIES = [
 
 const PROJECT_HTML_PATTERN = /^project-(\d+)\.html$/i;
 const PROJECT_DIRECTORY_PATTERN = /^project-(\d+)$/i;
+const MEDIA_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.mp4', '.webm', '.mov']);
 
 const manifestPath = path.join(ROOT, 'pub', 'project-index.json');
 
@@ -44,6 +45,48 @@ const readJsonFile = async (filePath) => {
   } catch (error) {
     return null;
   }
+};
+
+const collectMediaFiles = async (basePath) => {
+  const traverse = async (segments = []) => {
+    const targetPath = path.join(basePath, ...segments);
+    let children = [];
+    try {
+      children = await fs.readdir(targetPath, { withFileTypes: true });
+    } catch (error) {
+      return [];
+    }
+
+    const results = [];
+
+    for (const child of children) {
+      if (child.name.startsWith('.')) {
+        continue;
+      }
+
+      const nextSegments = [...segments, child.name];
+
+      if (child.isDirectory()) {
+        const nested = await traverse(nextSegments);
+        results.push(...nested);
+        continue;
+      }
+
+      const ext = path.extname(child.name).toLowerCase();
+      if (!MEDIA_EXTENSIONS.has(ext)) {
+        continue;
+      }
+
+      const relativePath = nextSegments.join('/');
+      results.push(relativePath);
+    }
+
+    return results;
+  };
+
+  const collected = await traverse();
+  const unique = Array.from(new Set(collected));
+  return unique.sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
 };
 
 const sortProjects = (entries) => {
@@ -118,6 +161,12 @@ const collectProjectDirectories = async (htmlEntries = new Map()) => {
               detail,
             };
 
+            const imagesDirectory = path.join(basePath, child.name, 'images');
+            const mediaFiles = await collectMediaFiles(imagesDirectory);
+            if (mediaFiles.length) {
+              manifestEntry.media = mediaFiles;
+            }
+
             entries.set(id, manifestEntry);
           })
       );
@@ -130,10 +179,16 @@ const collectProjectDirectories = async (htmlEntries = new Map()) => {
 const mergeEntries = (base, override) => {
   const merged = new Map(base);
   override.forEach((value, key) => {
+    const baseEntry = base.get(key);
+    const baseMedia =
+      baseEntry && Array.isArray(baseEntry.media) && baseEntry.media.length ? baseEntry.media : null;
+    const overrideMedia = Array.isArray(value.media) && value.media.length ? value.media : null;
+
     merged.set(key, {
       id: value.id,
-      detail: value.detail || (base.get(key) ? base.get(key).detail : `${value.id}.html`),
-      category: value.category || (base.get(key) ? base.get(key).category : null),
+      detail: value.detail || (baseEntry ? baseEntry.detail : `${value.id}.html`),
+      category: value.category || (baseEntry ? baseEntry.category : null),
+      media: overrideMedia || baseMedia || null,
     });
   });
   return merged;
@@ -157,18 +212,38 @@ const normaliseManifest = (manifest) => {
 
       const detail = entry.detail || entry.detailLink || entry.href || entry.page;
       const category = entry.category ? `${entry.category}`.trim() : '';
+      const media = Array.isArray(entry.media)
+        ? entry.media
+            .map((item) => `${item}`.trim())
+            .filter((item) => item && MEDIA_EXTENSIONS.has(path.extname(item).toLowerCase()))
+        : [];
 
       return {
         id,
         detail: detail ? `${detail}`.trim() : `${id}.html`,
         category: category || null,
+        media,
       };
     })
     .filter(Boolean);
 };
 
 const writeManifest = async (entries) => {
-  const serialised = JSON.stringify(entries, null, 2);
+  const sanitised = entries.map((entry) => {
+    const normalised = {
+      id: entry.id,
+      detail: entry.detail,
+      category: entry.category,
+    };
+
+    if (Array.isArray(entry.media) && entry.media.length) {
+      normalised.media = entry.media;
+    }
+
+    return normalised;
+  });
+
+  const serialised = JSON.stringify(sanitised, null, 2);
   await fs.mkdir(path.dirname(manifestPath), { recursive: true });
   await fs.writeFile(manifestPath, `${serialised}\n`, 'utf8');
 };

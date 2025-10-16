@@ -269,6 +269,7 @@
     const projectMetadataCache = new Map();
 
     const PROJECT_MANIFEST_URL = 'pub/project-index.json';
+    const projectManifestCache = new Map();
     let projectManifestPromise = null;
 
     const fetchProjectManifest = async () => {
@@ -292,6 +293,8 @@
             return [];
           }
 
+          const mediaPattern = /\.(?:png|gif|jpe?g|webp|mp4|webm|mov)$/i;
+
           return data
             .map((entry) => {
               if (!entry) {
@@ -306,11 +309,40 @@
 
               const detailLink = entry.detail || entry.detailLink || entry.href || entry.page;
               const category = entry.category ? `${entry.category}`.trim() : '';
+              const rawMediaList = (() => {
+                if (Array.isArray(entry.media)) {
+                  return entry.media;
+                }
+                if (Array.isArray(entry.assets)) {
+                  return entry.assets;
+                }
+                if (Array.isArray(entry.files)) {
+                  return entry.files;
+                }
+                if (Array.isArray(entry.images)) {
+                  return entry.images;
+                }
+                return [];
+              })();
+
+              const manifestMedia = rawMediaList
+                .map((value) => {
+                  if (value === null || value === undefined) {
+                    return null;
+                  }
+                  const stringValue = `${value}`.trim();
+                  if (!stringValue || !mediaPattern.test(stringValue)) {
+                    return null;
+                  }
+                  return stringValue.replace(/\\/g, '/');
+                })
+                .filter(Boolean);
 
               return {
                 id,
                 detail: detailLink ? `${detailLink}`.trim() : `${id}.html`,
                 category: category || null,
+                media: manifestMedia,
               };
             })
             .filter(Boolean);
@@ -318,6 +350,16 @@
           return [];
         }
       })();
+
+      projectManifestPromise = projectManifestPromise.then((entries) => {
+        projectManifestCache.clear();
+        entries.forEach((entry) => {
+          if (entry && entry.id) {
+            projectManifestCache.set(entry.id, entry);
+          }
+        });
+        return entries;
+      });
 
       return projectManifestPromise;
     };
@@ -507,7 +549,69 @@
       return null;
     };
 
-    const buildYouTubeEmbedUrl = (videoId) => {
+    const extractYouTubeIdWithParams = (input) => {
+      if (!input) {
+        return null;
+      }
+
+      const source = `${input}`.trim();
+      if (!source) {
+        return null;
+      }
+
+      const base =
+        typeof window !== 'undefined' && window.location && window.location.origin
+          ? window.location.origin
+          : 'https://www.youtube.com';
+
+      try {
+        const parsed = new URL(source, base);
+        const host = parsed.hostname ? parsed.hostname.toLowerCase() : '';
+        if (host.includes('youtube.com') || host.includes('youtu.be')) {
+          let id = null;
+          const pathParts = parsed.pathname.split('/').filter(Boolean);
+
+          if (host.includes('youtu.be')) {
+            if (pathParts.length) {
+              id = pathParts[0];
+            }
+          } else if (pathParts.length) {
+            if (pathParts[0] === 'watch') {
+              id = parsed.searchParams.get('v');
+            } else if (pathParts[0] === 'embed' || pathParts[0] === 'shorts' || pathParts[0] === 'live') {
+              id = pathParts[1] || null;
+            } else if (!parsed.searchParams.has('v')) {
+              id = pathParts[pathParts.length - 1] || null;
+            }
+          }
+
+          if (!id && parsed.searchParams.has('v')) {
+            id = parsed.searchParams.get('v');
+          }
+
+          if (!id) {
+            id = extractYouTubeId(source);
+          }
+
+          if (id) {
+            const params = new URLSearchParams(parsed.searchParams);
+            params.delete('v');
+            return { id, params };
+          }
+        }
+      } catch (error) {
+        /* ignore URL parsing issues */
+      }
+
+      const fallbackId = extractYouTubeId(source);
+      if (fallbackId) {
+        return { id: fallbackId, params: new URLSearchParams() };
+      }
+
+      return null;
+    };
+
+    const buildYouTubeEmbedUrl = (videoId, extraParams) => {
       if (!videoId) {
         return null;
       }
@@ -524,6 +628,47 @@
         playsinline: '1',
       });
 
+      if (extraParams && typeof extraParams.forEach === 'function') {
+        const protectedKeys = new Set([
+          'autoplay',
+          'loop',
+          'playlist',
+          'controls',
+          'modestbranding',
+          'showinfo',
+          'rel',
+          'mute',
+          'playsinline',
+        ]);
+
+        extraParams.forEach((value, key) => {
+          if (value === null || value === undefined) {
+            return;
+          }
+          const trimmedValue = `${value}`.trim();
+          if (!trimmedValue) {
+            return;
+          }
+
+          if (protectedKeys.has(key)) {
+            if (key === 'playlist') {
+              const existing = params.get('playlist') || '';
+              const items = existing
+                .split(',')
+                .map((item) => item.trim())
+                .filter(Boolean);
+              if (trimmedValue !== videoId && !items.includes(trimmedValue)) {
+                items.push(trimmedValue);
+                params.set('playlist', items.join(','));
+              }
+            }
+            return;
+          }
+
+          params.set(key, trimmedValue);
+        });
+      }
+
       return `https://www.youtube.com/embed/${videoId}?${params.toString()}`;
     };
 
@@ -537,9 +682,9 @@
         return null;
       }
 
-      const youtubeId = extractYouTubeId(raw);
-      if (youtubeId) {
-        return `https://www.youtube.com/embed/${youtubeId}`;
+      const youtubeDetails = extractYouTubeIdWithParams(raw);
+      if (youtubeDetails) {
+        return buildYouTubeEmbedUrl(youtubeDetails.id, youtubeDetails.params);
       }
 
       const extractId = (input) => {
@@ -584,9 +729,9 @@
         return null;
       }
 
-      const directYouTubeId = extractYouTubeId(url);
-      if (directYouTubeId) {
-        return buildYouTubeEmbedUrl(directYouTubeId);
+      const directYouTubeDetails = extractYouTubeIdWithParams(url);
+      if (directYouTubeDetails) {
+        return buildYouTubeEmbedUrl(directYouTubeDetails.id, directYouTubeDetails.params);
       }
 
       try {
@@ -595,9 +740,9 @@
         const host = parsed.hostname ? parsed.hostname.toLowerCase() : '';
 
         if (host.includes('youtube.com') || host.includes('youtu.be')) {
-          const youtubeId = extractYouTubeId(parsed.href);
-          if (youtubeId) {
-            return buildYouTubeEmbedUrl(youtubeId);
+          const youtubeDetails = extractYouTubeIdWithParams(parsed.href);
+          if (youtubeDetails) {
+            return buildYouTubeEmbedUrl(youtubeDetails.id, youtubeDetails.params);
           }
         }
 
@@ -2043,6 +2188,43 @@
           (projectId ? `${projectId}.html` : '#');
 
         const inlineList = collectInlineMediaList(track);
+        const manifestEntry = projectManifestCache.get(projectId);
+        const manifestList =
+          manifestEntry && Array.isArray(manifestEntry.media) ? manifestEntry.media : [];
+        const fallbackList = (() => {
+          if (!manifestList.length) {
+            return inlineList;
+          }
+
+          const combined = [];
+          const seen = new Set();
+
+          inlineList.forEach((item) => {
+            if (!item) {
+              return;
+            }
+            const key = `${item}`.trim();
+            if (!key || seen.has(key)) {
+              return;
+            }
+            seen.add(key);
+            combined.push(item);
+          });
+
+          manifestList.forEach((item) => {
+            if (!item) {
+              return;
+            }
+            const key = `${item}`.trim();
+            if (!key || seen.has(key)) {
+              return;
+            }
+            seen.add(key);
+            combined.push(item);
+          });
+
+          return combined.length ? combined : inlineList;
+        })();
 
         const label = (() => {
           const titleEl = section.querySelector('.project-title');
@@ -2058,7 +2240,7 @@
           return "Découvrir le projet";
         })();
 
-        const task = loadProjectMediaEntries(projectId, directory, inlineList)
+        const task = loadProjectMediaEntries(projectId, directory, fallbackList)
           .then((entries) => {
             if (!track) {
               return [];
@@ -2130,6 +2312,43 @@
         const directoryAttr = readStringAttribute(detail, 'data-media-source');
         const directory = directoryAttr || (projectId ? `${projectId}/images/` : null);
         const inlineList = collectInlineMediaList(detail);
+        const manifestEntry = projectManifestCache.get(projectId);
+        const manifestList =
+          manifestEntry && Array.isArray(manifestEntry.media) ? manifestEntry.media : [];
+        const fallbackList = (() => {
+          if (!manifestList.length) {
+            return inlineList;
+          }
+
+          const combined = [];
+          const seen = new Set();
+
+          inlineList.forEach((item) => {
+            if (!item) {
+              return;
+            }
+            const key = `${item}`.trim();
+            if (!key || seen.has(key)) {
+              return;
+            }
+            seen.add(key);
+            combined.push(item);
+          });
+
+          manifestList.forEach((item) => {
+            if (!item) {
+              return;
+            }
+            const key = `${item}`.trim();
+            if (!key || seen.has(key)) {
+              return;
+            }
+            seen.add(key);
+            combined.push(item);
+          });
+
+          return combined.length ? combined : inlineList;
+        })();
         const hero = detail.querySelector('.project-hero__media');
         const gallery = detail.querySelector('.project-detail__gallery');
 
@@ -2142,7 +2361,7 @@
           ? `Agrandir ${detailTitleText}`
           : 'Agrandir le visuel du projet';
 
-        const detailTask = loadProjectMediaEntries(projectId, directory, inlineList)
+        const detailTask = loadProjectMediaEntries(projectId, directory, fallbackList)
           .then((entries) => {
             if (hero) {
               if (entries && entries.length) {
