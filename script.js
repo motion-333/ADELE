@@ -293,6 +293,13 @@
         return null;
       }
 
+      if (entry.mediaDirectory) {
+        const normalized = normalizeDirectoryPath(entry.mediaDirectory);
+        if (normalized) {
+          return normalized;
+        }
+      }
+
       const list = Array.isArray(entry.media) ? entry.media : [];
       for (let index = 0; index < list.length; index += 1) {
         const raw = list[index];
@@ -413,6 +420,10 @@
 
               const detailLink = entry.detail || entry.detailLink || entry.href || entry.page;
               const category = entry.category ? `${entry.category}`.trim() : '';
+              const mediaDirectory = normalizeDirectoryPath(
+                entry.mediaDirectory || entry.mediaPath || entry.directory || ''
+              );
+
               const rawMediaList = (() => {
                 if (Array.isArray(entry.media)) {
                   return entry.media;
@@ -442,11 +453,46 @@
                 })
                 .filter(Boolean);
 
+              const normalizeTextValue = (value) => {
+                if (value === null || value === undefined) {
+                  return null;
+                }
+                const trimmed = `${value}`.trim();
+                return trimmed ? trimmed : null;
+              };
+
+              const normalizeList = (list) => {
+                if (!Array.isArray(list)) {
+                  return [];
+                }
+                return list
+                  .map((item) => {
+                    if (item === null || item === undefined) {
+                      return null;
+                    }
+                    const trimmed = `${item}`.trim();
+                    return trimmed ? trimmed : null;
+                  })
+                  .filter(Boolean);
+              };
+
+              const title = normalizeTextValue(entry.title);
+              const info = normalizeTextValue(entry.info);
+              const paragraph = normalizeTextValue(entry.paragraph);
+              const vimeo = normalizeTextValue(entry.vimeo);
+              const credits = normalizeList(entry.credits);
+
               return {
                 id,
                 detail: detailLink ? `${detailLink}`.trim() : `${id}.html`,
                 category: category || null,
+                mediaDirectory: mediaDirectory || null,
                 media: manifestMedia,
+                title,
+                info,
+                paragraph,
+                credits,
+                vimeo,
               };
             })
             .filter(Boolean);
@@ -1067,6 +1113,40 @@
         const normalized = `${manifestEntry.category}`.trim().toLowerCase();
         return CATEGORY_KEYS.includes(normalized) ? normalized : null;
       })();
+
+      if (
+        manifestEntry &&
+        (manifestEntry.title ||
+          manifestEntry.info ||
+          manifestEntry.paragraph ||
+          manifestEntry.vimeo ||
+          (Array.isArray(manifestEntry.credits) && manifestEntry.credits.length) ||
+          manifestEntry.mediaDirectory ||
+          (Array.isArray(manifestEntry.media) && manifestEntry.media.length))
+      ) {
+        const resolvedCategory =
+          manifestCategory ||
+          (manifestEntry.category ? `${manifestEntry.category}`.trim().toLowerCase() : null);
+
+        const metadata = {
+          id: projectId,
+          category: resolvedCategory,
+          mediaDirectory: determineProjectMediaDirectory(
+            projectId,
+            resolvedCategory,
+            manifestEntry,
+            null
+          ),
+          title: manifestEntry.title || null,
+          info: manifestEntry.info || null,
+          paragraph: manifestEntry.paragraph || null,
+          credits: Array.isArray(manifestEntry.credits) ? manifestEntry.credits.slice() : [],
+          vimeo: normalizeVimeoUrl(manifestEntry.vimeo),
+        };
+
+        projectMetadataCache.set(projectId, metadata);
+        return metadata;
+      }
 
       const attemptedCategories = new Set();
 

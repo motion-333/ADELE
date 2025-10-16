@@ -17,7 +17,135 @@ const PROJECT_HTML_PATTERN = /^project-(\d+)\.html$/i;
 const PROJECT_DIRECTORY_PATTERN = /^project-(\d+)$/i;
 const MEDIA_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.mp4', '.webm', '.mov']);
 
+const METADATA_KEY_ALIASES = {
+  'titre de projet': 'title',
+  'titre': 'title',
+  'infos additionelles': 'info',
+  'infos additionnelles': 'info',
+  'infos supplementaires': 'info',
+  'infos supplémentaires': 'info',
+  'paragraphe': 'paragraph',
+  'description': 'paragraph',
+  'texte': 'paragraph',
+  'credits': 'credits',
+  'credit': 'credits',
+  'crédits': 'credits',
+  'vimeo': 'vimeo',
+};
+
 const manifestPath = path.join(ROOT, 'pub', 'project-index.json');
+
+const normalizeMetadataKey = (key) => {
+  if (!key) {
+    return '';
+  }
+  return key
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+};
+
+const stripMetadataBullet = (value) => {
+  if (!value) {
+    return '';
+  }
+  return `${value}`.replace(/^\s*[-–—•*·]+\s*/, '').trim();
+};
+
+const parseProjectMetadataText = (text) => {
+  const result = {
+    title: null,
+    info: null,
+    paragraph: null,
+    credits: [],
+    vimeo: null,
+  };
+
+  if (!text) {
+    return result;
+  }
+
+  const normalizedText = `${text}`.replace(/\r\n/g, '\n');
+  const lines = normalizedText.split('\n');
+
+  const paragraphLines = [];
+  const creditLines = [];
+
+  let currentKey = null;
+
+  lines.forEach((rawLine) => {
+    const line = rawLine.replace(/\r/g, '');
+    const keyMatch = line.match(/^\s*([^:]+):\s*(.*)$/);
+    if (keyMatch) {
+      const alias = METADATA_KEY_ALIASES[normalizeMetadataKey(keyMatch[1])];
+      if (alias) {
+        currentKey = alias;
+        const value = keyMatch[2].trim();
+        if (alias === 'title') {
+          result.title = value || result.title;
+        } else if (alias === 'info') {
+          result.info = value || result.info;
+        } else if (alias === 'paragraph') {
+          paragraphLines.length = 0;
+          if (value) {
+            paragraphLines.push(value);
+          }
+        } else if (alias === 'credits') {
+          creditLines.length = 0;
+          if (value) {
+            creditLines.push(stripMetadataBullet(value));
+          }
+        } else if (alias === 'vimeo') {
+          if (value) {
+            result.vimeo = value;
+          }
+        }
+        return;
+      }
+    }
+
+    const trimmed = line.trim();
+    if (!trimmed) {
+      if (currentKey === 'paragraph') {
+        paragraphLines.push('');
+      } else if (currentKey !== 'credits') {
+        currentKey = null;
+      }
+      return;
+    }
+
+    if (currentKey === 'title') {
+      result.title = result.title ? `${result.title} ${trimmed}` : trimmed;
+    } else if (currentKey === 'info') {
+      result.info = result.info ? `${result.info} ${trimmed}` : trimmed;
+    } else if (currentKey === 'paragraph') {
+      paragraphLines.push(trimmed);
+    } else if (currentKey === 'credits') {
+      creditLines.push(stripMetadataBullet(trimmed));
+    } else if (currentKey === 'vimeo') {
+      result.vimeo = result.vimeo ? `${result.vimeo} ${trimmed}` : trimmed;
+    }
+  });
+
+  const paragraph = paragraphLines
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+  if (paragraph) {
+    result.paragraph = paragraph;
+  }
+
+  const credits = creditLines
+    .map((entry) => stripMetadataBullet(entry))
+    .filter((entry) => !!entry);
+  if (credits.length) {
+    result.credits = credits;
+  }
+
+  return result;
+};
 
 const isDirectory = async (targetPath) => {
   try {
@@ -54,6 +182,26 @@ const readJsonFile = async (filePath) => {
   } catch (error) {
     return null;
   }
+};
+
+const normalizeDirectoryPath = (input) => {
+  if (!input) {
+    return '';
+  }
+
+  let normalized = `${input}`.trim().replace(/\\/g, '/');
+  if (!normalized) {
+    return '';
+  }
+
+  normalized = normalized.replace(/^\.\/+/, '');
+  normalized = normalized.replace(/^\/+/, '');
+
+  if (normalized && !normalized.endsWith('/')) {
+    normalized = `${normalized}/`;
+  }
+
+  return normalized;
 };
 
 const collectMediaFiles = async (basePath) => {
@@ -188,6 +336,33 @@ const collectProjectDirectories = async (htmlEntries = new Map()) => {
               detail,
             };
 
+            const metadataPath = path.join(basePath, child.name, 'project.txt');
+            let metadata = null;
+            try {
+              const rawMetadata = await fs.readFile(metadataPath, 'utf8');
+              metadata = parseProjectMetadataText(rawMetadata);
+            } catch (error) {
+              metadata = null;
+            }
+
+            if (metadata) {
+              if (metadata.title) {
+                manifestEntry.title = metadata.title;
+              }
+              if (metadata.info) {
+                manifestEntry.info = metadata.info;
+              }
+              if (metadata.paragraph) {
+                manifestEntry.paragraph = metadata.paragraph;
+              }
+              if (Array.isArray(metadata.credits) && metadata.credits.length) {
+                manifestEntry.credits = metadata.credits;
+              }
+              if (metadata.vimeo) {
+                manifestEntry.vimeo = metadata.vimeo;
+              }
+            }
+
             const imagesDirectory = path.join(basePath, child.name, 'images');
             let mediaFiles = [];
             if (await isDirectory(imagesDirectory)) {
@@ -195,8 +370,15 @@ const collectProjectDirectories = async (htmlEntries = new Map()) => {
               await writeMediaListFile(imagesDirectory, mediaFiles);
             }
 
+            const relativeImagesDirectory = normalizeDirectoryPath(
+              path.posix.join(directory, child.name, 'images')
+            );
+            if (relativeImagesDirectory) {
+              manifestEntry.mediaDirectory = relativeImagesDirectory;
+            }
+
             if (mediaFiles.length) {
-              manifestEntry.media = mediaFiles;
+              manifestEntry.media = mediaFiles.map((file) => file.replace(/\\/g, '/'));
             }
 
             entries.set(id, manifestEntry);
@@ -208,20 +390,64 @@ const collectProjectDirectories = async (htmlEntries = new Map()) => {
   return entries;
 };
 
+const hasTextValue = (value) => {
+  if (value === null || value === undefined) {
+    return false;
+  }
+  return `${value}`.trim().length > 0;
+};
+
 const mergeEntries = (base, override) => {
   const merged = new Map(base);
   override.forEach((value, key) => {
-    const baseEntry = base.get(key);
-    const baseMedia =
-      baseEntry && Array.isArray(baseEntry.media) && baseEntry.media.length ? baseEntry.media : null;
-    const overrideMedia = Array.isArray(value.media) && value.media.length ? value.media : null;
+    const existing = merged.get(key) || base.get(key) || {};
+    const result = { ...existing };
 
-    merged.set(key, {
-      id: value.id,
-      detail: value.detail || (baseEntry ? baseEntry.detail : `${value.id}.html`),
-      category: value.category || (baseEntry ? baseEntry.category : null),
-      media: overrideMedia || baseMedia || null,
-    });
+    result.id = value.id || existing.id || key;
+
+    if (hasTextValue(value.detail)) {
+      result.detail = value.detail;
+    } else if (!result.detail) {
+      result.detail = `${result.id}.html`;
+    }
+
+    if (hasTextValue(value.category)) {
+      result.category = value.category;
+    }
+
+    if (hasTextValue(value.mediaDirectory)) {
+      result.mediaDirectory = value.mediaDirectory;
+    }
+
+    if (hasTextValue(value.title)) {
+      result.title = value.title;
+    }
+
+    if (hasTextValue(value.info)) {
+      result.info = value.info;
+    }
+
+    if (hasTextValue(value.paragraph)) {
+      result.paragraph = value.paragraph;
+    }
+
+    if (hasTextValue(value.vimeo)) {
+      result.vimeo = value.vimeo;
+    }
+
+    if (Array.isArray(value.credits) && value.credits.length) {
+      result.credits = value.credits;
+    } else if (!Array.isArray(result.credits)) {
+      result.credits = Array.isArray(existing.credits) ? existing.credits : [];
+    }
+
+    if (Array.isArray(value.media) && value.media.length) {
+      result.media = value.media;
+    } else if (!Array.isArray(result.media) || !result.media.length) {
+      result.media = Array.isArray(existing.media) ? existing.media : [];
+    }
+
+    merged.set(key, result);
   });
   return merged;
 };
@@ -244,18 +470,57 @@ const normaliseManifest = (manifest) => {
 
       const detail = entry.detail || entry.detailLink || entry.href || entry.page;
       const category = entry.category ? `${entry.category}`.trim() : '';
+      const mediaDirectory = normalizeDirectoryPath(entry.mediaDirectory || entry.mediaPath || '');
       const media = Array.isArray(entry.media)
         ? entry.media
             .map((item) => `${item}`.trim())
             .filter((item) => item && MEDIA_EXTENSIONS.has(path.extname(item).toLowerCase()))
         : [];
 
-      return {
+      const credits = Array.isArray(entry.credits)
+        ? entry.credits.map((credit) => `${credit}`.trim()).filter((credit) => !!credit)
+        : [];
+
+      const title = hasTextValue(entry.title) ? `${entry.title}`.trim() : null;
+      const info = hasTextValue(entry.info) ? `${entry.info}`.trim() : null;
+      const paragraph = hasTextValue(entry.paragraph) ? `${entry.paragraph}`.trim() : null;
+      const vimeo = hasTextValue(entry.vimeo) ? `${entry.vimeo}`.trim() : null;
+
+      const normalised = {
         id,
         detail: detail ? `${detail}`.trim() : `${id}.html`,
         category: category || null,
-        media,
       };
+
+      if (mediaDirectory) {
+        normalised.mediaDirectory = mediaDirectory;
+      }
+
+      if (media.length) {
+        normalised.media = media;
+      }
+
+      if (title) {
+        normalised.title = title;
+      }
+
+      if (info) {
+        normalised.info = info;
+      }
+
+      if (paragraph) {
+        normalised.paragraph = paragraph;
+      }
+
+      if (credits.length) {
+        normalised.credits = credits;
+      }
+
+      if (vimeo) {
+        normalised.vimeo = vimeo;
+      }
+
+      return normalised;
     })
     .filter(Boolean);
 };
@@ -267,6 +532,30 @@ const writeManifest = async (entries) => {
       detail: entry.detail,
       category: entry.category,
     };
+
+    if (hasTextValue(entry.mediaDirectory)) {
+      normalised.mediaDirectory = normalizeDirectoryPath(entry.mediaDirectory);
+    }
+
+    if (hasTextValue(entry.title)) {
+      normalised.title = entry.title;
+    }
+
+    if (hasTextValue(entry.info)) {
+      normalised.info = entry.info;
+    }
+
+    if (hasTextValue(entry.paragraph)) {
+      normalised.paragraph = entry.paragraph;
+    }
+
+    if (Array.isArray(entry.credits) && entry.credits.length) {
+      normalised.credits = entry.credits;
+    }
+
+    if (hasTextValue(entry.vimeo)) {
+      normalised.vimeo = entry.vimeo;
+    }
 
     if (Array.isArray(entry.media) && entry.media.length) {
       normalised.media = entry.media;
