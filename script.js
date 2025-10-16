@@ -930,31 +930,33 @@
       }
 
       const manifestEntry = projectManifestCache.get(projectId);
-      const categoryOrder = (() => {
-        const ordered = CATEGORY_KEYS.slice();
-        if (manifestEntry && manifestEntry.category) {
-          const normalized = `${manifestEntry.category}`.trim().toLowerCase();
-          if (CATEGORY_KEYS.includes(normalized)) {
-            const currentIndex = ordered.indexOf(normalized);
-            if (currentIndex > 0) {
-              ordered.splice(currentIndex, 1);
-              ordered.unshift(normalized);
-            }
-          }
+      const manifestCategory = (() => {
+        if (!manifestEntry || !manifestEntry.category) {
+          return null;
         }
-        return ordered;
+
+        const normalized = `${manifestEntry.category}`.trim().toLowerCase();
+        return CATEGORY_KEYS.includes(normalized) ? normalized : null;
       })();
 
-      for (let index = 0; index < categoryOrder.length; index += 1) {
-        const category = categoryOrder[index];
-        const categoryRoot = CATEGORY_DIRECTORY_LOOKUP[category] || normalizeDirectoryPath(category);
+      const attemptedCategories = new Set();
+
+      const tryCategory = async (category) => {
+        if (!category || attemptedCategories.has(category)) {
+          return null;
+        }
+
+        attemptedCategories.add(category);
+
+        const categoryRoot =
+          CATEGORY_DIRECTORY_LOOKUP[category] || normalizeDirectoryPath(category);
         const baseDir = normalizeDirectoryPath(`${categoryRoot}${projectId}`);
         const metadataUrl = `${baseDir}project.txt`;
 
         try {
           const response = await fetch(metadataUrl, { cache: 'no-store' });
           if (!response || !response.ok) {
-            continue;
+            return null;
           }
 
           const text = await response.text();
@@ -975,8 +977,85 @@
           projectMetadataCache.set(projectId, metadata);
           return metadata;
         } catch (error) {
-          /* ignore this attempt and try the next category */
+          return null;
         }
+      };
+
+      const preferredCategories = manifestCategory
+        ? [manifestCategory]
+        : CATEGORY_KEYS.slice();
+
+      for (let index = 0; index < preferredCategories.length; index += 1) {
+        const metadata = await tryCategory(preferredCategories[index]);
+        if (metadata) {
+          return metadata;
+        }
+      }
+
+      if (manifestCategory) {
+        const fallbackCategories = CATEGORY_KEYS.filter(
+          (category) => !attemptedCategories.has(category)
+        );
+
+        for (let index = 0; index < fallbackCategories.length; index += 1) {
+          const metadata = await tryCategory(fallbackCategories[index]);
+          if (metadata) {
+            return metadata;
+          }
+        }
+      }
+
+      if (manifestEntry) {
+        const fallbackCategory = manifestCategory || null;
+        const categoryRoot =
+          fallbackCategory &&
+          (CATEGORY_DIRECTORY_LOOKUP[fallbackCategory] || normalizeDirectoryPath(fallbackCategory));
+        const baseDir = categoryRoot
+          ? normalizeDirectoryPath(`${categoryRoot}${projectId}`)
+          : null;
+
+        const manifestMediaDirectory = (() => {
+          if (baseDir) {
+            return normalizeDirectoryPath(`${baseDir}images`);
+          }
+
+          if (Array.isArray(manifestEntry.media)) {
+            for (let index = 0; index < manifestEntry.media.length; index += 1) {
+              const candidate = sanitizeFileEntry(manifestEntry.media[index]);
+              if (!candidate || /^https?:\/\//i.test(candidate)) {
+                continue;
+              }
+
+              const normalized = candidate.replace(/^\/+/, '');
+              const parts = normalized.split('/');
+              if (parts.length <= 1) {
+                continue;
+              }
+
+              parts.pop();
+              const directoryCandidate = parts.join('/');
+              if (directoryCandidate) {
+                return normalizeDirectoryPath(directoryCandidate);
+              }
+            }
+          }
+
+          return null;
+        })();
+
+        const fallbackMetadata = {
+          id: projectId,
+          category: fallbackCategory,
+          mediaDirectory: manifestMediaDirectory,
+          title: null,
+          info: null,
+          paragraph: null,
+          credits: [],
+          vimeo: null,
+        };
+
+        projectMetadataCache.set(projectId, fallbackMetadata);
+        return fallbackMetadata;
       }
 
       projectMetadataCache.set(projectId, null);
@@ -2209,8 +2288,10 @@
         return projectMediaCache.get(key);
       }
 
+      const fallbackList = Array.isArray(inlineList) ? inlineList : [];
       let remoteList = [];
-      if (directory) {
+
+      if (directory && !fallbackList.length) {
         try {
           remoteList = await fetchDirectoryFileNames(directory);
         } catch (error) {
@@ -2218,7 +2299,6 @@
         }
       }
 
-      const fallbackList = Array.isArray(inlineList) ? inlineList : [];
       const rawList = remoteList.length ? remoteList : fallbackList;
       const entries = await assembleMediaEntries(directory, rawList);
 
