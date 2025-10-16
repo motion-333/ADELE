@@ -922,6 +922,17 @@
       const video = readStringAttribute(element, 'data-video');
       const aspectAttr = parseNumeric(element.getAttribute('data-aspect'));
 
+      const updateVideoClass = () => {
+        const currentStill = readStringAttribute(element, 'data-still');
+        const currentAnimated = readStringAttribute(element, 'data-animated');
+        const currentVideo = readStringAttribute(element, 'data-video');
+        if (currentVideo && !currentStill && !currentAnimated) {
+          element.classList.add('placeholder--video');
+        } else {
+          element.classList.remove('placeholder--video');
+        }
+      };
+
       const applyCurrentMedia = () => {
         const currentStill = readStringAttribute(element, 'data-still');
         const currentAnimated = readStringAttribute(element, 'data-animated');
@@ -930,6 +941,7 @@
         const animatedSource = currentAnimated || currentStill || '';
         applyMediaVariables(element, stillSource, animatedSource);
         syncPlaceholderVideo(element, currentVideo);
+        updateVideoClass();
       };
 
       applyCurrentMedia();
@@ -995,6 +1007,7 @@
       media.style.removeProperty('--item-aspect');
       media.style.removeProperty(MEDIA_IMAGE_VAR);
       media.style.removeProperty(MEDIA_ANIMATED_VAR);
+      media.classList.remove('placeholder--video');
       syncPlaceholderVideo(media, null);
     };
 
@@ -1128,6 +1141,9 @@
       }
       if (video) {
         media.setAttribute('data-video', video);
+        media.classList.add('placeholder--video');
+      } else {
+        media.classList.remove('placeholder--video');
       }
       if (aspect) {
         media.setAttribute('data-aspect', aspect);
@@ -1793,12 +1809,21 @@
           .then((entries) => {
             if (hero) {
               if (entries && entries.length) {
-                const heroEntry = entries[0];
-                const defaultStill = heroEntry.still || heroEntry.animated || heroEntry.video || '';
-                const defaultAnimated = heroEntry.animated || heroEntry.still || heroEntry.video || '';
-                const defaultVideo = heroEntry.video || '';
+                const heroEntry =
+                  entries.find((entry) => entry && (entry.still || entry.animated)) ||
+                  entries[0];
+                const heroHasImage =
+                  !!(heroEntry && (heroEntry.still || heroEntry.animated));
+                const defaultStill = heroHasImage
+                  ? heroEntry.still || heroEntry.animated || ''
+                  : '';
+                const defaultAnimated = heroHasImage
+                  ? heroEntry.animated || heroEntry.still || ''
+                  : '';
+                const defaultVideo =
+                  heroEntry && !heroHasImage && heroEntry.video ? heroEntry.video : '';
                 const defaultAspect =
-                  Number.isFinite(heroEntry.aspect) && heroEntry.aspect > 0
+                  heroEntry && Number.isFinite(heroEntry.aspect) && heroEntry.aspect > 0
                     ? `${heroEntry.aspect}`
                     : '';
 
@@ -1825,12 +1850,7 @@
                 if (defaultVideo) {
                   hero.setAttribute('data-default-video', defaultVideo);
                   hero.setAttribute('data-video', defaultVideo);
-                  if (
-                    defaultVideo !== defaultStill &&
-                    defaultVideo !== defaultAnimated
-                  ) {
-                    mediaReadyPromises.push(ensureImageReady(defaultVideo));
-                  }
+                  mediaReadyPromises.push(ensureImageReady(defaultVideo));
                 } else {
                   hero.removeAttribute('data-default-video');
                   hero.removeAttribute('data-video');
@@ -1873,32 +1893,67 @@
                 }
 
                 entries.forEach((entry) => {
-                  const sources = [entry.still, entry.animated, entry.video].filter(Boolean);
-                  if (sources.some((source) => heroCandidates.has(source))) {
+                  if (!entry) {
                     return;
                   }
 
-                  const item = document.createElement('div');
-                  item.className = 'project-detail__item placeholder';
-                  item.tabIndex = 0;
-                  item.setAttribute('role', 'button');
-                  item.setAttribute('aria-label', lightboxLabel);
-                  if (entry.still) {
-                    item.setAttribute('data-still', entry.still);
-                    mediaReadyPromises.push(ensureImageReady(entry.still));
+                  const stillMatchesHero =
+                    !!(entry.still && heroCandidates.has(entry.still));
+                  const animatedMatchesHero =
+                    !!(entry.animated && heroCandidates.has(entry.animated));
+                  const videoMatchesHero =
+                    !!(entry.video && heroCandidates.has(entry.video));
+
+                  const createGalleryItem = (options) => {
+                    const { still, animated, video, aspect } = options;
+                    const item = document.createElement('div');
+                    const classes = ['project-detail__item', 'placeholder'];
+                    if (video && !still && !animated) {
+                      classes.push('placeholder--video');
+                    }
+                    item.className = classes.join(' ');
+                    item.tabIndex = 0;
+                    item.setAttribute('role', 'button');
+                    item.setAttribute('aria-label', lightboxLabel);
+                    if (still) {
+                      item.setAttribute('data-still', still);
+                      mediaReadyPromises.push(ensureImageReady(still));
+                    }
+                    if (animated) {
+                      item.setAttribute('data-animated', animated);
+                      mediaReadyPromises.push(ensureImageReady(animated));
+                    }
+                    if (video) {
+                      item.setAttribute('data-video', video);
+                      mediaReadyPromises.push(ensureImageReady(video));
+                    }
+                    if (Number.isFinite(aspect) && aspect > 0) {
+                      item.setAttribute('data-aspect', `${aspect}`);
+                    }
+                    gallery.appendChild(item);
+                  };
+
+                  const includeImage =
+                    (!!entry.still && !stillMatchesHero) ||
+                    (!!entry.animated && !animatedMatchesHero);
+
+                  if (includeImage) {
+                    createGalleryItem({
+                      still: !stillMatchesHero ? entry.still : null,
+                      animated: !animatedMatchesHero ? entry.animated : null,
+                      video: null,
+                      aspect: entry.aspect,
+                    });
                   }
-                  if (entry.animated) {
-                    item.setAttribute('data-animated', entry.animated);
-                    mediaReadyPromises.push(ensureImageReady(entry.animated));
+
+                  if (entry.video && !videoMatchesHero) {
+                    createGalleryItem({
+                      still: null,
+                      animated: null,
+                      video: entry.video,
+                      aspect: entry.aspect,
+                    });
                   }
-                  if (entry.video) {
-                    item.setAttribute('data-video', entry.video);
-                    mediaReadyPromises.push(ensureImageReady(entry.video));
-                  }
-                  if (Number.isFinite(entry.aspect) && entry.aspect > 0) {
-                    item.setAttribute('data-aspect', `${entry.aspect}`);
-                  }
-                  gallery.appendChild(item);
                 });
               }
             }
@@ -3227,23 +3282,21 @@
       const storedAnimated = storedHero.animated || null;
       const storedVideo = storedHero.video || null;
 
+      const hasStoredImage = storedStill || storedAnimated;
+      const hasDefaultImage = heroDefaults.still || heroDefaults.animated;
       const heroStill =
         storedStill ||
         storedAnimated ||
         heroDefaults.still ||
         heroDefaults.animated ||
-        storedVideo ||
-        heroDefaults.video ||
         null;
       const heroAnimated =
         storedAnimated ||
         heroDefaults.animated ||
-        storedStill ||
-        heroDefaults.still ||
-        storedVideo ||
-        heroDefaults.video ||
-        heroStill;
-      const heroVideo = storedVideo || heroDefaults.video || null;
+        heroStill ||
+        null;
+      const heroVideo =
+        !hasStoredImage && !hasDefaultImage ? storedVideo || heroDefaults.video || null : null;
 
       if (heroFrame) {
         if (heroStill) {
@@ -3432,7 +3485,11 @@
 
             if (!hasDefaultEntry) {
               const fallbackItem = document.createElement('div');
-              fallbackItem.className = 'project-detail__item placeholder';
+              const fallbackClasses = ['project-detail__item', 'placeholder'];
+              if (heroDefaults.video && !heroDefaults.still && !heroDefaults.animated) {
+                fallbackClasses.push('placeholder--video');
+              }
+              fallbackItem.className = fallbackClasses.join(' ');
 
               if (heroDefaults.still) {
                 fallbackItem.setAttribute('data-still', heroDefaults.still);

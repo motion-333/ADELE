@@ -54,6 +54,7 @@ body.theme-dark {
 
 body.theme-light {
   color-scheme: light;
+  --color-light-grey: #b5b5b5;
   --color-bg: var(--color-cream);
   --color-surface: rgba(243, 234, 219, 0.92);
   --color-overlay: rgba(243, 234, 219, 0.82);
@@ -256,6 +257,34 @@ a {
 .topbar__theme-toggle .icon,
 .topbar__about .icon {
   color: inherit;
+}
+
+body.theme-dark .topbar__theme-toggle .icon {
+  color: var(--color-cream);
+}
+
+body.theme-light .topbar__theme-toggle .icon {
+  color: var(--color-anthracite);
+}
+
+body.theme-dark .topbar__theme-toggle .icon--theme__sun,
+body.theme-dark .topbar__theme-toggle .icon--theme__moon {
+  fill: var(--color-cream);
+  stroke: var(--color-cream);
+}
+
+body.theme-light .topbar__theme-toggle .icon--theme__sun,
+body.theme-light .topbar__theme-toggle .icon--theme__moon {
+  fill: var(--color-anthracite);
+  stroke: var(--color-anthracite);
+}
+
+body.theme-dark .topbar__theme-toggle .icon--theme__rays line {
+  stroke: var(--color-cream);
+}
+
+body.theme-light .topbar__theme-toggle .icon--theme__rays line {
+  stroke: var(--color-anthracite);
 }
 
 .topbar__theme-toggle .icon--theme__sun,
@@ -463,9 +492,49 @@ body.category-evenementiel .project[data-category='evenementiel'] {
   filter: saturate(0.8) contrast(1.05);
 }
 
-.placeholder[data-video]:is(:hover, :focus-visible) .placeholder__video,
-.placeholder[data-video].is-active .placeholder__video {
+.placeholder[data-video].is-active .placeholder__video,
+.placeholder--video .placeholder__video {
   opacity: 1;
+}
+
+.placeholder--video {
+  background-image: none;
+  background-color: var(--color-surface);
+}
+
+.placeholder--video:not(.project-hero__media)::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: clamp(2.8rem, 8vw, 4rem);
+  height: clamp(2.8rem, 8vw, 4rem);
+  border-radius: 999px;
+  border: 2px solid rgba(243, 234, 219, 0.85);
+  background: rgba(26, 26, 31, 0.58);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 2;
+  transition: opacity 0.3s ease;
+}
+
+.placeholder--video:not(.project-hero__media)::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  border-left: clamp(1rem, 3vw, 1.4rem) solid var(--color-cream);
+  border-top: clamp(0.65rem, 1.9vw, 1.05rem) solid transparent;
+  border-bottom: clamp(0.65rem, 1.9vw, 1.05rem) solid transparent;
+  transform: translate(calc(-50% + clamp(0.12rem, 0.5vw, 0.2rem)), -50%);
+  pointer-events: none;
+  z-index: 3;
+  transition: opacity 0.3s ease;
+}
+
+.placeholder--video:not(.project-hero__media):is(:hover, :focus-visible)::before,
+.placeholder--video:not(.project-hero__media):is(:hover, :focus-visible)::after {
+  opacity: 0;
 }
 
 .portfolio .placeholder {
@@ -889,7 +958,7 @@ body.is-transitioning {
   flex-direction: column;
   gap: clamp(1.25rem, 3vw, 1.75rem);
   text-align: left;
-  align-items: flex-start;
+  align-items: stretch;
 }
 
   .project-detail__heading {
@@ -899,6 +968,9 @@ body.is-transitioning {
     row-gap: clamp(0.4rem, 1vw, 0.75rem);
     align-items: center;
     justify-content: flex-start;
+    width: 100%;
+    text-align: left;
+    justify-items: start;
   }
 
   .project-detail__heading-text {
@@ -908,6 +980,7 @@ body.is-transitioning {
     gap: clamp(0.2rem, 0.6vw, 0.35rem);
     min-width: 0;
     text-align: left;
+    align-self: flex-start;
   }
 
   .project-detail__title {
@@ -935,6 +1008,7 @@ body.is-transitioning {
       'Segoe UI', sans-serif;
     font-weight: 500;
     text-align: left;
+    align-self: flex-start;
   }
 
 .project-detail__description {
@@ -947,6 +1021,7 @@ body.is-transitioning {
   text-align: center;
   margin-left: auto;
   margin-right: auto;
+  align-self: center;
 }
 
 .project-detail__gallery {
@@ -1093,7 +1168,7 @@ body.is-transitioning {
   text-transform: uppercase;
   color: var(--color-cream);
   mix-blend-mode: difference;
-  filter: contrast(0.9) brightness(1.08);
+  filter: contrast(0.82) brightness(1.1) saturate(0.95);
   opacity: 0.94;
   transition: opacity 0.3s ease;
 }
@@ -1105,7 +1180,7 @@ body.is-transitioning {
   font-weight: 500;
   color: var(--color-cream);
   mix-blend-mode: difference;
-  filter: contrast(0.88) brightness(1.05);
+  filter: contrast(0.8) brightness(1.08) saturate(0.9);
   opacity: 0.9;
 }
 
