@@ -3400,23 +3400,7 @@
           track.dataset.baseDuration = duration.toString();
         });
 
-        const loopFragment = document.createDocumentFragment();
-        baseProjects.forEach((project) => {
-          const clone = project.cloneNode(true);
-          clone.classList.remove('project--primary');
-          clone.classList.add('project--clone');
-          Array.from(clone.querySelectorAll('.placeholder')).forEach((element) => {
-            initializeMediaElement(element);
-          });
-          loopFragment.appendChild(clone);
-        });
-        projectList.appendChild(loopFragment);
-
-        const allProjects = Array.from(projectList.querySelectorAll('.project'));
         const primaryProjects = baseProjects;
-        const cloneProjects = allProjects.filter((project) =>
-          project.classList.contains('project--clone')
-        );
 
         let activeCategory = null;
         let isCategoryAnimating = false;
@@ -3452,13 +3436,7 @@
           const previouslyVisible = primaryProjects.filter((project) =>
             project.classList.contains('is-visible')
           );
-          const clonesVisible = cloneProjects.filter((project) =>
-            project.classList.contains('is-visible')
-          );
           const newPrimary = primaryProjects.filter(
-            (project) => project.getAttribute('data-category') === category
-          );
-          const newClones = cloneProjects.filter(
             (project) => project.getAttribute('data-category') === category
           );
 
@@ -3475,7 +3453,6 @@
 
             if (shouldReduceMotion) {
               newPrimary.forEach((project) => project.classList.add('is-visible'));
-              newClones.forEach((project) => project.classList.add('is-visible'));
               scheduleResizeTasks();
               window.setTimeout(() => {
                 scheduleResizeTasks();
@@ -3486,7 +3463,6 @@
             }
 
             newPrimary.forEach((project) => project.classList.remove('is-visible'));
-            newClones.forEach((project) => project.classList.remove('is-visible'));
 
             newPrimary.forEach((project, index) => {
               window.setTimeout(() => {
@@ -3496,7 +3472,6 @@
 
             const totalDelay = newPrimary.length * 160 + 420;
             window.setTimeout(() => {
-              newClones.forEach((project) => project.classList.add('is-visible'));
               scheduleResizeTasks();
               isCategoryAnimating = false;
               dequeueNextCategory();
@@ -3505,28 +3480,24 @@
 
           const fadeOutPrevious = (callback) => {
             if (!previouslyVisible.length) {
-              clonesVisible.forEach((project) => project.classList.remove('is-visible'));
               callback();
               return;
             }
 
             if (shouldReduceMotion) {
               previouslyVisible.forEach((project) => project.classList.remove('is-visible'));
-              clonesVisible.forEach((project) => project.classList.remove('is-visible'));
               callback();
               return;
             }
 
-            previouslyVisible
-              .slice()
-              .reverse()
-              .forEach((project, index) => {
-                window.setTimeout(() => {
-                  project.classList.remove('is-visible');
-                }, index * 120);
-              });
-
-            clonesVisible.forEach((project) => project.classList.remove('is-visible'));
+              previouslyVisible
+                .slice()
+                .reverse()
+                .forEach((project, index) => {
+                  window.setTimeout(() => {
+                    project.classList.remove('is-visible');
+                  }, index * 120);
+                });
 
             const totalFade = previouslyVisible.length * 120 + 360;
             window.setTimeout(callback, totalFade);
@@ -3589,7 +3560,7 @@
             baseSpeedAbs: 0,
             fastSpeedAbs: 0,
             speed: 0,
-            mode: 'base',
+            mode: 'manual',
             baseDirection,
             initialized: false,
           };
@@ -3683,8 +3654,14 @@
             return;
           }
 
+          if (mode === 'manual') {
+            state.mode = 'manual';
+            state.speed = 0;
+            return;
+          }
+
           if (shouldReduceMotion) {
-            state.mode = 'base';
+            state.mode = 'manual';
             state.speed = 0;
             return;
           }
@@ -3958,12 +3935,6 @@
                 window.matchMedia('(pointer: coarse)').matches)) ||
             window.innerWidth <= 768;
 
-          if (prefersTouch) {
-            strip.dataset.controlsReady = 'true';
-            strip.dataset.controlsSkipped = 'true';
-            return;
-          }
-
           const track = strip.querySelector('.media-track');
           if (!track) {
             return;
@@ -3972,6 +3943,12 @@
           const state = trackStateMap.get(track);
           if (!state) {
             return;
+          }
+
+          if (prefersTouch) {
+            strip.classList.add('media-strip--touch');
+          } else {
+            strip.classList.remove('media-strip--touch');
           }
 
           const updateEdgeMode = (mode) => {
@@ -3983,59 +3960,59 @@
 
           let edgePointerActive = false;
 
-          const handleEdgePointerMove = (event) => {
-            if (shouldReduceMotion) {
-              if (edgePointerActive) {
-                edgePointerActive = false;
-                updateEdgeMode('base');
+          if (!prefersTouch) {
+            const handleEdgePointerMove = (event) => {
+              if (shouldReduceMotion) {
+                if (edgePointerActive) {
+                  edgePointerActive = false;
+                  updateEdgeMode('manual');
+                }
+                return;
               }
-              return;
-            }
 
-            const pointerType = event.pointerType || 'mouse';
-            if (pointerType === 'touch') {
-              if (edgePointerActive) {
-                edgePointerActive = false;
-                updateEdgeMode('base');
+              const pointerType = event.pointerType || 'mouse';
+              if (pointerType === 'touch') {
+                if (edgePointerActive) {
+                  edgePointerActive = false;
+                  updateEdgeMode('manual');
+                }
+                return;
               }
-              return;
-            }
 
-            const rect = strip.getBoundingClientRect();
-            if (!rect || rect.width === 0) {
-              return;
-            }
-
-            const edgeWidth = Math.min(
-              Math.max(rect.width * EDGE_ZONE_RATIO, EDGE_ZONE_MIN),
-              EDGE_ZONE_MAX
-            );
-            const x = event.clientX;
-
-            if (Number.isFinite(x)) {
-              edgePointerActive = true;
-              if (x <= rect.left + edgeWidth) {
-                updateEdgeMode('fast-right');
-              } else if (x >= rect.right - edgeWidth) {
-                updateEdgeMode('fast-left');
-              } else if (state.mode !== 'base') {
-                updateEdgeMode('base');
+              const rect = strip.getBoundingClientRect();
+              if (!rect || rect.width === 0) {
+                return;
               }
-            }
-          };
 
-          const resetEdgeHover = () => {
-            if (!edgePointerActive) {
-              return;
-            }
-            edgePointerActive = false;
-            updateEdgeMode('base');
-          };
+              const edgeWidth = Math.min(
+                Math.max(rect.width * EDGE_ZONE_RATIO, EDGE_ZONE_MIN),
+                EDGE_ZONE_MAX
+              );
+              const x = event.clientX;
 
-          strip.addEventListener('pointerenter', handleEdgePointerMove);
-          strip.addEventListener('pointermove', handleEdgePointerMove);
-          strip.addEventListener('pointerleave', resetEdgeHover);
-          strip.addEventListener('pointercancel', resetEdgeHover);
+              if (Number.isFinite(x)) {
+                edgePointerActive = true;
+                if (x <= rect.left + edgeWidth) {
+                  updateEdgeMode('fast-right');
+                } else if (x >= rect.right - edgeWidth) {
+                  updateEdgeMode('fast-left');
+                } else if (state.mode !== 'base') {
+                  updateEdgeMode('base');
+                }
+              }
+            };
+
+            strip.addEventListener('pointerenter', handleEdgePointerMove);
+            strip.addEventListener('pointermove', handleEdgePointerMove);
+            strip.addEventListener('pointerleave', () => {
+              edgePointerActive = false;
+              applyMode(state, 'manual');
+            });
+            strip.addEventListener('pointercancel', () => {
+              edgePointerActive = false;
+              applyMode(state, 'manual');
+            });
+          }
 
           const createControl = (direction) => {
             const control = document.createElement('button');
@@ -4056,6 +4033,20 @@
           const leftControl = createControl('left');
           const rightControl = createControl('right');
 
+          const nudgeTrackByMode = (mode) => {
+            if (!state) {
+              return;
+            }
+
+            const stripWidth = strip.clientWidth || 0;
+            const baseStep = stripWidth > 0 ? stripWidth * 0.85 : state.contentWidth;
+            const step = Math.max(Math.min(baseStep, 720), 140);
+            const direction = mode === 'fast-left' ? -1 : 1;
+            state.offset += step * direction;
+            wrapOffset(state);
+            state.track.style.transform = `translateX(${state.offset}px)`;
+          };
+
           const beginFastMode = (mode, control, pointerId) => {
             applyMode(state, mode);
             control.classList.add('is-active');
@@ -4073,7 +4064,7 @@
 
           const endFastMode = (control, pointerId) => {
             control.classList.remove('is-active');
-            applyMode(state, 'base');
+            applyMode(state, edgePointerActive ? 'base' : 'manual');
             if (
               pointerId !== undefined &&
               typeof control.releasePointerCapture === 'function' &&
@@ -4086,6 +4077,11 @@
 
           const attachControlHandlers = (control, mode) => {
             control.addEventListener('pointerdown', (event) => {
+              if (prefersTouch && event.pointerType === 'touch') {
+                event.preventDefault();
+                nudgeTrackByMode(mode);
+                return;
+              }
               event.preventDefault();
               beginFastMode(mode, control, event.pointerId);
             });
@@ -4098,12 +4094,12 @@
             control.addEventListener('pointercancel', reset);
             control.addEventListener('lostpointercapture', () => {
               control.classList.remove('is-active');
-              applyMode(state, 'base');
+              applyMode(state, edgePointerActive ? 'base' : 'manual');
             });
             control.addEventListener('pointerleave', (event) => {
               if (event.pointerType === 'mouse') {
                 control.classList.remove('is-active');
-                applyMode(state, 'base');
+                applyMode(state, edgePointerActive ? 'base' : 'manual');
               }
             });
 
@@ -4124,12 +4120,17 @@
               }
               event.preventDefault();
               control.classList.remove('is-active');
-              applyMode(state, 'base');
+              applyMode(state, edgePointerActive ? 'base' : 'manual');
             });
 
             control.addEventListener('blur', () => {
               control.classList.remove('is-active');
-              applyMode(state, 'base');
+              applyMode(state, edgePointerActive ? 'base' : 'manual');
+            });
+
+            control.addEventListener('click', (event) => {
+              event.preventDefault();
+              nudgeTrackByMode(mode);
             });
           };
 
@@ -4138,94 +4139,20 @@
 
           strip.append(leftControl, rightControl);
           strip.dataset.controlsReady = 'true';
+          strip.removeAttribute('data-controls-skipped');
         };
 
         const strips = Array.from(projectList.querySelectorAll('.media-strip'));
         strips.forEach((strip) => setupControls(strip));
 
-        let loopHeight = 0;
-        let isLoopAdjusting = false;
-        let lastKnownScrollY = window.scrollY || window.pageYOffset || 0;
-
-        const updateLoopHeight = () => {
-          const totalHeight = projectList.scrollHeight;
-          loopHeight = totalHeight / 2;
-        };
-
-        const ensureLoopTarget = (value, preferNonZero = false) => {
-          let desired = Number.isFinite(value) ? value : 0;
-          if (preferNonZero && desired <= 0) {
-            if (loopHeight > 0) {
-              const minimum = Math.min(
-                Math.max(loopHeight * 0.02, 1),
-                Math.max(loopHeight - 1, 1)
-              );
-              desired = minimum || 1;
-            } else {
-              desired = 1;
-            }
-          }
-          return desired;
-        };
-
-        const adjustLoopScroll = (targetY, options = {}) => {
-          isLoopAdjusting = true;
-          const { preferNonZero = false } = options;
-          const desired = ensureLoopTarget(targetY, preferNonZero);
-          const current = window.scrollY || window.pageYOffset || 0;
-          const delta = desired - current;
-          if (Math.abs(delta) > 0.5) {
-            window.scrollBy(0, delta);
-          }
-          lastKnownScrollY = desired;
-          window.requestAnimationFrame(() => {
-            isLoopAdjusting = false;
-          });
-        };
-
-        const handleLoopScroll = () => {
-          if (isLoopAdjusting) {
-            return;
-          }
-
-          if (loopHeight <= 0) {
-            lastKnownScrollY = window.scrollY || window.pageYOffset || 0;
-            return;
-          }
-
-          const currentY = window.scrollY || window.pageYOffset || 0;
-
-          if (currentY > lastKnownScrollY && currentY >= loopHeight) {
-            let normalized = currentY % loopHeight;
-            if (!Number.isFinite(normalized)) {
-              normalized = 0;
-            }
-            const target = ensureLoopTarget(normalized, true);
-            if (typeof animateLoopResetProgress === 'function') {
-              animateLoopResetProgress(currentY, target);
-            }
-            adjustLoopScroll(target, { preferNonZero: true });
-            return;
-          }
-
-          lastKnownScrollY = currentY;
-        };
-
-        window.addEventListener('scroll', handleLoopScroll, { passive: true });
-
         const runResizeTasks = () => {
           computeTrackMetrics();
-          updateLoopHeight();
           if (pendingReturnScroll !== null) {
             const viewportHeight =
               window.innerHeight || document.documentElement.clientHeight || 0;
             const maxScroll = Math.max(projectList.scrollHeight - viewportHeight, 0);
-            let target = Math.max(Math.min(pendingReturnScroll, maxScroll), 0);
-            if (loopHeight > 0 && target >= loopHeight) {
-              const normalized = target % loopHeight;
-              target = Number.isFinite(normalized) ? normalized : 0;
-            }
-            adjustLoopScroll(target, { preferNonZero: true });
+            const target = Math.max(Math.min(pendingReturnScroll, maxScroll), 0);
+            window.scrollTo({ top: target });
             pendingReturnScroll = null;
             returnScrollReady = true;
             clearStoredScrollPosition();
@@ -4235,21 +4162,6 @@
               /* no-op */
             }
             return;
-          }
-          const currentY = window.scrollY || window.pageYOffset || 0;
-          if (loopHeight > 0 && currentY >= loopHeight) {
-            let normalized = currentY % loopHeight;
-            if (!Number.isFinite(normalized)) {
-              normalized = 0;
-            }
-            const normalizedTarget = ensureLoopTarget(normalized, true);
-            if (!isLoopAdjusting && Math.abs(normalizedTarget - currentY) > 1) {
-              adjustLoopScroll(normalizedTarget, { preferNonZero: true });
-              return;
-            }
-            lastKnownScrollY = normalizedTarget;
-          } else {
-            lastKnownScrollY = currentY;
           }
         };
 

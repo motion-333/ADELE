@@ -512,7 +512,7 @@ body.category-evenementiel .project[data-category='evenementiel'] {
 
 .media-track {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 5px;
   width: max-content;
   will-change: transform;
@@ -544,7 +544,7 @@ body.category-evenementiel .project[data-category='evenementiel'] {
   background-image: var(--placeholder-image);
   background-size: cover;
   background-repeat: no-repeat;
-  background-position: center;
+  background-position: top center;
 }
 
 .placeholder__video {
@@ -553,6 +553,7 @@ body.category-evenementiel .project[data-category='evenementiel'] {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: top;
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.35s ease;
@@ -853,6 +854,17 @@ body.is-transitioning {
   z-index: 3;
 }
 
+.media-strip[data-controls-ready='true'] .media-strip__control {
+  display: flex;
+  opacity: 0;
+}
+
+.media-strip[data-controls-ready='true']:hover .media-strip__control,
+.media-strip[data-controls-ready='true'] .media-strip__control:focus-visible,
+.media-strip[data-controls-ready='true'] .media-strip__control.is-active {
+  opacity: 1;
+}
+
 .media-strip__control svg {
   width: 44%;
   height: 44%;
@@ -881,10 +893,15 @@ body.is-transitioning {
   outline-offset: 3px;
 }
 
-@media (hover: none) and (pointer: coarse) {
-  .media-strip__control {
-    display: none !important;
-  }
+.media-strip--touch .media-strip__control {
+  opacity: 1;
+  display: flex;
+  background: rgba(26, 26, 31, 0.72);
+  border-width: 1px;
+}
+
+.media-strip--touch .media-strip__control:is(:active, .is-active) {
+  transform: translateY(-50%) scale(0.96);
 }
 
 @media (max-width: 600px) {
