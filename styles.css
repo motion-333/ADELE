@@ -544,7 +544,7 @@ body.category-evenementiel .project[data-category='evenementiel'] {
   background-image: var(--placeholder-image);
   background-size: cover;
   background-repeat: no-repeat;
-  background-position: top center;
+  background-position: center;
 }
 
 .placeholder__video {
@@ -624,6 +624,11 @@ body.category-evenementiel .project[data-category='evenementiel'] {
   height: 100%;
   min-height: clamp(210px, 30vw, 360px);
   max-height: clamp(210px, 30vw, 360px);
+}
+
+.media-track
+  .placeholder[data-still]:not([data-animated]):not([data-video]):not(.placeholder--video) {
+  background-position: top center;
 }
 
 .placeholder:is(:hover, :focus-visible) {

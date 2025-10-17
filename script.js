@@ -3925,7 +3925,7 @@
         bindPlaceholderNavigation();
 
         const setupControls = (strip) => {
-          if (!strip || strip.dataset.controlsReady === 'true') {
+          if (!strip) {
             return;
           }
 
@@ -3934,6 +3934,25 @@
               (window.matchMedia('(hover: none) and (pointer: coarse)').matches ||
                 window.matchMedia('(pointer: coarse)').matches)) ||
             window.innerWidth <= 768;
+
+          const previousMode = strip.getAttribute('data-controls-mode');
+
+          if (!prefersTouch) {
+            strip.classList.remove('media-strip--touch');
+            strip.removeAttribute('data-controls-ready');
+            if (previousMode !== 'pointer') {
+              strip.setAttribute('data-controls-mode', 'pointer');
+            }
+            const existingControls = strip.querySelectorAll('.media-strip__control');
+            existingControls.forEach((control) => control.remove());
+            return;
+          }
+
+          strip.classList.add('media-strip--touch');
+
+          if (strip.dataset.controlsReady === 'true' && previousMode === 'touch') {
+            return;
+          }
 
           const track = strip.querySelector('.media-track');
           if (!track) {
@@ -3945,11 +3964,7 @@
             return;
           }
 
-          if (prefersTouch) {
-            strip.classList.add('media-strip--touch');
-          } else {
-            strip.classList.remove('media-strip--touch');
-          }
+          strip.querySelectorAll('.media-strip__control').forEach((control) => control.remove());
 
           const updateEdgeMode = (mode) => {
             if (state.mode === mode) {
@@ -4139,6 +4154,7 @@
 
           strip.append(leftControl, rightControl);
           strip.dataset.controlsReady = 'true';
+          strip.setAttribute('data-controls-mode', 'touch');
           strip.removeAttribute('data-controls-skipped');
         };
 
@@ -4146,6 +4162,7 @@
         strips.forEach((strip) => setupControls(strip));
 
         const runResizeTasks = () => {
+          strips.forEach((strip) => setupControls(strip));
           computeTrackMetrics();
           if (pendingReturnScroll !== null) {
             const viewportHeight =
