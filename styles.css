@@ -331,6 +331,25 @@ a {
   }
 }
 
+@media (max-width: 520px) {
+  .topbar__nav {
+    gap: clamp(0.25rem, 1.4vw, 0.6rem);
+  }
+
+  .topbar__nav-link {
+    padding: 0.32rem clamp(0.3rem, 1.8vw, 0.55rem);
+    font-size: clamp(0.5rem, 3.6vw, 0.68rem);
+    letter-spacing: 0.045em;
+  }
+}
+
+@media (max-width: 400px) {
+  .topbar__nav-link {
+    padding: 0.28rem clamp(0.25rem, 1.5vw, 0.45rem);
+    font-size: clamp(0.48rem, 4vw, 0.6rem);
+  }
+}
+
 .icon {
   display: inline-flex;
   width: 100%;
@@ -828,7 +847,7 @@ body.is-transitioning {
 
 @media (hover: none) and (pointer: coarse) {
   .media-strip__control {
-    display: inline-flex;
+    display: none !important;
   }
 }
 

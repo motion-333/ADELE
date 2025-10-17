@@ -1469,7 +1469,6 @@
       return Math.max(maxHeight - viewportHeight, 0);
     };
 
-    const dimensionCache = new Map();
     const mediaReadyCache = new Map();
 
     const ensureImageReady = (src) => {
@@ -1562,78 +1561,6 @@
       mediaReadyCache.set(src, promise);
       promise.catch(() => {
         mediaReadyCache.delete(src);
-      });
-
-      return promise;
-    };
-
-    const loadImageDimensions = (src) => {
-      if (!src) {
-        return Promise.resolve(null);
-      }
-      if (dimensionCache.has(src)) {
-        return dimensionCache.get(src);
-      }
-
-      const extension = getMediaExtension(src);
-
-      if (extension && VIDEO_EXTENSIONS.has(extension)) {
-        const videoPromise = new Promise((resolve) => {
-          const video = document.createElement('video');
-          const finalize = () => {
-            const width = video.videoWidth || 0;
-            const height = video.videoHeight || 0;
-            if (!width || !height) {
-              resolve(null);
-            } else {
-              resolve({ width, height });
-            }
-          };
-          video.preload = 'metadata';
-          video.addEventListener('loadedmetadata', finalize, { once: true });
-          video.addEventListener('error', () => {
-            resolve(null);
-          });
-          video.src = src;
-          try {
-            video.load();
-          } catch (error) {
-            /* ignore */
-          }
-          if (video.readyState >= 1 && video.videoWidth && video.videoHeight) {
-            finalize();
-          }
-        });
-
-        dimensionCache.set(src, videoPromise);
-        videoPromise.catch(() => {
-          dimensionCache.delete(src);
-        });
-
-        return videoPromise;
-      }
-
-      const promise = new Promise((resolve) => {
-        const image = new Image();
-        image.decoding = 'async';
-        image.onload = () => {
-          const width = image.naturalWidth || image.width || 0;
-          const height = image.naturalHeight || image.height || 0;
-          if (!width || !height) {
-            resolve(null);
-          } else {
-            resolve({ width, height });
-          }
-        };
-        image.onerror = () => {
-          resolve(null);
-        };
-        image.src = src;
-      });
-
-      dimensionCache.set(src, promise);
-      promise.catch(() => {
-        dimensionCache.delete(src);
       });
 
       return promise;
@@ -2535,29 +2462,12 @@
       });
 
       const ordered = Array.from(groups.values()).sort((a, b) => a.order - b.order);
-      const results = await Promise.all(
-        ordered.map(async (entry) => {
-          let aspect = null;
-          const sizeSource = entry.still || entry.animated || entry.video;
-          if (sizeSource) {
-            try {
-              const dimensions = await loadImageDimensions(sizeSource);
-              if (dimensions && dimensions.width && dimensions.height) {
-                aspect = dimensions.width / dimensions.height;
-              }
-            } catch (error) {
-              aspect = null;
-            }
-          }
-
-          return {
-            still: entry.still,
-            animated: entry.animated,
-            video: entry.video,
-            aspect,
-          };
-        })
-      );
+      const results = ordered.map((entry) => ({
+        still: entry.still,
+        animated: entry.animated,
+        video: entry.video,
+        aspect: null,
+      }));
 
       return results.filter(
         (item) => item && (item.still || item.animated || item.video)
@@ -2865,8 +2775,14 @@
         if (detailTitleElement) {
           const MIN_TITLE_FONT_PX = 18;
           const MAX_ADJUSTMENT_STEPS = 8;
+          const wrapQuery = window.matchMedia('(max-width: 640px)');
 
-          const resizeTitleToSingleLine = () => {
+          const resizeTitleForViewport = () => {
+            if (wrapQuery.matches) {
+              detailTitleElement.style.removeProperty('font-size');
+              return;
+            }
+
             const computed = window.getComputedStyle(detailTitleElement);
             let currentSize = parseFloat(computed.fontSize) || 0;
             if (!currentSize) {
@@ -2893,7 +2809,7 @@
 
           const resetAndResizeTitle = () => {
             detailTitleElement.style.removeProperty('font-size');
-            resizeTitleToSingleLine();
+            resizeTitleForViewport();
           };
 
           resetAndResizeTitle();
@@ -2910,6 +2826,11 @@
           };
 
           window.addEventListener('resize', handleResize);
+          if (typeof wrapQuery.addEventListener === 'function') {
+            wrapQuery.addEventListener('change', handleResize);
+          } else if (typeof wrapQuery.addListener === 'function') {
+            wrapQuery.addListener(handleResize);
+          }
 
           if (fontsReadyPromise && typeof fontsReadyPromise.then === 'function') {
             fontsReadyPromise
@@ -4219,10 +4140,32 @@
           loopHeight = totalHeight / 2;
         };
 
-        const adjustLoopScroll = (targetY) => {
+        const ensureLoopTarget = (value, preferNonZero = false) => {
+          let desired = Number.isFinite(value) ? value : 0;
+          if (preferNonZero && desired <= 0) {
+            if (loopHeight > 0) {
+              const minimum = Math.min(
+                Math.max(loopHeight * 0.02, 1),
+                Math.max(loopHeight - 1, 1)
+              );
+              desired = minimum || 1;
+            } else {
+              desired = 1;
+            }
+          }
+          return desired;
+        };
+
+        const adjustLoopScroll = (targetY, options = {}) => {
           isLoopAdjusting = true;
-          window.scrollTo(0, targetY);
-          lastKnownScrollY = targetY;
+          const { preferNonZero = false } = options;
+          const desired = ensureLoopTarget(targetY, preferNonZero);
+          const current = window.scrollY || window.pageYOffset || 0;
+          const delta = desired - current;
+          if (Math.abs(delta) > 0.5) {
+            window.scrollBy(0, delta);
+          }
+          lastKnownScrollY = desired;
           window.requestAnimationFrame(() => {
             isLoopAdjusting = false;
           });
@@ -4245,10 +4188,11 @@
             if (!Number.isFinite(normalized)) {
               normalized = 0;
             }
+            const target = ensureLoopTarget(normalized, true);
             if (typeof animateLoopResetProgress === 'function') {
-              animateLoopResetProgress(currentY, normalized);
+              animateLoopResetProgress(currentY, target);
             }
-            adjustLoopScroll(normalized);
+            adjustLoopScroll(target, { preferNonZero: true });
             return;
           }
 
@@ -4269,7 +4213,7 @@
               const normalized = target % loopHeight;
               target = Number.isFinite(normalized) ? normalized : 0;
             }
-            adjustLoopScroll(target);
+            adjustLoopScroll(target, { preferNonZero: true });
             pendingReturnScroll = null;
             returnScrollReady = true;
             clearStoredScrollPosition();
@@ -4286,11 +4230,12 @@
             if (!Number.isFinite(normalized)) {
               normalized = 0;
             }
-            if (!isLoopAdjusting && Math.abs(normalized - currentY) > 1) {
-              adjustLoopScroll(normalized);
+            const normalizedTarget = ensureLoopTarget(normalized, true);
+            if (!isLoopAdjusting && Math.abs(normalizedTarget - currentY) > 1) {
+              adjustLoopScroll(normalizedTarget, { preferNonZero: true });
               return;
             }
-            lastKnownScrollY = normalized;
+            lastKnownScrollY = normalizedTarget;
           } else {
             lastKnownScrollY = currentY;
           }
