@@ -2594,14 +2594,67 @@
     };
 
     const initializeProjectMedia = async () => {
-      const tasks = [];
-      const mediaReadyPromises = [];
 
       const projectSections = Array.from(document.querySelectorAll('.project[data-project]'));
-      projectSections.forEach((section) => {
+
+      const projectsParent = (() => {
+        const list = document.querySelector('.projects');
+        if (!list || !list.parentElement) {
+          return null;
+        }
+        return list.parentElement;
+      })();
+
+      const startProjectsLoadingIndicator = () => {
+        if (!projectsParent || !projectSections.length) {
+          return () => {};
+        }
+
+        let indicator = projectsParent.querySelector('.projects__loading');
+        if (!indicator) {
+          indicator = document.createElement('div');
+          indicator.className = 'projects__loading';
+          indicator.setAttribute('role', 'status');
+          indicator.setAttribute('aria-live', 'polite');
+          const text = document.createElement('span');
+          text.className = 'projects__loading-text';
+          indicator.appendChild(text);
+          const projectsList = projectsParent.querySelector('.projects');
+          projectsParent.insertBefore(indicator, projectsList);
+        }
+
+        const textTarget = indicator.querySelector('.projects__loading-text') || indicator;
+        const baseText = indicator.getAttribute('data-loading-label') || 'Loading';
+        indicator.classList.remove('is-hidden');
+
+        let step = 0;
+        const updateText = () => {
+          step = (step + 1) % 4;
+          const dots = step === 0 ? '...' : '.'.repeat(step);
+          textTarget.textContent = `${baseText}${dots}`;
+        };
+
+        updateText();
+        const intervalId = window.setInterval(updateText, 420);
+
+        return () => {
+          window.clearInterval(intervalId);
+          textTarget.textContent = `${baseText}...`;
+          indicator.classList.add('is-hidden');
+          window.setTimeout(() => {
+            if (indicator && indicator.parentNode) {
+              indicator.parentNode.removeChild(indicator);
+            }
+          }, 520);
+        };
+      };
+
+      const stopLoadingIndicator = startProjectsLoadingIndicator();
+
+      const processProjectSection = async (section) => {
         const track = section.querySelector('.media-track');
         if (!track) {
-          return;
+          return [];
         }
 
         const projectId = readStringAttribute(section, 'data-project');
@@ -2671,71 +2724,92 @@
           return "Découvrir le projet";
         })();
 
-        const task = loadProjectMediaEntries(projectId, directory, fallbackList)
-          .then((entries) => {
-            if (!track) {
-              return [];
+        let entries = [];
+        try {
+          entries = await loadProjectMediaEntries(projectId, directory, fallbackList);
+        } catch (error) {
+          entries = [];
+        }
+
+        track.innerHTML = '';
+
+        if (!entries || !entries.length) {
+          return [];
+        }
+
+        const sliderEntries = entries
+          .map((entry) => {
+            if (!entry) {
+              return null;
             }
 
-            track.innerHTML = '';
+            const stillImage = isImageSource(entry.still) ? entry.still : null;
+            const animatedImage = isImageSource(entry.animated) ? entry.animated : null;
 
-            if (!entries || !entries.length) {
-              return [];
+            if (!stillImage && !animatedImage) {
+              return null;
             }
 
-            const sliderEntries = entries
-              .map((entry) => {
-                if (!entry) {
-                  return null;
-                }
-
-                const stillImage = isImageSource(entry.still) ? entry.still : null;
-                const animatedImage = isImageSource(entry.animated)
-                  ? entry.animated
-                  : null;
-
-                if (!stillImage && !animatedImage) {
-                  return null;
-                }
-
-                return {
-                  still: stillImage,
-                  animated: animatedImage,
-                  aspect: entry.aspect,
-                };
-              })
-              .filter(Boolean);
-
-            sliderEntries.forEach((entry) => {
-              const placeholder = document.createElement('a');
-              placeholder.className = 'placeholder';
-              placeholder.href = detailLink || '#';
-              if (projectId) {
-                placeholder.dataset.project = projectId;
-              }
-              placeholder.setAttribute('aria-label', label);
-
-              if (entry.still) {
-                placeholder.setAttribute('data-still', entry.still);
-                mediaReadyPromises.push(ensureImageReady(entry.still));
-              }
-              if (entry.animated) {
-                placeholder.setAttribute('data-animated', entry.animated);
-                mediaReadyPromises.push(ensureImageReady(entry.animated));
-              }
-              if (Number.isFinite(entry.aspect) && entry.aspect > 0) {
-                placeholder.setAttribute('data-aspect', `${entry.aspect}`);
-              }
-
-              track.appendChild(placeholder);
-            });
-
-            return entries;
+            return {
+              still: stillImage,
+              animated: animatedImage,
+              aspect: entry.aspect,
+            };
           })
-          .catch(() => []);
+          .filter(Boolean);
 
-        tasks.push(task);
-      });
+        sliderEntries.forEach((entry) => {
+          const placeholder = document.createElement('a');
+          placeholder.className = 'placeholder';
+          placeholder.href = detailLink || '#';
+          if (projectId) {
+            placeholder.dataset.project = projectId;
+          }
+          placeholder.setAttribute('aria-label', label);
+
+          if (entry.still) {
+            placeholder.setAttribute('data-still', entry.still);
+          }
+          if (entry.animated) {
+            placeholder.setAttribute('data-animated', entry.animated);
+          }
+          if (Number.isFinite(entry.aspect) && entry.aspect > 0) {
+            placeholder.setAttribute('data-aspect', `${entry.aspect}`);
+          }
+
+          track.appendChild(placeholder);
+          initializeMediaElement(placeholder);
+        });
+
+        return entries;
+      };
+
+      try {
+        for (let index = 0; index < projectSections.length; index += 1) {
+          const section = projectSections[index];
+          if (!section) {
+            continue;
+          }
+
+          section.classList.add('project--loading');
+          try {
+            await processProjectSection(section);
+          } catch (error) {
+            /* ignore project loading errors */
+          } finally {
+            section.classList.remove('project--loading');
+            section.classList.add('project--hydrated');
+          }
+
+          await new Promise((resolve) => {
+            window.requestAnimationFrame(() => {
+              resolve();
+            });
+          });
+        }
+      } finally {
+        stopLoadingIndicator();
+      }
 
       const detail = document.querySelector('.project-detail[data-project]');
       if (detail) {
@@ -2859,8 +2933,8 @@
           openLightboxFromElement(target);
         };
 
-        const detailTask = loadProjectMediaEntries(projectId, directory, fallbackList)
-          .then((entries) => {
+        try {
+          const entries = await loadProjectMediaEntries(projectId, directory, fallbackList);
             if (hero) {
               if (entries && entries.length) {
                 const heroEntry =
@@ -2884,7 +2958,7 @@
                 if (defaultStill) {
                   hero.setAttribute('data-default-still', defaultStill);
                   hero.setAttribute('data-still', defaultStill);
-                  mediaReadyPromises.push(ensureImageReady(defaultStill));
+                  ensureImageReady(defaultStill).catch(() => {});
                 } else {
                   hero.removeAttribute('data-default-still');
                   hero.removeAttribute('data-still');
@@ -2894,7 +2968,7 @@
                   hero.setAttribute('data-default-animated', defaultAnimated);
                   hero.setAttribute('data-animated', defaultAnimated);
                   if (defaultAnimated !== defaultStill) {
-                    mediaReadyPromises.push(ensureImageReady(defaultAnimated));
+                    ensureImageReady(defaultAnimated).catch(() => {});
                   }
                 } else {
                   hero.removeAttribute('data-default-animated');
@@ -2904,7 +2978,7 @@
                 if (defaultVideo) {
                   hero.setAttribute('data-default-video', defaultVideo);
                   hero.setAttribute('data-video', defaultVideo);
-                  mediaReadyPromises.push(ensureImageReady(defaultVideo));
+                  ensureImageReady(defaultVideo).catch(() => {});
                 } else {
                   hero.removeAttribute('data-default-video');
                   hero.removeAttribute('data-video');
@@ -2971,15 +3045,15 @@
                     item.setAttribute('aria-label', lightboxLabel);
                     if (still) {
                       item.setAttribute('data-still', still);
-                      mediaReadyPromises.push(ensureImageReady(still));
+                      ensureImageReady(still).catch(() => {});
                     }
                     if (animated) {
                       item.setAttribute('data-animated', animated);
-                      mediaReadyPromises.push(ensureImageReady(animated));
+                      ensureImageReady(animated).catch(() => {});
                     }
                     if (video) {
                       item.setAttribute('data-video', video);
-                      mediaReadyPromises.push(ensureImageReady(video));
+                      ensureImageReady(video).catch(() => {});
                     }
                     if (Number.isFinite(aspect) && aspect > 0) {
                       item.setAttribute('data-aspect', `${aspect}`);
@@ -3026,17 +3100,13 @@
               }
             }
 
-            return entries;
-          })
-          .catch(() => []);
-
-        tasks.push(detailTask);
+          }
+        } catch (error) {
+          /* ignore detail loading errors */
+        }
       }
 
-      await Promise.all(tasks);
-      if (mediaReadyPromises.length) {
-        await Promise.allSettled(mediaReadyPromises);
-      }
+      /* media preloads fire asynchronously */
     };
 
     await Promise.all([detailMetadataPromise, homeMetadataPromise]);
