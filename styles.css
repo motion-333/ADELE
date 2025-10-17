@@ -974,7 +974,7 @@ body.is-transitioning {
   }
 
   .project-detail__title {
-    font-size: clamp(1.8rem, 4vw, 3.2rem);
+    font-size: clamp(1.55rem, 3.1vw, 2.75rem);
     font-family: 'Dela Gothic One', 'Outfit', 'DM Sans', system-ui,
       -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     font-weight: 400;
@@ -984,6 +984,9 @@ body.is-transitioning {
     color: var(--color-cream);
     mix-blend-mode: difference;
     filter: contrast(0.92) brightness(1.08);
+    line-height: 1.05;
+    white-space: nowrap;
+    max-width: 100%;
   }
 
   .project-detail__heading:hover .project-detail__title,
@@ -1021,9 +1024,10 @@ body.is-transitioning {
 .project-detail__gallery {
   width: min(95vw, 1100px);
   margin: 0 auto;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: clamp(12px, 3vw, 24px);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: clamp(8px, 2.4vw, 18px);
   position: relative;
   align-items: stretch;
 }
@@ -1070,6 +1074,9 @@ body.is-transitioning {
 
 .project-detail__item {
   position: relative;
+  flex: 1 1 clamp(260px, 26vw, 320px);
+  min-width: clamp(240px, 24vw, 300px);
+  max-width: clamp(260px, 32vw, 360px);
   width: 100%;
   aspect-ratio: var(--item-aspect, 1.35);
   box-shadow: 0 20px 40px var(--color-shadow);

@@ -1,7 +1,7 @@
 [
   {
     "id": "project-01",
-    "detail": "project-01.html",
+    "detail": "titre-de-projet-01.html",
     "category": "film",
     "mediaDirectory": "film/project-01/images/",
     "title": "Titre de Projet 01",
@@ -15,7 +15,7 @@
   },
   {
     "id": "project-02",
-    "detail": "project-02.html",
+    "detail": "titre-de-projet-02.html",
     "category": "film",
     "mediaDirectory": "film/project-02/images/",
     "title": "Titre de Projet 02",
@@ -29,7 +29,7 @@
   },
   {
     "id": "project-03",
-    "detail": "project-03.html",
+    "detail": "titre-de-projet-03.html",
     "category": "film",
     "mediaDirectory": "film/project-03/images/",
     "title": "Titre de Projet 03",
@@ -43,7 +43,7 @@
   },
   {
     "id": "project-04",
-    "detail": "project-04.html",
+    "detail": "titre-de-projet-04.html",
     "category": "film",
     "mediaDirectory": "film/project-04/images/",
     "title": "Titre de Projet 04",
@@ -57,7 +57,7 @@
   },
   {
     "id": "project-05",
-    "detail": "project-05.html",
+    "detail": "titre-de-projet-05.html",
     "category": "film",
     "mediaDirectory": "film/project-05/images/",
     "title": "Titre de Projet 05",
@@ -71,7 +71,7 @@
   },
   {
     "id": "project-06",
-    "detail": "project-06.html",
+    "detail": "titre-de-projet-06.html",
     "category": "film",
     "mediaDirectory": "film/project-06/images/",
     "title": "Titre de Projet 06",
@@ -85,7 +85,7 @@
   },
   {
     "id": "project-07",
-    "detail": "project-07.html",
+    "detail": "titre-de-projet-07.html",
     "category": "film",
     "mediaDirectory": "film/project-07/images/",
     "title": "Titre de Projet 07",
@@ -99,7 +99,7 @@
   },
   {
     "id": "project-08",
-    "detail": "project-08.html",
+    "detail": "levi-s-workwear.html",
     "category": "film",
     "mediaDirectory": "film/project-08/images/",
     "title": "LEVI'S WORKWEAR",
@@ -109,7 +109,7 @@
   },
   {
     "id": "project-09",
-    "detail": "project-09.html",
+    "detail": "la-horde-x-alpine.html",
     "category": "film",
     "mediaDirectory": "film/project-09/images/",
     "title": "(La)Horde x Alpine",
@@ -146,7 +146,7 @@
   },
   {
     "id": "project-10",
-    "detail": "project-10.html",
+    "detail": "titre-de-projet-10.html",
     "category": "photo",
     "mediaDirectory": "photo/project-10/images/",
     "title": "Titre de Projet 10",
@@ -160,7 +160,7 @@
   },
   {
     "id": "project-11",
-    "detail": "project-11.html",
+    "detail": "serie-photo-11.html",
     "category": "photo",
     "mediaDirectory": "photo/project-11/images/",
     "title": "Série Photo 11",
@@ -174,7 +174,7 @@
   },
   {
     "id": "project-12",
-    "detail": "project-12.html",
+    "detail": "portraits-creatifs-12.html",
     "category": "photo",
     "mediaDirectory": "photo/project-12/images/",
     "title": "Portraits Créatifs 12",
@@ -188,7 +188,7 @@
   },
   {
     "id": "project-13",
-    "detail": "project-13.html",
+    "detail": "evenementiel-live-13.html",
     "category": "evenementiel",
     "mediaDirectory": "evenementiel/project-13/images/",
     "title": "Événementiel Live 13",
@@ -202,7 +202,7 @@
   },
   {
     "id": "project-14",
-    "detail": "project-14.html",
+    "detail": "experience-marque-14.html",
     "category": "evenementiel",
     "mediaDirectory": "evenementiel/project-14/images/",
     "title": "Expérience Marque 14",
@@ -216,7 +216,7 @@
   },
   {
     "id": "project-15",
-    "detail": "project-15.html",
+    "detail": "conference-inspirante-15.html",
     "category": "evenementiel",
     "mediaDirectory": "evenementiel/project-15/images/",
     "title": "Conférence Inspirante 15",

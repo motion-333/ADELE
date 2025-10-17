@@ -266,6 +266,15 @@ const isDirectory = async (targetPath) => {
   }
 };
 
+const pathExists = async (targetPath) => {
+  try {
+    await fs.access(targetPath);
+    return true;
+  } catch (error) {
+    return false;
+  }
+};
+
 const toProjectId = (input) => {
   if (!input) {
     return null;
@@ -312,6 +321,31 @@ const normalizeDirectoryPath = (input) => {
   }
 
   return normalized;
+};
+
+const slugify = (input, fallback = '') => {
+  const source = input && `${input}`.trim().length ? `${input}` : fallback;
+  if (!source) {
+    return '';
+  }
+
+  const normalized = `${source}`
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/-{2,}/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+  if (normalized) {
+    return normalized;
+  }
+
+  if (fallback && fallback !== source) {
+    return slugify(fallback, '');
+  }
+
+  return '';
 };
 
 const escapeHtml = (value) => {
@@ -409,30 +443,101 @@ const ensureManifestScriptTag = async (filePath) => {
   }
 };
 
+const updateIndexDetailLinks = async (entries) => {
+  const indexPath = path.join(ROOT, 'index.html');
+  let content;
+  try {
+    content = await fs.readFile(indexPath, 'utf8');
+  } catch (error) {
+    return;
+  }
+
+  let updated = content;
+
+  entries.forEach((entry) => {
+    if (!entry || !entry.id || !entry.detail) {
+      return;
+    }
+
+    const id = `${entry.id}`.trim();
+    const detail = `${entry.detail}`.trim();
+    if (!id || !detail) {
+      return;
+    }
+
+    const pattern = new RegExp(
+      `(data-project\\s*=\\s*(['"])${id}\\2[\\s\\S]*?data-detail-link\\s*=\\s*(['"]))([^'"\\s>]*?)(\\3)`,
+      'g'
+    );
+
+    updated = updated.replace(pattern, (match, prefix, _projectQuote, detailQuote, currentValue, suffix) => {
+      if (currentValue === detail) {
+        return match;
+      }
+      return `${prefix}${detail}${suffix}`;
+    });
+  });
+
+  if (updated !== content) {
+    await fs.writeFile(indexPath, updated, 'utf8');
+  }
+};
+
 const ensureProjectDetailPage = async (entry) => {
   if (!entry || !entry.id) {
     return;
   }
 
-  const detailFile = entry.detail ? `${entry.detail}`.trim() : `${entry.id}.html`;
+  let detailFile = entry.detail ? `${entry.detail}`.trim() : `${entry.id}.html`;
   if (!detailFile) {
     return;
   }
 
-  const targetPath = path.join(ROOT, detailFile);
-  let exists = true;
-  try {
-    await fs.access(targetPath);
-  } catch (error) {
-    exists = false;
+  detailFile = detailFile.replace(/\\/g, '/').replace(/^\/+/, '');
+  if (!detailFile.toLowerCase().endsWith('.html')) {
+    detailFile = `${detailFile}.html`;
   }
 
+  const targetPath = path.join(ROOT, detailFile);
+  const legacyName = `${entry.id}.html`;
+  const legacyPath = path.join(ROOT, legacyName);
+
+  if (detailFile.toLowerCase() !== legacyName.toLowerCase()) {
+    const legacyExists = await pathExists(legacyPath);
+    if (legacyExists) {
+      const targetExists = await pathExists(targetPath);
+      if (!targetExists) {
+        try {
+          await fs.rename(legacyPath, targetPath);
+        } catch (error) {
+          if (error && error.code === 'EXDEV') {
+            const legacyContent = await fs.readFile(legacyPath, 'utf8');
+            await fs.writeFile(targetPath, legacyContent, 'utf8');
+            try {
+              await fs.unlink(legacyPath);
+            } catch (unlinkError) {
+              /* ignore removal failures */
+            }
+          } else {
+            throw error;
+          }
+        }
+      } else {
+        await fs.unlink(legacyPath).catch(() => {});
+      }
+    }
+  }
+
+  let exists = await pathExists(targetPath);
   if (!exists) {
     const html = await renderProjectDetailHtml(entry);
     await fs.writeFile(targetPath, `${html}\n`, 'utf8');
+    exists = true;
   }
 
-  await ensureManifestScriptTag(targetPath);
+  if (exists) {
+    await ensureManifestScriptTag(targetPath);
+  }
 };
 
 const collectMediaFiles = async (basePath) => {
@@ -626,6 +731,78 @@ const hasTextValue = (value) => {
     return false;
   }
   return `${value}`.trim().length > 0;
+};
+
+const assignDetailFilenames = (entries) => {
+  const used = new Set();
+  const result = new Map();
+
+  entries.forEach((value, key) => {
+    if (!value) {
+      return;
+    }
+
+    const entry = { ...value };
+    const entryId = entry.id || key;
+    const preferredBase = hasTextValue(entry.title)
+      ? slugify(entry.title, entryId)
+      : slugify(entryId, entryId);
+    const existingDetail = hasTextValue(entry.detail) ? `${entry.detail}`.trim() : '';
+    const idBase = slugify(entryId, entryId) || 'project';
+
+    const candidates = [];
+    if (preferredBase) {
+      candidates.push(`${preferredBase}.html`);
+    }
+    if (existingDetail) {
+      candidates.push(existingDetail);
+    }
+    candidates.push(`${idBase}.html`);
+
+    let chosen = null;
+
+    for (const candidate of candidates) {
+      if (!candidate) {
+        continue;
+      }
+
+      let normalized = `${candidate}`.trim().replace(/\\/g, '/').replace(/^\/+/, '');
+      if (!normalized.toLowerCase().endsWith('.html')) {
+        normalized = `${normalized}.html`;
+      }
+
+      const base = normalized.replace(/\.html$/i, '');
+      let attempt = `${base}.html`;
+      let suffix = 2;
+      while (used.has(attempt.toLowerCase())) {
+        attempt = `${base}-${suffix}.html`;
+        suffix += 1;
+      }
+
+      chosen = attempt;
+      break;
+    }
+
+    if (!chosen) {
+      let base = preferredBase || idBase || 'project';
+      if (!base) {
+        base = 'project';
+      }
+      let attempt = `${base}.html`;
+      let suffix = 2;
+      while (used.has(attempt.toLowerCase())) {
+        attempt = `${base}-${suffix}.html`;
+        suffix += 1;
+      }
+      chosen = attempt;
+    }
+
+    used.add(chosen.toLowerCase());
+    entry.detail = chosen;
+    result.set(key, entry);
+  });
+
+  return result;
 };
 
 const mergeEntries = (base, override) => {
@@ -824,12 +1001,14 @@ const main = async () => {
 
   const merged = mergeEntries(htmlEntries, directoryEntries);
   const finalEntries = mergeEntries(merged, existingMap);
+  const sluggifiedEntries = assignDetailFilenames(finalEntries);
 
-  const result = sortProjects(Array.from(finalEntries.values()));
+  const result = sortProjects(Array.from(sluggifiedEntries.values()));
   const sanitised = await writeManifest(result);
   await writeManifestScript(sanitised);
 
   await ensureManifestScriptTag(path.join(ROOT, 'index.html'));
+  await updateIndexDetailLinks(sanitised);
   await Promise.all(sanitised.map((entry) => ensureProjectDetailPage(entry)));
 
   const added = sanitised.length;

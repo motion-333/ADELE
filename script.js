@@ -2770,9 +2770,76 @@
           ? detailTitleElement.textContent.trim()
           : '';
 
+        if (detailTitleElement) {
+          const MIN_TITLE_FONT_PX = 18;
+          const MAX_ADJUSTMENT_STEPS = 8;
+
+          const resizeTitleToSingleLine = () => {
+            const computed = window.getComputedStyle(detailTitleElement);
+            let currentSize = parseFloat(computed.fontSize) || 0;
+            if (!currentSize) {
+              return;
+            }
+
+            let steps = 0;
+            let adjusted = false;
+            while (
+              steps < MAX_ADJUSTMENT_STEPS &&
+              detailTitleElement.scrollWidth > detailTitleElement.clientWidth + 1 &&
+              currentSize > MIN_TITLE_FONT_PX
+            ) {
+              currentSize = Math.max(MIN_TITLE_FONT_PX, currentSize * 0.94);
+              detailTitleElement.style.fontSize = `${currentSize}px`;
+              steps += 1;
+              adjusted = true;
+            }
+
+            if (!adjusted) {
+              detailTitleElement.style.removeProperty('font-size');
+            }
+          };
+
+          const resetAndResizeTitle = () => {
+            detailTitleElement.style.removeProperty('font-size');
+            resizeTitleToSingleLine();
+          };
+
+          resetAndResizeTitle();
+
+          let resizeFrame = null;
+          const handleResize = () => {
+            if (resizeFrame !== null) {
+              cancelAnimationFrame(resizeFrame);
+            }
+            resizeFrame = requestAnimationFrame(() => {
+              resizeFrame = null;
+              resetAndResizeTitle();
+            });
+          };
+
+          window.addEventListener('resize', handleResize);
+
+          if (fontsReadyPromise && typeof fontsReadyPromise.then === 'function') {
+            fontsReadyPromise
+              .then(() => {
+                resetAndResizeTitle();
+              })
+              .catch(() => {
+                resetAndResizeTitle();
+              });
+          }
+        }
+
         const lightboxLabel = detailTitleText
           ? `Agrandir ${detailTitleText}`
           : 'Agrandir le visuel du projet';
+
+        const handleGalleryLightbox = (target) => {
+          if (!target || !target.classList) {
+            return;
+          }
+          openLightboxFromElement(target);
+        };
 
         const detailTask = loadProjectMediaEntries(projectId, directory, fallbackList)
           .then((entries) => {
@@ -2900,6 +2967,20 @@
                       item.setAttribute('data-aspect', `${aspect}`);
                     }
                     gallery.appendChild(item);
+                    initializeMediaElement(item);
+                    item.addEventListener('click', (event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      handleGalleryLightbox(item);
+                    });
+                    item.addEventListener('keydown', (event) => {
+                      if (!ACTION_KEYS.has(event.key)) {
+                        return;
+                      }
+                      event.preventDefault();
+                      event.stopPropagation();
+                      handleGalleryLightbox(item);
+                    });
                   };
 
                   const includeImage =
@@ -4682,13 +4763,6 @@
           gallery.classList.remove('is-ready');
           gallery.style.removeProperty('height');
         }
-
-        const handleGalleryLightbox = (target) => {
-          if (!target || !target.classList) {
-            return;
-          }
-          openLightboxFromElement(target);
-        };
 
         gallery.addEventListener('click', (event) => {
           const target = event.target.closest('.project-detail__item');
