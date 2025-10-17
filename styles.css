@@ -517,6 +517,7 @@ body.category-evenementiel .project[data-category='evenementiel'] {
 .media-track .placeholder {
   flex: 0 0 clamp(330px, 42vw, 540px);
   height: 100%;
+  min-height: clamp(210px, 30vw, 360px);
   max-height: clamp(210px, 30vw, 360px);
 }
 
