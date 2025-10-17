@@ -2933,10 +2933,22 @@
           openLightboxFromElement(target);
         };
 
-        try {
-          const entries = await loadProjectMediaEntries(projectId, directory, fallbackList);
-            if (hero) {
-              if (entries && entries.length) {
+          let entries = [];
+          try {
+            const loadedEntries = await loadProjectMediaEntries(
+              projectId,
+              directory,
+              fallbackList,
+            );
+            if (Array.isArray(loadedEntries)) {
+              entries = loadedEntries;
+            }
+          } catch (error) {
+            console.error('Adele portfolio: failed to load project media', error);
+          }
+
+          if (hero) {
+            if (entries && entries.length) {
                 const heroEntry =
                   entries.find((entry) => entry && (entry.still || entry.animated)) ||
                   entries[0];
@@ -3099,12 +3111,7 @@
                 });
               }
             }
-
           }
-        } catch (error) {
-          /* ignore detail loading errors */
-        }
-      }
 
       /* media preloads fire asynchronously */
     };
