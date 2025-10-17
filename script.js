@@ -3952,6 +3952,18 @@
             return;
           }
 
+          const prefersTouch =
+            (typeof window.matchMedia === 'function' &&
+              (window.matchMedia('(hover: none) and (pointer: coarse)').matches ||
+                window.matchMedia('(pointer: coarse)').matches)) ||
+            window.innerWidth <= 768;
+
+          if (prefersTouch) {
+            strip.dataset.controlsReady = 'true';
+            strip.dataset.controlsSkipped = 'true';
+            return;
+          }
+
           const track = strip.querySelector('.media-track');
           if (!track) {
             return;
