@@ -3937,23 +3937,6 @@
 
           const previousMode = strip.getAttribute('data-controls-mode');
 
-          if (!prefersTouch) {
-            strip.classList.remove('media-strip--touch');
-            strip.removeAttribute('data-controls-ready');
-            if (previousMode !== 'pointer') {
-              strip.setAttribute('data-controls-mode', 'pointer');
-            }
-            const existingControls = strip.querySelectorAll('.media-strip__control');
-            existingControls.forEach((control) => control.remove());
-            return;
-          }
-
-          strip.classList.add('media-strip--touch');
-
-          if (strip.dataset.controlsReady === 'true' && previousMode === 'touch') {
-            return;
-          }
-
           const track = strip.querySelector('.media-track');
           if (!track) {
             return;
@@ -3964,8 +3947,6 @@
             return;
           }
 
-          strip.querySelectorAll('.media-strip__control').forEach((control) => control.remove());
-
           const updateEdgeMode = (mode) => {
             if (state.mode === mode) {
               return;
@@ -3975,7 +3956,11 @@
 
           let edgePointerActive = false;
 
-          if (!prefersTouch) {
+          const ensurePointerHover = () => {
+            if (strip.dataset.pointerBound === 'true') {
+              return;
+            }
+
             const handleEdgePointerMove = (event) => {
               if (shouldReduceMotion) {
                 if (edgePointerActive) {
@@ -4017,17 +4002,41 @@
               }
             };
 
+            const resetEdgeHover = () => {
+              if (edgePointerActive) {
+                edgePointerActive = false;
+              }
+              applyMode(state, 'manual');
+            };
+
             strip.addEventListener('pointerenter', handleEdgePointerMove);
             strip.addEventListener('pointermove', handleEdgePointerMove);
-            strip.addEventListener('pointerleave', () => {
-              edgePointerActive = false;
-              applyMode(state, 'manual');
-            });
-            strip.addEventListener('pointercancel', () => {
-              edgePointerActive = false;
-              applyMode(state, 'manual');
-            });
+            strip.addEventListener('pointerleave', resetEdgeHover);
+            strip.addEventListener('pointercancel', resetEdgeHover);
+
+            strip.dataset.pointerBound = 'true';
+          };
+
+          if (!prefersTouch) {
+            ensurePointerHover();
+            strip.classList.remove('media-strip--touch');
+            strip.setAttribute('data-controls-mode', 'pointer');
+            strip.dataset.controlsReady = 'pointer';
+            strip
+              .querySelectorAll('.media-strip__control')
+              .forEach((control) => control.remove());
+            return;
           }
+
+          strip.classList.add('media-strip--touch');
+
+          if (strip.dataset.controlsReady === 'true' && previousMode === 'touch') {
+            return;
+          }
+
+          strip
+            .querySelectorAll('.media-strip__control')
+            .forEach((control) => control.remove());
 
           const createControl = (direction) => {
             const control = document.createElement('button');
