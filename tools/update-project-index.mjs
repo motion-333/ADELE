@@ -34,6 +34,116 @@ const METADATA_KEY_ALIASES = {
 };
 
 const manifestPath = path.join(ROOT, 'pub', 'project-index.json');
+const manifestScriptPath = path.join(ROOT, 'pub', 'project-manifest.js');
+const projectTemplatePath = path.join(ROOT, 'tools', 'templates', 'project-detail.html');
+
+const DEFAULT_DESCRIPTION =
+  "Cette section présente une description détaillée du projet, incluant son périmètre, ses objectifs et ses principaux livrables. Elle expose les activités prévues, les méthodologies retenues ainsi que les résultats attendus, tout en mettant en avant le rôle et la participation du client tout au long du processus. L’implication du client — qu’il s’agisse de retours, de prises de décision ou de collaboration — sera essentielle pour garantir la réussite du projet et son alignement avec ses besoins.";
+
+const FALLBACK_PROJECT_TEMPLATE = `<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{PAGE_TITLE}}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@100..900&family=Raleway:ital,wght@0,100..900;1,100..900&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="project-detail-page theme-dark">
+    <header class="topbar">
+      <div class="topbar__inner">
+        <div class="topbar__identity">
+          <a class="topbar__title" href="index.html">Adèle Farges</a>
+          <span class="topbar__subtitle">DIRECTRICE DE PRODUCTION</span>
+        </div>
+        <nav class="topbar__nav" aria-label="Catégories de projets">
+          <button type="button" class="topbar__nav-link" data-category-select="film">FILM</button>
+          <button type="button" class="topbar__nav-link" data-category-select="photo">PHOTO</button>
+          <button type="button" class="topbar__nav-link" data-category-select="evenementiel">ÉVÉNEMENTIEL</button>
+        </nav>
+        <div class="topbar__actions">
+          <button
+            type="button"
+            class="topbar__theme-toggle"
+            aria-label="Activer le mode clair"
+          >
+            <svg class="icon icon--theme" viewBox="0 0 32 32" role="img" aria-hidden="true">
+              <circle class="icon--theme__sun" cx="16" cy="16" r="7"></circle>
+              <path
+                class="icon--theme__moon"
+                d="M20.5 24.5a8.5 8.5 0 0 1 0-17 8.5 8.5 0 1 0 0 17Z"
+              ></path>
+              <g class="icon--theme__rays" stroke-linecap="round">
+                <line x1="16" y1="3" x2="16" y2="6"></line>
+                <line x1="16" y1="26" x2="16" y2="29"></line>
+                <line x1="3" y1="16" x2="6" y2="16"></line>
+                <line x1="26" y1="16" x2="29" y2="16"></line>
+                <line x1="7.6" y1="7.6" x2="9.8" y2="9.8"></line>
+                <line x1="22.2" y1="22.2" x2="24.4" y2="24.4"></line>
+                <line x1="7.6" y1="24.4" x2="9.8" y2="22.2"></line>
+                <line x1="22.2" y1="9.8" x2="24.4" y2="7.6"></line>
+              </g>
+            </svg>
+          </button>
+          <a class="topbar__about" href="about.html" aria-label="À propos d'Adèle Farges">
+            <svg class="icon icon--info" viewBox="0 0 24 24" role="img" aria-hidden="true">
+              <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.8"></circle>
+              <line x1="12" y1="10" x2="12" y2="16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></line>
+              <circle cx="12" cy="7" r="1.2" fill="currentColor"></circle>
+            </svg>
+          </a>
+        </div>
+      </div>
+    </header>
+    <main class="project-detail" data-project="{{PROJECT_ID}}"{{MEDIA_SOURCE_ATTR}}{{VIMEO_ATTR}}>
+      <div class="project-hero">
+        <div class="project-hero__media placeholder">
+          <button
+            class="project-hero__play"
+            type="button"
+            aria-label="Lire la vidéo du projet"
+          ></button>
+          <div class="project-hero__video" hidden></div>
+        </div>
+      </div>
+      <section class="project-detail__body">
+        <div class="project-detail__heading">
+          <a class="project-detail__back" href="index.html" aria-label="Retourner au portfolio">
+            <svg class="icon icon--back" viewBox="0 0 24 24" role="img" aria-hidden="true">
+              <polyline points="14 6 8 12 14 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></polyline>
+              <line x1="9" y1="12" x2="20" y2="12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></line>
+            </svg>
+          </a>
+          <div class="project-detail__heading-text">
+            <h1 class="project-detail__title">{{TITLE_TEXT}}</h1>
+            <span class="project-detail__meta">{{META_TEXT}}</span>
+          </div>
+        </div>
+        <p class="project-detail__description">{{DESCRIPTION_TEXT}}</p>
+      </section>
+      <section class="project-detail__gallery"></section>
+      <section class="project-detail__credits" aria-label="Crédits du projet">
+        <h2 class="project-detail__credits-title">Crédits</h2>
+        <ul class="project-detail__credits-list"></ul>
+      </section>
+    </main>
+    <footer class="site-footer">
+      <small>
+        Site dev by
+        <a href="https://www.motion333.com" target="_blank" rel="noopener">Motion</a>
+      </small>
+    </footer>
+    <script src="pub/project-manifest.js" defer></script>
+    <script src="script.js"></script>
+  </body>
+</html>`;
+
+let projectTemplateCache = null;
 
 const normalizeMetadataKey = (key) => {
   if (!key) {
@@ -202,6 +312,127 @@ const normalizeDirectoryPath = (input) => {
   }
 
   return normalized;
+};
+
+const escapeHtml = (value) => {
+  if (value === null || value === undefined) {
+    return '';
+  }
+
+  return `${value}`
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+};
+
+const escapeAttribute = (value) => escapeHtml(value).replace(/`/g, '&#96;');
+
+const loadProjectTemplate = async () => {
+  if (projectTemplateCache !== null) {
+    return projectTemplateCache;
+  }
+
+  try {
+    const template = await fs.readFile(projectTemplatePath, 'utf8');
+    projectTemplateCache = template;
+  } catch (error) {
+    projectTemplateCache = FALLBACK_PROJECT_TEMPLATE;
+  }
+
+  return projectTemplateCache;
+};
+
+const renderProjectDetailHtml = async (entry) => {
+  const template = await loadProjectTemplate();
+  const projectId = entry && entry.id ? `${entry.id}`.trim() : 'project-00';
+  const titleText = entry && entry.title ? `${entry.title}`.trim() : 'TITRE DE PROJET';
+  const metaText = entry && entry.info ? `${entry.info}`.trim() : 'Nom de Prod, 2025';
+  const paragraphText =
+    entry && entry.paragraph && `${entry.paragraph}`.trim()
+      ? `${entry.paragraph}`.trim()
+      : DEFAULT_DESCRIPTION;
+  const pageTitle = `${titleText} — Adèle Farges`;
+  const mediaDirectory = entry && entry.mediaDirectory ? `${entry.mediaDirectory}`.trim() : '';
+  const vimeoUrl = entry && entry.vimeo ? `${entry.vimeo}`.trim() : '';
+
+  const mediaAttr = mediaDirectory
+    ? ` data-media-source="${escapeAttribute(mediaDirectory)}"`
+    : '';
+  const vimeoAttr = vimeoUrl ? ` data-vimeo="${escapeAttribute(vimeoUrl)}"` : '';
+
+  const replacements = new Map([
+    ['PAGE_TITLE', escapeHtml(pageTitle)],
+    ['PROJECT_ID', escapeAttribute(projectId)],
+    ['TITLE_TEXT', escapeHtml(titleText)],
+    ['META_TEXT', escapeHtml(metaText)],
+    ['DESCRIPTION_TEXT', escapeHtml(paragraphText)],
+    ['MEDIA_SOURCE_ATTR', mediaAttr],
+    ['VIMEO_ATTR', vimeoAttr],
+  ]);
+
+  let html = template;
+  replacements.forEach((replacement, key) => {
+    const pattern = new RegExp(`{{${key}}}`, 'g');
+    html = html.replace(pattern, replacement);
+  });
+
+  return html;
+};
+
+const ensureManifestScriptTag = async (filePath) => {
+  let content;
+  try {
+    content = await fs.readFile(filePath, 'utf8');
+  } catch (error) {
+    return;
+  }
+
+  if (content.includes('pub/project-manifest.js')) {
+    return;
+  }
+
+  const scriptPattern = /([ \t]*)<script\s+src="script\.js"[^>]*><\/script>/i;
+  if (!scriptPattern.test(content)) {
+    return;
+  }
+
+  const updated = content.replace(
+    scriptPattern,
+    (match, indent = '') =>
+      `${indent}<script src="pub/project-manifest.js" defer></script>\n${indent}<script src="script.js"></script>`
+  );
+
+  if (updated !== content) {
+    await fs.writeFile(filePath, updated, 'utf8');
+  }
+};
+
+const ensureProjectDetailPage = async (entry) => {
+  if (!entry || !entry.id) {
+    return;
+  }
+
+  const detailFile = entry.detail ? `${entry.detail}`.trim() : `${entry.id}.html`;
+  if (!detailFile) {
+    return;
+  }
+
+  const targetPath = path.join(ROOT, detailFile);
+  let exists = true;
+  try {
+    await fs.access(targetPath);
+  } catch (error) {
+    exists = false;
+  }
+
+  if (!exists) {
+    const html = await renderProjectDetailHtml(entry);
+    await fs.writeFile(targetPath, `${html}\n`, 'utf8');
+  }
+
+  await ensureManifestScriptTag(targetPath);
 };
 
 const collectMediaFiles = async (basePath) => {
@@ -567,6 +798,17 @@ const writeManifest = async (entries) => {
   const serialised = JSON.stringify(sanitised, null, 2);
   await fs.mkdir(path.dirname(manifestPath), { recursive: true });
   await fs.writeFile(manifestPath, `${serialised}\n`, 'utf8');
+  return sanitised;
+};
+
+const writeManifestScript = async (entries) => {
+  const payload = `window.__ADELE_PROJECT_MANIFEST__ = Object.freeze(${JSON.stringify(
+    entries,
+    null,
+    2
+  )});\n`;
+  await fs.mkdir(path.dirname(manifestScriptPath), { recursive: true });
+  await fs.writeFile(manifestScriptPath, payload, 'utf8');
 };
 
 const main = async () => {
@@ -584,9 +826,13 @@ const main = async () => {
   const finalEntries = mergeEntries(merged, existingMap);
 
   const result = sortProjects(Array.from(finalEntries.values()));
-  await writeManifest(result);
+  const sanitised = await writeManifest(result);
+  await writeManifestScript(sanitised);
 
-  const added = result.length;
+  await ensureManifestScriptTag(path.join(ROOT, 'index.html'));
+  await Promise.all(sanitised.map((entry) => ensureProjectDetailPage(entry)));
+
+  const added = sanitised.length;
   process.stdout.write(`Updated ${path.relative(ROOT, manifestPath)} with ${added} project${added === 1 ? '' : 's'}.\n`);
 };
 

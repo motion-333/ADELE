@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Titre de Projet — Adèle Farges</title>
+    <title>{{PAGE_TITLE}}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -13,7 +13,6 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body class="project-detail-page theme-dark">
-    
     <header class="topbar">
       <div class="topbar__inner">
         <div class="topbar__identity">
@@ -51,15 +50,15 @@
           </button>
           <a class="topbar__about" href="about.html" aria-label="À propos d'Adèle Farges">
             <svg class="icon icon--info" viewBox="0 0 24 24" role="img" aria-hidden="true">
-            <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.8"></circle>
-            <line x1="12" y1="10" x2="12" y2="16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></line>
-            <circle cx="12" cy="7" r="1.2" fill="currentColor"></circle>
+              <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.8"></circle>
+              <line x1="12" y1="10" x2="12" y2="16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></line>
+              <circle cx="12" cy="7" r="1.2" fill="currentColor"></circle>
             </svg>
           </a>
         </div>
       </div>
     </header>
-    <main class="project-detail" data-project="project-05">
+    <main class="project-detail" data-project="{{PROJECT_ID}}"{{MEDIA_SOURCE_ATTR}}{{VIMEO_ATTR}}>
       <div class="project-hero">
         <div class="project-hero__media placeholder">
           <button
@@ -79,18 +78,11 @@
             </svg>
           </a>
           <div class="project-detail__heading-text">
-            <h1 class="project-detail__title">TITRE DE PROJET</h1>
-            <span class="project-detail__meta">Nom de Prod, 2025</span>
+            <h1 class="project-detail__title">{{TITLE_TEXT}}</h1>
+            <span class="project-detail__meta">{{META_TEXT}}</span>
           </div>
         </div>
-        <p class="project-detail__description">
-          Cette section présente une description détaillée du projet, incluant son périmètre,
-          ses objectifs et ses principaux livrables. Elle expose les activités prévues, les
-          méthodologies retenues ainsi que les résultats attendus, tout en mettant en avant le
-          rôle et la participation du client tout au long du processus. L’implication du client —
-          qu’il s’agisse de retours, de prises de décision ou de collaboration — sera essentielle
-          pour garantir la réussite du projet et son alignement avec ses besoins.
-        </p>
+        <p class="project-detail__description">{{DESCRIPTION_TEXT}}</p>
       </section>
       <section class="project-detail__gallery"></section>
       <section class="project-detail__credits" aria-label="Crédits du projet">

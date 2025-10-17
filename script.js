@@ -379,9 +379,145 @@
       return null;
     }
 
+    const MANIFEST_MEDIA_PATTERN = /\.(?:png|gif|jpe?g|webp|mp4|webm|mov)$/i;
     const PROJECT_MANIFEST_URL = 'pub/project-index.json';
     const projectManifestCache = new Map();
     let projectManifestPromise = null;
+
+    const sanitizeManifestEntry = (entry) => {
+      if (!entry) {
+        return null;
+      }
+
+      const rawId = entry.id || entry.project || entry.slug || entry.name;
+      const id = rawId ? `${rawId}`.trim() : '';
+      if (!id) {
+        return null;
+      }
+
+      const detailLink = entry.detail || entry.detailLink || entry.href || entry.page;
+      const category = entry.category ? `${entry.category}`.trim() : '';
+      const mediaDirectory = normalizeDirectoryPath(
+        entry.mediaDirectory || entry.mediaPath || entry.directory || ''
+      );
+
+      const rawMediaList = (() => {
+        if (Array.isArray(entry.media)) {
+          return entry.media;
+        }
+        if (Array.isArray(entry.assets)) {
+          return entry.assets;
+        }
+        if (Array.isArray(entry.files)) {
+          return entry.files;
+        }
+        if (Array.isArray(entry.images)) {
+          return entry.images;
+        }
+        return [];
+      })();
+
+      const manifestMedia = rawMediaList
+        .map((value) => sanitizeFileEntry(value))
+        .filter((value) => value && MANIFEST_MEDIA_PATTERN.test(value));
+
+      const entryTitle = entry.title ? `${entry.title}`.trim() : '';
+      const entryInfo = entry.info ? `${entry.info}`.trim() : '';
+      const entryParagraph = entry.paragraph ? `${entry.paragraph}`.trim() : '';
+      const entryCredits = Array.isArray(entry.credits)
+        ? entry.credits.map((credit) => `${credit}`.trim()).filter(Boolean)
+        : [];
+
+      const entryVimeo = entry.vimeo ? `${entry.vimeo}`.trim() : '';
+
+      const manifestEntry = {
+        id,
+        detail: detailLink ? `${detailLink}`.trim() : `${id}.html`,
+        category,
+      };
+
+      if (mediaDirectory) {
+        manifestEntry.mediaDirectory = mediaDirectory;
+      }
+
+      if (entryTitle) {
+        manifestEntry.title = entryTitle;
+      }
+
+      if (entryInfo) {
+        manifestEntry.info = entryInfo;
+      }
+
+      if (entryParagraph) {
+        manifestEntry.paragraph = entryParagraph;
+      }
+
+      if (entryCredits.length) {
+        manifestEntry.credits = entryCredits;
+      }
+
+      if (entryVimeo) {
+        manifestEntry.vimeo = entryVimeo;
+      }
+
+      if (manifestMedia.length) {
+        manifestEntry.media = manifestMedia;
+      }
+
+      return manifestEntry;
+    };
+
+    const processManifestPayload = (data) => {
+      if (!Array.isArray(data)) {
+        return [];
+      }
+
+      return data.map((entry) => sanitizeManifestEntry(entry)).filter(Boolean);
+    };
+
+    const readInlineManifest = () => {
+      if (Array.isArray(window.__ADELE_PROJECT_MANIFEST__)) {
+        try {
+          const clone = JSON.parse(JSON.stringify(window.__ADELE_PROJECT_MANIFEST__));
+          return processManifestPayload(clone);
+        } catch (error) {
+          return processManifestPayload(window.__ADELE_PROJECT_MANIFEST__);
+        }
+      }
+
+      const manifestScript = document.querySelector('script[data-project-manifest]');
+      if (manifestScript) {
+        try {
+          const parsed = JSON.parse(manifestScript.textContent || '[]');
+          return processManifestPayload(parsed);
+        } catch (error) {
+          return [];
+        }
+      }
+
+      return [];
+    };
+    const fetchManifestFromNetwork = async () => {
+      if (typeof fetch !== 'function') {
+        return [];
+      }
+
+      if (window.location && window.location.protocol === 'file:') {
+        return [];
+      }
+
+      try {
+        const response = await fetch(PROJECT_MANIFEST_URL, { cache: 'no-store' });
+        if (!response || !response.ok) {
+          return [];
+        }
+
+        const data = await response.json();
+        return processManifestPayload(data);
+      } catch (error) {
+        return [];
+      }
+    };
 
     const fetchProjectManifest = async () => {
       if (projectManifestPromise) {
@@ -389,116 +525,17 @@
       }
 
       projectManifestPromise = (async () => {
-        if (typeof fetch !== 'function') {
-          return [];
+        const networkEntries = await fetchManifestFromNetwork();
+        if (networkEntries.length) {
+          return networkEntries;
         }
 
-        try {
-          const response = await fetch(PROJECT_MANIFEST_URL, { cache: 'no-store' });
-          if (!response || !response.ok) {
-            return [];
-          }
-
-          const data = await response.json();
-          if (!Array.isArray(data)) {
-            return [];
-          }
-
-          const mediaPattern = /\.(?:png|gif|jpe?g|webp|mp4|webm|mov)$/i;
-
-          return data
-            .map((entry) => {
-              if (!entry) {
-                return null;
-              }
-
-              const rawId = entry.id || entry.project || entry.slug || entry.name;
-              const id = rawId ? `${rawId}`.trim() : '';
-              if (!id) {
-                return null;
-              }
-
-              const detailLink = entry.detail || entry.detailLink || entry.href || entry.page;
-              const category = entry.category ? `${entry.category}`.trim() : '';
-              const mediaDirectory = normalizeDirectoryPath(
-                entry.mediaDirectory || entry.mediaPath || entry.directory || ''
-              );
-
-              const rawMediaList = (() => {
-                if (Array.isArray(entry.media)) {
-                  return entry.media;
-                }
-                if (Array.isArray(entry.assets)) {
-                  return entry.assets;
-                }
-                if (Array.isArray(entry.files)) {
-                  return entry.files;
-                }
-                if (Array.isArray(entry.images)) {
-                  return entry.images;
-                }
-                return [];
-              })();
-
-              const manifestMedia = rawMediaList
-                .map((value) => {
-                  if (value === null || value === undefined) {
-                    return null;
-                  }
-                  const stringValue = `${value}`.trim();
-                  if (!stringValue || !mediaPattern.test(stringValue)) {
-                    return null;
-                  }
-                  return stringValue.replace(/\\/g, '/');
-                })
-                .filter(Boolean);
-
-              const normalizeTextValue = (value) => {
-                if (value === null || value === undefined) {
-                  return null;
-                }
-                const trimmed = `${value}`.trim();
-                return trimmed ? trimmed : null;
-              };
-
-              const normalizeList = (list) => {
-                if (!Array.isArray(list)) {
-                  return [];
-                }
-                return list
-                  .map((item) => {
-                    if (item === null || item === undefined) {
-                      return null;
-                    }
-                    const trimmed = `${item}`.trim();
-                    return trimmed ? trimmed : null;
-                  })
-                  .filter(Boolean);
-              };
-
-              const title = normalizeTextValue(entry.title);
-              const info = normalizeTextValue(entry.info);
-              const paragraph = normalizeTextValue(entry.paragraph);
-              const vimeo = normalizeTextValue(entry.vimeo);
-              const credits = normalizeList(entry.credits);
-
-              return {
-                id,
-                detail: detailLink ? `${detailLink}`.trim() : `${id}.html`,
-                category: category || null,
-                mediaDirectory: mediaDirectory || null,
-                media: manifestMedia,
-                title,
-                info,
-                paragraph,
-                credits,
-                vimeo,
-              };
-            })
-            .filter(Boolean);
-        } catch (error) {
-          return [];
+        const inlineEntries = readInlineManifest();
+        if (inlineEntries.length) {
+          return inlineEntries;
         }
+
+        return [];
       })();
 
       projectManifestPromise = projectManifestPromise.then((entries) => {
@@ -513,6 +550,8 @@
 
       return projectManifestPromise;
     };
+
+
 
     const createProjectSection = (template) => {
       if (template) {
@@ -4438,6 +4477,10 @@
               }
               fallbackItem.className = fallbackClasses.join(' ');
 
+              fallbackItem.tabIndex = 0;
+              fallbackItem.setAttribute('role', 'button');
+              fallbackItem.setAttribute('aria-label', lightboxLabel);
+
               if (heroDefaults.still) {
                 fallbackItem.setAttribute('data-still', heroDefaults.still);
                 ensureImageReady(heroDefaults.still).catch(() => {});
@@ -4464,177 +4507,181 @@
                 fallbackItem.setAttribute('data-aspect', `${heroDefaults.aspect}`);
               }
 
-              fallbackItem.tabIndex = 0;
-              fallbackItem.setAttribute('role', 'button');
-              fallbackItem.setAttribute('aria-label', lightboxLabel);
-
               gallery.insertBefore(fallbackItem, gallery.firstChild);
               initializeMediaElement(fallbackItem);
             }
           }
         }
 
-        const parseAspectValue = (raw) => {
-          if (raw === null || raw === undefined) {
-            return null;
-          }
-          const value = `${raw}`.trim();
-          if (!value) {
-            return null;
-          }
-          const parsed = parseFloat(value);
-          return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
-        };
+        const shouldUseMasonry = gallery.hasAttribute('data-masonry');
 
-        const readAspectRatio = (item) => {
-          if (!item) {
-            return 1;
-          }
-
-          const dataAttr = parseAspectValue(item.getAttribute('data-aspect'));
-          if (dataAttr) {
-            return dataAttr;
-          }
-
-          const inlineValue = parseAspectValue(item.style.getPropertyValue('--item-aspect'));
-          if (inlineValue) {
-            return inlineValue;
-          }
-
-          if (window.getComputedStyle) {
-            const computedValue = parseAspectValue(
-              window.getComputedStyle(item).getPropertyValue('--item-aspect')
-            );
-            if (computedValue) {
-              return computedValue;
+        if (shouldUseMasonry) {
+          const parseAspectValue = (raw) => {
+            if (raw === null || raw === undefined) {
+              return null;
             }
-          }
-
-          return 1;
-        };
-
-        const applyMasonryLayout = () => {
-          const items = Array.from(gallery.querySelectorAll('.project-detail__item'));
-          gallery.classList.add('is-masonry');
-          gallery.classList.remove('is-ready');
-
-          if (!items.length) {
-            gallery.style.height = '0px';
-            return;
-          }
-
-          const containerWidth = gallery.clientWidth;
-          if (!Number.isFinite(containerWidth) || containerWidth <= 0) {
-            return;
-          }
-
-          const gap = MASONRY_GAP;
-          const tentativeColumns = Math.max(
-            1,
-            Math.floor((containerWidth + gap) / (MASONRY_MIN_COLUMN_WIDTH + gap))
-          );
-          let columnCount = Math.min(tentativeColumns, items.length);
-          columnCount = Math.max(columnCount, 1);
-
-          let columnWidth =
-            (containerWidth - gap * (columnCount - 1)) / Math.max(columnCount, 1);
-
-          if (columnWidth > MASONRY_MAX_COLUMN_WIDTH && items.length > columnCount) {
-            const adjustedColumns = Math.min(
-              items.length,
-              Math.max(
-                columnCount,
-                Math.floor((containerWidth + gap) / (MASONRY_MAX_COLUMN_WIDTH + gap))
-              )
-            );
-            if (adjustedColumns > columnCount) {
-              columnCount = adjustedColumns;
-              columnWidth =
-                (containerWidth - gap * (columnCount - 1)) / Math.max(columnCount, 1);
+            const value = `${raw}`.trim();
+            if (!value) {
+              return null;
             }
-          }
+            const parsed = parseFloat(value);
+            return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+          };
 
-          if (!Number.isFinite(columnWidth) || columnWidth <= 0) {
-            columnWidth = containerWidth;
-            columnCount = 1;
-          }
+          const readAspectRatio = (item) => {
+            if (!item) {
+              return 1;
+            }
 
-          const columnHeights = new Array(columnCount).fill(0);
+            const dataAttr = parseAspectValue(item.getAttribute('data-aspect'));
+            if (dataAttr) {
+              return dataAttr;
+            }
 
-          items.forEach((item) => {
-            const aspectRatio = readAspectRatio(item);
-            const itemHeight = columnWidth / (aspectRatio > 0 ? aspectRatio : 1);
+            const inlineValue = parseAspectValue(item.style.getPropertyValue('--item-aspect'));
+            if (inlineValue) {
+              return inlineValue;
+            }
 
-            let targetColumn = 0;
-            for (let index = 1; index < columnCount; index += 1) {
-              if (columnHeights[index] < columnHeights[targetColumn]) {
-                targetColumn = index;
+            if (window.getComputedStyle) {
+              const computedValue = parseAspectValue(
+                window.getComputedStyle(item).getPropertyValue('--item-aspect')
+              );
+              if (computedValue) {
+                return computedValue;
               }
             }
 
-            const x = targetColumn * (columnWidth + gap);
-            const y = columnHeights[targetColumn];
+            return 1;
+          };
 
-            item.style.width = `${columnWidth}px`;
-            item.style.height = `${itemHeight}px`;
-            item.style.transform = `translate3d(${x}px, ${y}px, 0)`;
-            item.style.opacity = '1';
+          const applyMasonryLayout = () => {
+            const items = Array.from(gallery.querySelectorAll('.project-detail__item'));
+            gallery.classList.add('is-masonry');
+            gallery.classList.remove('is-ready');
 
-            columnHeights[targetColumn] = y + itemHeight + gap;
-          });
+            if (!items.length) {
+              gallery.style.height = '0px';
+              return;
+            }
 
-          const maxHeight = columnHeights.reduce(
-            (currentMax, height) => (height > currentMax ? height : currentMax),
-            0
-          );
-          const finalHeight = maxHeight > 0 ? maxHeight - gap : 0;
-          gallery.style.height = `${finalHeight > 0 ? finalHeight : 0}px`;
-          gallery.classList.add('is-ready');
-        };
+            const containerWidth = gallery.clientWidth;
+            if (!Number.isFinite(containerWidth) || containerWidth <= 0) {
+              return;
+            }
 
-        let masonryFrame = null;
-        const scheduleMasonryLayout = () => {
-          if (masonryFrame !== null) {
-            cancelAnimationFrame(masonryFrame);
-          }
-          masonryFrame = requestAnimationFrame(() => {
-            masonryFrame = null;
-            applyMasonryLayout();
-          });
-        };
+            const gap = MASONRY_GAP;
+            const tentativeColumns = Math.max(
+              1,
+              Math.floor((containerWidth + gap) / (MASONRY_MIN_COLUMN_WIDTH + gap))
+            );
+            let columnCount = Math.min(tentativeColumns, items.length);
+            columnCount = Math.max(columnCount, 1);
 
-        scheduleMasonryLayout();
+            let columnWidth =
+              (containerWidth - gap * (columnCount - 1)) / Math.max(columnCount, 1);
 
-        if (typeof window.ResizeObserver === 'function') {
-          if (
-            gallery.__masonryObserver &&
-            typeof gallery.__masonryObserver.disconnect === 'function'
-          ) {
-            gallery.__masonryObserver.disconnect();
-          }
+            if (columnWidth > MASONRY_MAX_COLUMN_WIDTH && items.length > columnCount) {
+              const adjustedColumns = Math.min(
+                items.length,
+                Math.max(
+                  columnCount,
+                  Math.floor((containerWidth + gap) / (MASONRY_MAX_COLUMN_WIDTH + gap))
+                )
+              );
+              if (adjustedColumns > columnCount) {
+                columnCount = adjustedColumns;
+                columnWidth =
+                  (containerWidth - gap * (columnCount - 1)) / Math.max(columnCount, 1);
+              }
+            }
 
-          const resizeObserver = new ResizeObserver(() => {
-            scheduleMasonryLayout();
-          });
-          resizeObserver.observe(gallery);
-          gallery.__masonryObserver = resizeObserver;
-        }
+            if (!Number.isFinite(columnWidth) || columnWidth <= 0) {
+              columnWidth = containerWidth;
+              columnCount = 1;
+            }
 
-        window.addEventListener('resize', scheduleMasonryLayout);
+            const columnHeights = new Array(columnCount).fill(0);
 
-        if (fontsReadyPromise && typeof fontsReadyPromise.then === 'function') {
-          fontsReadyPromise
-            .then(() => {
-              scheduleMasonryLayout();
-            })
-            .catch(() => {
+            items.forEach((item) => {
+              const aspectRatio = readAspectRatio(item);
+              const itemHeight = columnWidth / (aspectRatio > 0 ? aspectRatio : 1);
+
+              let targetColumn = 0;
+              for (let index = 1; index < columnCount; index += 1) {
+                if (columnHeights[index] < columnHeights[targetColumn]) {
+                  targetColumn = index;
+                }
+              }
+
+              const x = targetColumn * (columnWidth + gap);
+              const y = columnHeights[targetColumn];
+
+              item.style.width = `${columnWidth}px`;
+              item.style.height = `${itemHeight}px`;
+              item.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+              item.style.opacity = '1';
+
+              columnHeights[targetColumn] = y + itemHeight + gap;
+            });
+
+            const maxHeight = columnHeights.reduce(
+              (currentMax, height) => (height > currentMax ? height : currentMax),
+              0
+            );
+            const finalHeight = maxHeight > 0 ? maxHeight - gap : 0;
+            gallery.style.height = `${finalHeight > 0 ? finalHeight : 0}px`;
+            gallery.classList.add('is-ready');
+          };
+
+          let masonryFrame = null;
+          const scheduleMasonryLayout = () => {
+            if (masonryFrame !== null) {
+              cancelAnimationFrame(masonryFrame);
+            }
+            masonryFrame = requestAnimationFrame(() => {
+              masonryFrame = null;
+              applyMasonryLayout();
+            });
+          };
+
+          scheduleMasonryLayout();
+
+          if (typeof window.ResizeObserver === 'function') {
+            if (
+              gallery.__masonryObserver &&
+              typeof gallery.__masonryObserver.disconnect === 'function'
+            ) {
+              gallery.__masonryObserver.disconnect();
+            }
+
+            const resizeObserver = new ResizeObserver(() => {
               scheduleMasonryLayout();
             });
-        }
+            resizeObserver.observe(gallery);
+            gallery.__masonryObserver = resizeObserver;
+          }
 
-        window.addEventListener('load', () => {
-          scheduleMasonryLayout();
-        });
+          window.addEventListener('resize', scheduleMasonryLayout);
+
+          if (fontsReadyPromise && typeof fontsReadyPromise.then === 'function') {
+            fontsReadyPromise
+              .then(() => {
+                scheduleMasonryLayout();
+              })
+              .catch(() => {
+                scheduleMasonryLayout();
+              });
+          }
+
+          window.addEventListener('load', () => {
+            scheduleMasonryLayout();
+          });
+        } else {
+          gallery.classList.remove('is-masonry');
+          gallery.classList.remove('is-ready');
+          gallery.style.removeProperty('height');
+        }
 
         const handleGalleryLightbox = (target) => {
           if (!target || !target.classList) {
