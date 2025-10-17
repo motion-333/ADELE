@@ -33,6 +33,8 @@
     let projectController = null;
     const pendingCategoryQueue = [];
     let shouldReduceMotion = false;
+    let initialCategorySelection = null;
+    let initialCategoryStarted = false;
 
     const applyBodyCategory = (category) => {
       if (!body) {
@@ -61,6 +63,21 @@
           button.classList.remove('is-active');
         }
       });
+    };
+
+    const reflectActiveCategory = (category) => {
+      if (!category) {
+        topbarCategoryButtons.forEach((button) => {
+          button.classList.remove('is-active');
+        });
+        if (body) {
+          categoryClassNames.forEach((cls) => body.classList.remove(cls));
+        }
+        return;
+      }
+
+      updateCategoryButtonState(category);
+      applyBodyCategory(category);
     };
 
     const showTitleOverlay = () => {
@@ -132,6 +149,7 @@
       }
 
       pendingCategoryQueue.push({ category, options });
+      reflectActiveCategory(category);
     };
 
     const reduceMotionMedia =
@@ -3290,17 +3308,34 @@
       passive: true,
     });
     const resolveInitialCategory = () => {
+      if (initialCategorySelection && CATEGORY_KEYS.includes(initialCategorySelection)) {
+        return initialCategorySelection;
+      }
+
       if (initialHashCategory && CATEGORY_KEYS.includes(initialHashCategory)) {
-        return initialHashCategory;
+        initialCategorySelection = initialHashCategory;
+        return initialCategorySelection;
       }
 
       const storedCategory = readStoredCategory();
       if (storedCategory && CATEGORY_KEYS.includes(storedCategory)) {
-        return storedCategory;
+        initialCategorySelection = storedCategory;
+        return initialCategorySelection;
       }
 
-      return CATEGORY_KEYS[0];
+      initialCategorySelection = CATEGORY_KEYS[0];
+      return initialCategorySelection;
     };
+
+    const primeInitialCategory = () => {
+      const category = resolveInitialCategory();
+      if (category) {
+        reflectActiveCategory(category);
+      }
+      return category;
+    };
+
+    primeInitialCategory();
 
     const handleCategoryButtonClick = (event) => {
       const button = event.currentTarget;
@@ -3333,7 +3368,11 @@
 
     const projectList = document.querySelector('.projects');
     if (projectList) {
-      await homeMetadataPromise;
+      try {
+        await homeMetadataPromise;
+      } catch (error) {
+        console.error('Adele portfolio: failed to hydrate project metadata', error);
+      }
 
       const baseProjects = Array.from(projectList.children);
       if (baseProjects.length) {
@@ -4275,7 +4314,7 @@
       }
     }
 
-    const startInitialCategory = () => {
+    const startInitialCategory = (options = {}) => {
       if (!isHomePage) {
         return;
       }
@@ -4285,16 +4324,26 @@
         return;
       }
 
+      if (initialCategoryStarted && !options.force) {
+        return;
+      }
+
+      initialCategoryStarted = true;
       requestCategoryActivation(targetCategory, { initial: true, force: true });
     };
 
+    startInitialCategory();
+
     if (isHomePage) {
       if (fontsReadyPromise && typeof fontsReadyPromise.then === 'function') {
-        fontsReadyPromise.then(startInitialCategory).catch(startInitialCategory);
+        const triggerInitialCategory = () => startInitialCategory({ force: true });
+        fontsReadyPromise.then(triggerInitialCategory).catch(triggerInitialCategory);
       } else if (document.readyState === 'complete') {
-        startInitialCategory();
+        startInitialCategory({ force: true });
       } else {
-        window.addEventListener('load', startInitialCategory, { once: true });
+        window.addEventListener('load', () => startInitialCategory({ force: true }), {
+          once: true,
+        });
       }
     }
 
