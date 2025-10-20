@@ -3947,6 +3947,143 @@
             return;
           }
 
+          const ensureTouchSwipe = () => {
+            if (track.dataset.swipeBound === 'true') {
+              return;
+            }
+
+            let activePointerId = null;
+            let startX = 0;
+            let startY = 0;
+            let startOffset = 0;
+            let isDragging = false;
+            let verticalLock = false;
+
+            const releasePointerCapture = () => {
+              if (
+                typeof activePointerId === 'number' &&
+                typeof track.releasePointerCapture === 'function' &&
+                typeof track.hasPointerCapture === 'function' &&
+                track.hasPointerCapture(activePointerId)
+              ) {
+                try {
+                  track.releasePointerCapture(activePointerId);
+                } catch (error) {
+                  /* no-op */
+                }
+              }
+            };
+
+            const resetGesture = () => {
+              releasePointerCapture();
+              activePointerId = null;
+              isDragging = false;
+              verticalLock = false;
+            };
+
+            const pointerMatches = (event) => {
+              if (activePointerId === null) {
+                return false;
+              }
+              if (event.pointerId === undefined) {
+                return activePointerId === 'touch';
+              }
+              if (typeof activePointerId === 'number') {
+                return event.pointerId === activePointerId;
+              }
+              return false;
+            };
+
+            const handlePointerDown = (event) => {
+              const pointerType = event.pointerType || 'mouse';
+              if (pointerType !== 'touch' && pointerType !== 'pen') {
+                return;
+              }
+
+              const pointerId = event.pointerId !== undefined ? event.pointerId : null;
+              activePointerId = pointerId !== null ? pointerId : 'touch';
+              startX = Number.isFinite(event.clientX) ? event.clientX : 0;
+              startY = Number.isFinite(event.clientY) ? event.clientY : 0;
+              startOffset = state.offset || 0;
+              isDragging = false;
+              verticalLock = false;
+
+              if (pointerId !== null && typeof track.setPointerCapture === 'function') {
+                try {
+                  track.setPointerCapture(pointerId);
+                } catch (error) {
+                  /* no-op */
+                }
+              }
+            };
+
+            const handlePointerMove = (event) => {
+              if (!pointerMatches(event)) {
+                return;
+              }
+
+              const currentX = Number.isFinite(event.clientX) ? event.clientX : 0;
+              const currentY = Number.isFinite(event.clientY) ? event.clientY : 0;
+              const deltaX = currentX - startX;
+              const deltaY = currentY - startY;
+
+              if (!isDragging && !verticalLock) {
+                const absDeltaX = Math.abs(deltaX);
+                const absDeltaY = Math.abs(deltaY);
+
+                if (absDeltaX > 6 && absDeltaX >= absDeltaY) {
+                  isDragging = true;
+                  applyMode(state, 'manual');
+                } else if (absDeltaY > absDeltaX && absDeltaY > 6) {
+                  verticalLock = true;
+                  resetGesture();
+                  return;
+                } else {
+                  return;
+                }
+              }
+
+              if (!isDragging) {
+                return;
+              }
+
+              event.preventDefault();
+              state.offset = startOffset + deltaX;
+              wrapOffset(state);
+              state.track.style.transform = `translateX(${state.offset}px)`;
+            };
+
+            const handlePointerEnd = (event) => {
+              if (!pointerMatches(event)) {
+                return;
+              }
+
+              if (isDragging) {
+                event.preventDefault();
+              }
+
+              resetGesture();
+            };
+
+            track.addEventListener('pointerdown', handlePointerDown, {
+              passive: true,
+            });
+            track.addEventListener('pointermove', handlePointerMove, {
+              passive: false,
+            });
+            track.addEventListener('pointerup', handlePointerEnd, {
+              passive: true,
+            });
+            track.addEventListener('pointercancel', handlePointerEnd, {
+              passive: true,
+            });
+            track.addEventListener('pointerleave', handlePointerEnd, {
+              passive: true,
+            });
+
+            track.dataset.swipeBound = 'true';
+          };
+
           const updateEdgeMode = (mode) => {
             if (state.mode === mode) {
               return;
@@ -4029,141 +4166,12 @@
           }
 
           strip.classList.add('media-strip--touch');
-
-          if (strip.dataset.controlsReady === 'true' && previousMode === 'touch') {
-            return;
-          }
-
           strip
             .querySelectorAll('.media-strip__control')
             .forEach((control) => control.remove());
-
-          const createControl = (direction) => {
-            const control = document.createElement('button');
-            control.type = 'button';
-            control.className = `media-strip__control media-strip__control--${direction}`;
-            const label =
-              direction === 'left'
-                ? 'Faire défiler les médias vers la droite'
-                : 'Faire défiler les médias vers la gauche';
-            control.setAttribute('aria-label', label);
-            control.innerHTML =
-              direction === 'left'
-                ? '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><polyline points="14 6 8 12 14 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'
-                : '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><polyline points="10 6 16 12 10 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-            return control;
-          };
-
-          const leftControl = createControl('left');
-          const rightControl = createControl('right');
-
-          const nudgeTrackByMode = (mode) => {
-            if (!state) {
-              return;
-            }
-
-            const stripWidth = strip.clientWidth || 0;
-            const baseStep = stripWidth > 0 ? stripWidth * 0.85 : state.contentWidth;
-            const step = Math.max(Math.min(baseStep, 720), 140);
-            const direction = mode === 'fast-left' ? -1 : 1;
-            state.offset += step * direction;
-            wrapOffset(state);
-            state.track.style.transform = `translateX(${state.offset}px)`;
-          };
-
-          const beginFastMode = (mode, control, pointerId) => {
-            applyMode(state, mode);
-            control.classList.add('is-active');
-            if (
-              typeof control.setPointerCapture === 'function' &&
-              pointerId !== undefined
-            ) {
-              try {
-                control.setPointerCapture(pointerId);
-              } catch (error) {
-                // no-op
-              }
-            }
-          };
-
-          const endFastMode = (control, pointerId) => {
-            control.classList.remove('is-active');
-            applyMode(state, edgePointerActive ? 'base' : 'manual');
-            if (
-              pointerId !== undefined &&
-              typeof control.releasePointerCapture === 'function' &&
-              typeof control.hasPointerCapture === 'function' &&
-              control.hasPointerCapture(pointerId)
-            ) {
-              control.releasePointerCapture(pointerId);
-            }
-          };
-
-          const attachControlHandlers = (control, mode) => {
-            control.addEventListener('pointerdown', (event) => {
-              if (prefersTouch && event.pointerType === 'touch') {
-                event.preventDefault();
-                nudgeTrackByMode(mode);
-                return;
-              }
-              event.preventDefault();
-              beginFastMode(mode, control, event.pointerId);
-            });
-
-            const reset = (event) => {
-              endFastMode(control, event ? event.pointerId : undefined);
-            };
-
-            control.addEventListener('pointerup', reset);
-            control.addEventListener('pointercancel', reset);
-            control.addEventListener('lostpointercapture', () => {
-              control.classList.remove('is-active');
-              applyMode(state, edgePointerActive ? 'base' : 'manual');
-            });
-            control.addEventListener('pointerleave', (event) => {
-              if (event.pointerType === 'mouse') {
-                control.classList.remove('is-active');
-                applyMode(state, edgePointerActive ? 'base' : 'manual');
-              }
-            });
-
-            control.addEventListener('keydown', (event) => {
-              if (!ACTION_KEYS.has(event.key)) {
-                return;
-              }
-              event.preventDefault();
-              if (!control.classList.contains('is-active')) {
-                control.classList.add('is-active');
-                applyMode(state, mode);
-              }
-            });
-
-            control.addEventListener('keyup', (event) => {
-              if (!ACTION_KEYS.has(event.key)) {
-                return;
-              }
-              event.preventDefault();
-              control.classList.remove('is-active');
-              applyMode(state, edgePointerActive ? 'base' : 'manual');
-            });
-
-            control.addEventListener('blur', () => {
-              control.classList.remove('is-active');
-              applyMode(state, edgePointerActive ? 'base' : 'manual');
-            });
-
-            control.addEventListener('click', (event) => {
-              event.preventDefault();
-              nudgeTrackByMode(mode);
-            });
-          };
-
-          attachControlHandlers(leftControl, 'fast-right');
-          attachControlHandlers(rightControl, 'fast-left');
-
-          strip.append(leftControl, rightControl);
-          strip.dataset.controlsReady = 'true';
-          strip.setAttribute('data-controls-mode', 'touch');
+          ensureTouchSwipe();
+          strip.dataset.controlsReady = 'swipe';
+          strip.setAttribute('data-controls-mode', 'touch-swipe');
           strip.removeAttribute('data-controls-skipped');
         };
 

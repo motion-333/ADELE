@@ -909,6 +909,10 @@ body.is-transitioning {
   transform: translateY(-50%) scale(0.96);
 }
 
+.media-strip--touch .media-track {
+  touch-action: pan-y;
+}
+
 @media (max-width: 600px) {
   .media-strip__control {
     width: clamp(2.6rem, 14vw, 3.25rem);
