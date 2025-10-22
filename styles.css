@@ -631,6 +631,33 @@ body.category-evenementiel .project[data-category='evenementiel'] {
   background-position: top center;
 }
 
+body.category-film .project[data-category="film"] .placeholder[data-still$=".png" i]:not(.placeholder--video),
+body.category-film .project-detail[data-category="film"] .placeholder[data-still$=".png" i]:not(.placeholder--video) {
+  background-position: center center;
+}
+
+body.category-photo .project[data-category="photo"] .placeholder[data-still$=".png" i]:not(.placeholder--video),
+body.category-photo .project-detail[data-category="photo"] .placeholder[data-still$=".png" i]:not(.placeholder--video) {
+  background-position: top center;
+}
+
+body.category-evenementiel .project[data-category="evenementiel"] .placeholder[data-still$=".png" i]:not(.placeholder--video),
+body.category-evenementiel .project-detail[data-category="evenementiel"] .placeholder[data-still$=".png" i]:not(.placeholder--video) {
+  background-position: center center;
+}
+
+body.category-film .project-detail[data-category="film"] .project-hero__media.placeholder[data-still$=".png" i] {
+  background-position: center center;
+}
+
+body.category-photo .project-detail[data-category="photo"] .project-hero__media.placeholder[data-still$=".png" i] {
+  background-position: top center;
+}
+
+body.category-evenementiel .project-detail[data-category="evenementiel"] .project-hero__media.placeholder[data-still$=".png" i] {
+  background-position: center center;
+}
+
 .placeholder:is(:hover, :focus-visible) {
   background-image: var(--placeholder-animated);
 }

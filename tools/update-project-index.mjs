@@ -37,9 +37,6 @@ const manifestPath = path.join(ROOT, 'pub', 'project-index.json');
 const manifestScriptPath = path.join(ROOT, 'pub', 'project-manifest.js');
 const projectTemplatePath = path.join(ROOT, 'tools', 'templates', 'project-detail.html');
 
-const DEFAULT_DESCRIPTION =
-  "Cette section présente une description détaillée du projet, incluant son périmètre, ses objectifs et ses principaux livrables. Elle expose les activités prévues, les méthodologies retenues ainsi que les résultats attendus, tout en mettant en avant le rôle et la participation du client tout au long du processus. L’implication du client — qu’il s’agisse de retours, de prises de décision ou de collaboration — sera essentielle pour garantir la réussite du projet et son alignement avec ses besoins.";
-
 const FALLBACK_PROJECT_TEMPLATE = `<!DOCTYPE html>
 <html lang="fr">
   <head>
@@ -382,11 +379,11 @@ const renderProjectDetailHtml = async (entry) => {
   const template = await loadProjectTemplate();
   const projectId = entry && entry.id ? `${entry.id}`.trim() : 'project-00';
   const titleText = entry && entry.title ? `${entry.title}`.trim() : 'TITRE DE PROJET';
-  const metaText = entry && entry.info ? `${entry.info}`.trim() : 'Nom de Prod, 2025';
+  const metaText = entry && entry.info && `${entry.info}`.trim() ? `${entry.info}`.trim() : '';
   const paragraphText =
     entry && entry.paragraph && `${entry.paragraph}`.trim()
       ? `${entry.paragraph}`.trim()
-      : DEFAULT_DESCRIPTION;
+      : '';
   const pageTitle = `${titleText} — Adèle Farges`;
   const mediaDirectory = entry && entry.mediaDirectory ? `${entry.mediaDirectory}`.trim() : '';
   const vimeoUrl = entry && entry.vimeo ? `${entry.vimeo}`.trim() : '';

@@ -592,7 +592,8 @@
 
         const metaEl = section.querySelector('.project-meta');
         if (metaEl) {
-          metaEl.textContent = 'Nom de Prod, 2025';
+          metaEl.textContent = '';
+          metaEl.hidden = true;
         }
 
         return section;
@@ -614,7 +615,8 @@
       title.textContent = 'TITRE DE PROJET';
       const meta = document.createElement('span');
       meta.className = 'project-meta';
-      meta.textContent = 'Nom de Prod, 2025';
+      meta.textContent = '';
+      meta.hidden = true;
       heading.appendChild(title);
       heading.appendChild(meta);
 
@@ -1325,8 +1327,15 @@
           }
 
           const metaEl = section.querySelector('.project-meta');
-          if (metaEl && metadata.info) {
-            metaEl.textContent = metadata.info;
+          if (metaEl) {
+            if (metadata.info) {
+              metaEl.textContent = metadata.info;
+              metaEl.hidden = false;
+              metaEl.removeAttribute('hidden');
+            } else {
+              metaEl.textContent = '';
+              metaEl.hidden = true;
+            }
           }
 
           const track = section.querySelector('.media-track');
@@ -1401,14 +1410,36 @@
         titleEl.textContent = metadata.title;
       }
 
+      if (metadata.category) {
+        detail.setAttribute('data-category', metadata.category);
+        reflectActiveCategory(metadata.category);
+      } else {
+        detail.removeAttribute('data-category');
+        reflectActiveCategory(null);
+      }
+
       const metaEl = detail.querySelector('.project-detail__meta');
-      if (metaEl && metadata.info) {
-        metaEl.textContent = metadata.info;
+      if (metaEl) {
+        if (metadata.info) {
+          metaEl.textContent = metadata.info;
+          metaEl.hidden = false;
+          metaEl.removeAttribute('hidden');
+        } else {
+          metaEl.textContent = '';
+          metaEl.hidden = true;
+        }
       }
 
       const descriptionEl = detail.querySelector('.project-detail__description');
-      if (descriptionEl && metadata.paragraph) {
-        descriptionEl.textContent = metadata.paragraph;
+      if (descriptionEl) {
+        if (metadata.paragraph) {
+          descriptionEl.textContent = metadata.paragraph;
+          descriptionEl.hidden = false;
+          descriptionEl.removeAttribute('hidden');
+        } else {
+          descriptionEl.textContent = '';
+          descriptionEl.hidden = true;
+        }
       }
 
       const creditsSection = detail.querySelector('.project-detail__credits');
