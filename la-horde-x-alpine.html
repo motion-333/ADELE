@@ -13,7 +13,6 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body class="project-detail-page theme-dark">
-    
     <header class="topbar">
       <div class="topbar__inner">
         <div class="topbar__identity">
@@ -51,15 +50,15 @@
           </button>
           <a class="topbar__about" href="about.html" aria-label="À propos d'Adèle Farges">
             <svg class="icon icon--info" viewBox="0 0 24 24" role="img" aria-hidden="true">
-            <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.8"></circle>
-            <line x1="12" y1="10" x2="12" y2="16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></line>
-            <circle cx="12" cy="7" r="1.2" fill="currentColor"></circle>
+              <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.8"></circle>
+              <line x1="12" y1="10" x2="12" y2="16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></line>
+              <circle cx="12" cy="7" r="1.2" fill="currentColor"></circle>
             </svg>
           </a>
         </div>
       </div>
     </header>
-    <main class="project-detail" data-project="project-09">
+    <main class="project-detail" data-project="project-09" data-media-source="film/project-09/images/" data-vimeo="https://www.youtube.com/watch?v=opMENzlHkrU">
       <div class="project-hero">
         <div class="project-hero__media placeholder">
           <button
@@ -79,13 +78,13 @@
             </svg>
           </a>
           <div class="project-detail__heading-text">
-            <h1 class="project-detail__title">TITRE DE PROJET</h1>
-            <span class="project-detail__meta" hidden></span>
+            <h1 class="project-detail__title">(La)Horde x Alpine</h1>
+            <span class="project-detail__meta">2024</span>
           </div>
         </div>
-        <p class="project-detail__description" hidden></p>
+        <p class="project-detail__description">Texte explicatif pour le projet 09.</p>
       </section>
-      <section class="project-detail__gallery"></section>
+      <section class="project-detail__gallery" data-masonry></section>
       <section class="project-detail__credits" aria-label="Crédits du projet">
         <h2 class="project-detail__credits-title">Crédits</h2>
         <ul class="project-detail__credits-list"></ul>
@@ -101,3 +100,4 @@
     <script src="script.js"></script>
   </body>
 </html>
+

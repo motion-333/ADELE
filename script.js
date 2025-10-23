@@ -4450,16 +4450,34 @@
     if (projectDetail) {
       const headingMetaInitial = projectDetail.querySelector('.project-detail__meta');
       if (headingMetaInitial) {
-        headingMetaInitial.textContent = '';
-        headingMetaInitial.hidden = true;
+        const initialMetaText = (headingMetaInitial.textContent || '').trim();
+        if (initialMetaText) {
+          headingMetaInitial.hidden = false;
+          headingMetaInitial.removeAttribute('hidden');
+        } else {
+          headingMetaInitial.textContent = '';
+          headingMetaInitial.hidden = true;
+          if (!headingMetaInitial.hasAttribute('hidden')) {
+            headingMetaInitial.setAttribute('hidden', '');
+          }
+        }
       }
 
       const descriptionInitial = projectDetail.querySelector(
         '.project-detail__description'
       );
       if (descriptionInitial) {
-        descriptionInitial.textContent = '';
-        descriptionInitial.hidden = true;
+        const initialDescription = (descriptionInitial.textContent || '').trim();
+        if (initialDescription) {
+          descriptionInitial.hidden = false;
+          descriptionInitial.removeAttribute('hidden');
+        } else {
+          descriptionInitial.textContent = '';
+          descriptionInitial.hidden = true;
+          if (!descriptionInitial.hasAttribute('hidden')) {
+            descriptionInitial.setAttribute('hidden', '');
+          }
+        }
       }
 
       const backLink = projectDetail.querySelector('.project-detail__back');
@@ -4741,6 +4759,10 @@
               initializeMediaElement(fallbackItem);
             }
           }
+        }
+
+        if (!gallery.hasAttribute('data-masonry')) {
+          gallery.setAttribute('data-masonry', '');
         }
 
         const shouldUseMasonry = gallery.hasAttribute('data-masonry');

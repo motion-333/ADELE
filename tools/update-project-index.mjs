@@ -118,12 +118,12 @@ const FALLBACK_PROJECT_TEMPLATE = `<!DOCTYPE html>
           </a>
           <div class="project-detail__heading-text">
             <h1 class="project-detail__title">{{TITLE_TEXT}}</h1>
-            <span class="project-detail__meta">{{META_TEXT}}</span>
+            <span class="project-detail__meta"{{META_ATTRS}}>{{META_TEXT}}</span>
           </div>
         </div>
-        <p class="project-detail__description">{{DESCRIPTION_TEXT}}</p>
+        <p class="project-detail__description"{{DESCRIPTION_ATTRS}}>{{DESCRIPTION_TEXT}}</p>
       </section>
-      <section class="project-detail__gallery"></section>
+      <section class="project-detail__gallery" data-masonry></section>
       <section class="project-detail__credits" aria-label="Crédits du projet">
         <h2 class="project-detail__credits-title">Crédits</h2>
         <ul class="project-detail__credits-list"></ul>
@@ -384,6 +384,8 @@ const renderProjectDetailHtml = async (entry) => {
     entry && entry.paragraph && `${entry.paragraph}`.trim()
       ? `${entry.paragraph}`.trim()
       : '';
+  const metaAttrs = metaText ? '' : ' hidden';
+  const descriptionAttrs = paragraphText ? '' : ' hidden';
   const pageTitle = 'Adèle Farges';
   const mediaDirectory = entry && entry.mediaDirectory ? `${entry.mediaDirectory}`.trim() : '';
   const vimeoUrl = entry && entry.vimeo ? `${entry.vimeo}`.trim() : '';
@@ -397,7 +399,9 @@ const renderProjectDetailHtml = async (entry) => {
     ['PAGE_TITLE', escapeHtml(pageTitle)],
     ['PROJECT_ID', escapeAttribute(projectId)],
     ['TITLE_TEXT', escapeHtml(titleText)],
+    ['META_ATTRS', metaAttrs],
     ['META_TEXT', escapeHtml(metaText)],
+    ['DESCRIPTION_ATTRS', descriptionAttrs],
     ['DESCRIPTION_TEXT', escapeHtml(paragraphText)],
     ['MEDIA_SOURCE_ATTR', mediaAttr],
     ['VIMEO_ATTR', vimeoAttr],
@@ -525,16 +529,9 @@ const ensureProjectDetailPage = async (entry) => {
     }
   }
 
-  let exists = await pathExists(targetPath);
-  if (!exists) {
-    const html = await renderProjectDetailHtml(entry);
-    await fs.writeFile(targetPath, `${html}\n`, 'utf8');
-    exists = true;
-  }
-
-  if (exists) {
-    await ensureManifestScriptTag(targetPath);
-  }
+  const html = await renderProjectDetailHtml(entry);
+  await fs.writeFile(targetPath, `${html}\n`, 'utf8');
+  await ensureManifestScriptTag(targetPath);
 };
 
 const collectMediaFiles = async (basePath) => {
