@@ -274,9 +274,12 @@
     const RETURN_SCROLL_KEY = 'adele:return-scroll';
     const LAST_CATEGORY_KEY = 'adele:last-category';
     const RETURN_SCROLL_EVENT = 'adele:return-scroll-restored';
-    const MASONRY_GAP = 5;
+    const MASONRY_FALLBACK_GAP = 12;
     const MASONRY_MIN_COLUMN_WIDTH = 220;
     const MASONRY_MAX_COLUMN_WIDTH = 380;
+    const MASONRY_MIN_COLUMNS = 2;
+    const MASONRY_MAX_COLUMNS = 3;
+    const MASONRY_THREE_COLUMN_THRESHOLD = 820;
     const MEDIA_IMAGE_VAR = '--placeholder-image';
     const MEDIA_ANIMATED_VAR = '--placeholder-animated';
     const CATEGORY_DIRECTORY_LOOKUP = CATEGORY_KEYS.reduce((accumulator, key) => {
@@ -1641,6 +1644,55 @@
       }
     };
 
+    const scheduleMasonryForElement = (element) => {
+      if (!element || typeof element.closest !== 'function') {
+        return;
+      }
+
+      const gallery = element.closest('.project-detail__gallery');
+      if (!gallery) {
+        return;
+      }
+
+      const scheduler = gallery.__scheduleMasonryLayout;
+      if (typeof scheduler === 'function') {
+        scheduler();
+      }
+    };
+
+    const updateElementAspect = (element, width, height) => {
+      if (!element) {
+        return;
+      }
+
+      const numericWidth = Number(width);
+      const numericHeight = Number(height);
+
+      if (
+        !Number.isFinite(numericWidth) ||
+        !Number.isFinite(numericHeight) ||
+        numericWidth <= 0 ||
+        numericHeight <= 0
+      ) {
+        return;
+      }
+
+      const aspect = numericWidth / numericHeight;
+      if (!Number.isFinite(aspect) || aspect <= 0) {
+        return;
+      }
+
+      const currentAspect = parseFloat(element.getAttribute('data-aspect'));
+      if (Number.isFinite(currentAspect) && Math.abs(currentAspect - aspect) < 0.0001) {
+        return;
+      }
+
+      const aspectString = `${aspect}`;
+      element.setAttribute('data-aspect', aspectString);
+      element.style.setProperty('--item-aspect', aspectString);
+      scheduleMasonryForElement(element);
+    };
+
     const syncPlaceholderVideo = (element, src, options = {}) => {
       if (!element) {
         return;
@@ -1676,6 +1728,23 @@
         element.appendChild(videoElement);
       }
 
+      const applyVideoAspect = () => {
+        if (!videoElement) {
+          return;
+        }
+
+        const { videoWidth, videoHeight } = videoElement;
+        if (videoWidth > 0 && videoHeight > 0) {
+          updateElementAspect(element, videoWidth, videoHeight);
+        }
+      };
+
+      if (!videoElement.__aspectListenerBound) {
+        videoElement.__aspectListenerBound = true;
+        videoElement.addEventListener('loadedmetadata', applyVideoAspect);
+        videoElement.addEventListener('resize', applyVideoAspect);
+      }
+
       if (videoElement.getAttribute('data-src') !== videoSrc) {
         videoElement.setAttribute('data-src', videoSrc);
         videoElement.src = videoSrc;
@@ -1696,6 +1765,10 @@
       } else {
         videoElement.removeAttribute('controls');
         videoElement.setAttribute('aria-hidden', 'true');
+      }
+
+      if (videoElement.readyState >= 1) {
+        applyVideoAspect();
       }
 
       videoElement.play().catch(() => {
@@ -1763,8 +1836,28 @@
           element.appendChild(imageElement);
         }
 
+        const applyImageAspect = () => {
+          if (!imageElement) {
+            return;
+          }
+
+          const { naturalWidth, naturalHeight } = imageElement;
+          if (naturalWidth > 0 && naturalHeight > 0) {
+            updateElementAspect(element, naturalWidth, naturalHeight);
+          }
+        };
+
+        if (!imageElement.__aspectListenerBound) {
+          imageElement.__aspectListenerBound = true;
+          imageElement.addEventListener('load', applyImageAspect);
+        }
+
         if (imageElement.getAttribute('src') !== imageSource) {
           imageElement.src = imageSource;
+        }
+
+        if (imageElement.complete) {
+          applyImageAspect();
         }
       };
 
@@ -1881,6 +1974,10 @@
         ensureImageReady(video).catch(() => {
           /* ignore */
         });
+      }
+
+      if (isProjectGalleryItem) {
+        scheduleMasonryForElement(element);
       }
     };
 
@@ -4822,31 +4919,40 @@
               return;
             }
 
-            const gap = MASONRY_GAP;
-            const tentativeColumns = Math.max(
-              1,
-              Math.floor((containerWidth + gap) / (MASONRY_MIN_COLUMN_WIDTH + gap))
-            );
-            let columnCount = Math.min(tentativeColumns, items.length);
-            columnCount = Math.max(columnCount, 1);
+            let gap = MASONRY_FALLBACK_GAP;
+            if (window.getComputedStyle) {
+              const computedGap = window
+                .getComputedStyle(gallery)
+                .getPropertyValue('--gallery-gap');
+              const parsedGap = parseFloat(computedGap);
+              if (Number.isFinite(parsedGap) && parsedGap >= 0) {
+                gap = parsedGap;
+              }
+            }
+
+            let columnCount = items.length <= 1 ? items.length : 0;
+            if (items.length > 1) {
+              const availableColumns = Math.max(
+                1,
+                Math.floor((containerWidth + gap) / (MASONRY_MIN_COLUMN_WIDTH + gap))
+              );
+
+              columnCount = Math.max(
+                Math.min(availableColumns, MASONRY_MAX_COLUMNS, items.length),
+                Math.min(items.length, MASONRY_MIN_COLUMNS)
+              );
+
+              if (containerWidth >= MASONRY_THREE_COLUMN_THRESHOLD && items.length >= 3) {
+                columnCount = Math.min(Math.max(columnCount, 3), MASONRY_MAX_COLUMNS);
+              }
+            }
+
+            if (!Number.isFinite(columnCount) || columnCount <= 0) {
+              columnCount = 1;
+            }
 
             let columnWidth =
               (containerWidth - gap * (columnCount - 1)) / Math.max(columnCount, 1);
-
-            if (columnWidth > MASONRY_MAX_COLUMN_WIDTH && items.length > columnCount) {
-              const adjustedColumns = Math.min(
-                items.length,
-                Math.max(
-                  columnCount,
-                  Math.floor((containerWidth + gap) / (MASONRY_MAX_COLUMN_WIDTH + gap))
-                )
-              );
-              if (adjustedColumns > columnCount) {
-                columnCount = adjustedColumns;
-                columnWidth =
-                  (containerWidth - gap * (columnCount - 1)) / Math.max(columnCount, 1);
-              }
-            }
 
             if (!Number.isFinite(columnWidth) || columnWidth <= 0) {
               columnWidth = containerWidth;
@@ -4897,6 +5003,8 @@
             });
           };
 
+          gallery.__scheduleMasonryLayout = scheduleMasonryLayout;
+
           scheduleMasonryLayout();
 
           if (typeof window.ResizeObserver === 'function') {
@@ -4933,6 +5041,7 @@
           gallery.classList.remove('is-masonry');
           gallery.classList.remove('is-ready');
           gallery.style.removeProperty('height');
+          gallery.__scheduleMasonryLayout = null;
         }
 
         gallery.addEventListener('click', (event) => {

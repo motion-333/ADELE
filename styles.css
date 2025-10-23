@@ -1413,6 +1413,7 @@ body.is-transitioning {
 }
 
 .project-detail__gallery {
+  --gallery-gap: clamp(10px, 2vw, 18px);
   width: min(96vw, 1100px);
   margin: 0 auto;
   display: grid;
@@ -1420,7 +1421,7 @@ body.is-transitioning {
     auto-fit,
     minmax(clamp(220px, 28vw, 340px), 1fr)
   );
-  gap: clamp(8px, 2vw, 16px);
+  gap: var(--gallery-gap);
   position: relative;
   justify-content: center;
   align-items: start;
@@ -1488,14 +1489,14 @@ body.is-transitioning {
 @media (max-width: 600px) {
   .project-detail__gallery {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: clamp(6px, 3.5vw, 12px);
+    --gallery-gap: clamp(6px, 3.5vw, 12px);
   }
 }
 
 .project-detail__gallery.is-masonry {
   display: block;
   gap: 0;
-  padding-bottom: 5px;
+  padding-bottom: var(--gallery-gap);
   min-height: 0;
 }
 
