@@ -73,7 +73,7 @@ const FALLBACK_PROJECT_TEMPLATE = `<!DOCTYPE html>
               <circle class="icon--theme__sun" cx="16" cy="16" r="7"></circle>
               <path
                 class="icon--theme__moon"
-                d="M20.5 24.5a8.5 8.5 0 0 1 0-17 8.5 8.5 0 1 0 0 17Z"
+                d="M22.5 24.6c-4.66 0-8.44-3.78-8.44-8.44 0-3.2 1.8-6 4.44-7.42a.6.6 0 0 0-.37-1.12 9.88 9.88 0 1 0 6.91 17.18.6.6 0 0 0-.56-1z"
               ></path>
               <g class="icon--theme__rays" stroke-linecap="round">
                 <line x1="16" y1="3" x2="16" y2="6"></line>
@@ -384,7 +384,7 @@ const renderProjectDetailHtml = async (entry) => {
     entry && entry.paragraph && `${entry.paragraph}`.trim()
       ? `${entry.paragraph}`.trim()
       : '';
-  const pageTitle = `${titleText} — Adèle Farges`;
+  const pageTitle = 'Adèle Farges';
   const mediaDirectory = entry && entry.mediaDirectory ? `${entry.mediaDirectory}`.trim() : '';
   const vimeoUrl = entry && entry.vimeo ? `${entry.vimeo}`.trim() : '';
 

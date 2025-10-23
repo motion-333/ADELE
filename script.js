@@ -1696,6 +1696,7 @@
       const video = readStringAttribute(element, 'data-video');
       const aspectAttr = parseNumeric(element.getAttribute('data-aspect'));
       const isLightboxMedia = element.classList.contains('lightbox__media');
+      const isProjectGalleryItem = element.classList.contains('project-detail__item');
 
       const ensureLightboxImage = (source) => {
         const imageSource = source ? source.trim() : '';
@@ -1715,6 +1716,33 @@
           imageElement.setAttribute('aria-hidden', 'true');
           imageElement.decoding = 'async';
           imageElement.loading = 'eager';
+          element.appendChild(imageElement);
+        }
+
+        if (imageElement.getAttribute('src') !== imageSource) {
+          imageElement.src = imageSource;
+        }
+      };
+
+      const ensureGalleryImage = (source) => {
+        const imageSource = source ? source.trim() : '';
+        let imageElement = element.querySelector('img.placeholder__image');
+
+        if (!imageSource) {
+          if (imageElement) {
+            imageElement.remove();
+          }
+          return;
+        }
+
+        if (!imageElement) {
+          imageElement = document.createElement('img');
+          imageElement.className = 'placeholder__image';
+          imageElement.alt = '';
+          imageElement.setAttribute('aria-hidden', 'true');
+          imageElement.decoding = 'async';
+          imageElement.loading = 'lazy';
+          imageElement.draggable = false;
           element.appendChild(imageElement);
         }
 
@@ -1750,16 +1778,35 @@
         const animatedSource = currentAnimated || currentStill || '';
         if (isLightboxMedia) {
           const imageSource = currentVideo ? '' : animatedSource || stillSource;
-            if (currentVideo) {
-              ensureLightboxImage(null);
-              syncPlaceholderVideo(element, currentVideo, {
-                muted: false,
-                controls: false,
-                playsInline: true,
-              });
-            } else {
+          if (currentVideo) {
+            ensureLightboxImage(null);
+            syncPlaceholderVideo(element, currentVideo, {
+              muted: false,
+              controls: false,
+              playsInline: true,
+            });
+          } else {
             syncPlaceholderVideo(element, null);
             ensureLightboxImage(imageSource);
+          }
+          element.style.removeProperty(MEDIA_IMAGE_VAR);
+          element.style.removeProperty(MEDIA_ANIMATED_VAR);
+          updateVideoClass();
+          return;
+        }
+
+        if (isProjectGalleryItem) {
+          const imageSource = currentVideo ? '' : animatedSource || stillSource;
+          if (currentVideo) {
+            ensureGalleryImage(null);
+            syncPlaceholderVideo(element, currentVideo, {
+              muted: true,
+              controls: false,
+              playsInline: true,
+            });
+          } else {
+            syncPlaceholderVideo(element, null);
+            ensureGalleryImage(imageSource);
           }
           element.style.removeProperty(MEDIA_IMAGE_VAR);
           element.style.removeProperty(MEDIA_ANIMATED_VAR);
