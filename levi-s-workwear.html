@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -12,7 +12,7 @@
     />
     <link rel="stylesheet" href="styles.css" />
   </head>
-  <body class="theme-dark">
+  <body class="project-detail-page theme-dark">
     <header class="topbar">
       <div class="topbar__inner">
         <div class="topbar__identity">
@@ -48,23 +48,46 @@
               </g>
             </svg>
           </button>
-          <a class="topbar__about" href="about.html" aria-label="About Adèle Farges">
+          <a class="topbar__about" href="about.html" aria-label="À propos d'Adèle Farges">
             <svg class="icon icon--info" viewBox="0 0 24 24" role="img" aria-hidden="true">
-            <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.8"></circle>
-            <line x1="12" y1="10" x2="12" y2="16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></line>
-            <circle cx="12" cy="7" r="1.2" fill="currentColor"></circle>
+              <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.8"></circle>
+              <line x1="12" y1="10" x2="12" y2="16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></line>
+              <circle cx="12" cy="7" r="1.2" fill="currentColor"></circle>
             </svg>
           </a>
         </div>
       </div>
     </header>
-    <main class="about-page">
-      <section class="about-page__content" aria-label="Coordonnées">
-        <p class="about-page__line about-page__line--headline">Discutons ensemble de vos projets</p>
-        <p class="about-page__line about-page__line--contact">06 64 53 04 33</p>
-        <p class="about-page__line about-page__line--contact">
-          <a href="mailto:adelefarges.prod@gmail.com">adelefarges.prod@gmail.com</a>
-        </p>
+    <main class="project-detail" data-project="project-08" data-media-source="film/project-08/images/" data-vimeo="https://vimeo.com/889900112">
+      <div class="project-hero">
+        <div class="project-hero__media placeholder">
+          <button
+            class="project-hero__play"
+            type="button"
+            aria-label="Lire la vidéo du projet"
+          ></button>
+          <div class="project-hero__video" hidden></div>
+        </div>
+      </div>
+      <section class="project-detail__body">
+        <div class="project-detail__heading">
+          <a class="project-detail__back" href="index.html" aria-label="Retourner au portfolio">
+            <svg class="icon icon--back" viewBox="0 0 24 24" role="img" aria-hidden="true">
+              <polyline points="14 6 8 12 14 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></polyline>
+              <line x1="9" y1="12" x2="20" y2="12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></line>
+            </svg>
+          </a>
+          <div class="project-detail__heading-text">
+            <h1 class="project-detail__title">LEVI&#39;S WORKWEAR</h1>
+            <span class="project-detail__meta">2024</span>
+          </div>
+        </div>
+        <p class="project-detail__description">Texte du projet 08.</p>
+      </section>
+      <section class="project-detail__gallery" data-masonry></section>
+      <section class="project-detail__credits" aria-label="Crédits du projet">
+        <h2 class="project-detail__credits-title">Crédits</h2>
+        <ul class="project-detail__credits-list"></ul>
       </section>
     </main>
     <footer class="site-footer">
@@ -73,6 +96,8 @@
         <a href="https://www.motion333.com" target="_blank" rel="noopener">Motion</a>
       </small>
     </footer>
+    <script src="pub/project-manifest.js" defer></script>
     <script src="script.js"></script>
   </body>
 </html>
+

@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Titre de Projet — Adèle Farges</title>
+    <title>Adèle Farges</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -13,7 +13,6 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body class="project-detail-page theme-dark">
-    
     <header class="topbar">
       <div class="topbar__inner">
         <div class="topbar__identity">
@@ -35,7 +34,7 @@
               <circle class="icon--theme__sun" cx="16" cy="16" r="7"></circle>
               <path
                 class="icon--theme__moon"
-                d="M20.5 24.5a8.5 8.5 0 0 1 0-17 8.5 8.5 0 1 0 0 17Z"
+                d="M22.5 24.6c-4.66 0-8.44-3.78-8.44-8.44 0-3.2 1.8-6 4.44-7.42a.6.6 0 0 0-.37-1.12 9.88 9.88 0 1 0 6.91 17.18.6.6 0 0 0-.56-1z"
               ></path>
               <g class="icon--theme__rays" stroke-linecap="round">
                 <line x1="16" y1="3" x2="16" y2="6"></line>
@@ -51,15 +50,15 @@
           </button>
           <a class="topbar__about" href="about.html" aria-label="À propos d'Adèle Farges">
             <svg class="icon icon--info" viewBox="0 0 24 24" role="img" aria-hidden="true">
-            <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.8"></circle>
-            <line x1="12" y1="10" x2="12" y2="16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></line>
-            <circle cx="12" cy="7" r="1.2" fill="currentColor"></circle>
+              <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.8"></circle>
+              <line x1="12" y1="10" x2="12" y2="16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></line>
+              <circle cx="12" cy="7" r="1.2" fill="currentColor"></circle>
             </svg>
           </a>
         </div>
       </div>
     </header>
-    <main class="project-detail" data-project="project-09">
+    <main class="project-detail" data-project="project-13" data-media-source="evenementiel/project-13/images/">
       <div class="project-hero">
         <div class="project-hero__media placeholder">
           <button
@@ -79,20 +78,13 @@
             </svg>
           </a>
           <div class="project-detail__heading-text">
-            <h1 class="project-detail__title">TITRE DE PROJET</h1>
-            <span class="project-detail__meta">Nom de Prod, 2025</span>
+            <h1 class="project-detail__title">Événementiel Live 13</h1>
+            <span class="project-detail__meta">Collectif Nova, 2025</span>
           </div>
         </div>
-        <p class="project-detail__description">
-          Cette section présente une description détaillée du projet, incluant son périmètre,
-          ses objectifs et ses principaux livrables. Elle expose les activités prévues, les
-          méthodologies retenues ainsi que les résultats attendus, tout en mettant en avant le
-          rôle et la participation du client tout au long du processus. L’implication du client —
-          qu’il s’agisse de retours, de prises de décision ou de collaboration — sera essentielle
-          pour garantir la réussite du projet et son alignement avec ses besoins.
-        </p>
+        <p class="project-detail__description">Captation immersive d’un concert live où le rythme, la scénographie et le public forment un tout vibrant.</p>
       </section>
-      <section class="project-detail__gallery"></section>
+      <section class="project-detail__gallery" data-masonry></section>
       <section class="project-detail__credits" aria-label="Crédits du projet">
         <h2 class="project-detail__credits-title">Crédits</h2>
         <ul class="project-detail__credits-list"></ul>
@@ -104,6 +96,8 @@
         <a href="https://www.motion333.com" target="_blank" rel="noopener">Motion</a>
       </small>
     </footer>
+    <script src="pub/project-manifest.js" defer></script>
     <script src="script.js"></script>
   </body>
 </html>
+

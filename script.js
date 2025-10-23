@@ -33,6 +33,8 @@
     let projectController = null;
     const pendingCategoryQueue = [];
     let shouldReduceMotion = false;
+    let initialCategorySelection = null;
+    let initialCategoryStarted = false;
 
     const applyBodyCategory = (category) => {
       if (!body) {
@@ -61,6 +63,21 @@
           button.classList.remove('is-active');
         }
       });
+    };
+
+    const reflectActiveCategory = (category) => {
+      if (!category) {
+        topbarCategoryButtons.forEach((button) => {
+          button.classList.remove('is-active');
+        });
+        if (body) {
+          categoryClassNames.forEach((cls) => body.classList.remove(cls));
+        }
+        return;
+      }
+
+      updateCategoryButtonState(category);
+      applyBodyCategory(category);
     };
 
     const showTitleOverlay = () => {
@@ -132,6 +149,7 @@
       }
 
       pendingCategoryQueue.push({ category, options });
+      reflectActiveCategory(category);
     };
 
     const reduceMotionMedia =
@@ -256,9 +274,12 @@
     const RETURN_SCROLL_KEY = 'adele:return-scroll';
     const LAST_CATEGORY_KEY = 'adele:last-category';
     const RETURN_SCROLL_EVENT = 'adele:return-scroll-restored';
-    const MASONRY_GAP = 5;
+    const MASONRY_FALLBACK_GAP = 12;
     const MASONRY_MIN_COLUMN_WIDTH = 220;
     const MASONRY_MAX_COLUMN_WIDTH = 380;
+    const MASONRY_MIN_COLUMNS = 2;
+    const MASONRY_MAX_COLUMNS = 3;
+    const MASONRY_THREE_COLUMN_THRESHOLD = 820;
     const MEDIA_IMAGE_VAR = '--placeholder-image';
     const MEDIA_ANIMATED_VAR = '--placeholder-animated';
     const CATEGORY_DIRECTORY_LOOKUP = CATEGORY_KEYS.reduce((accumulator, key) => {
@@ -267,6 +288,443 @@
     }, {});
 
     const projectMetadataCache = new Map();
+
+    function deriveCategoryMediaDirectory(category, projectId) {
+      if (!projectId) {
+        return null;
+      }
+
+      const normalizedCategory = category ? `${category}`.trim().toLowerCase() : '';
+      if (!normalizedCategory) {
+        return null;
+      }
+
+      const categoryRoot =
+        CATEGORY_DIRECTORY_LOOKUP[normalizedCategory] ||
+        normalizeDirectoryPath(normalizedCategory);
+      if (!categoryRoot) {
+        return null;
+      }
+
+      return normalizeDirectoryPath(`${categoryRoot}${projectId}/images`);
+    }
+
+    function deriveManifestMediaDirectory(entry) {
+      if (!entry) {
+        return null;
+      }
+
+      if (entry.mediaDirectory) {
+        const normalized = normalizeDirectoryPath(entry.mediaDirectory);
+        if (normalized) {
+          return normalized;
+        }
+      }
+
+      const list = Array.isArray(entry.media) ? entry.media : [];
+      for (let index = 0; index < list.length; index += 1) {
+        const raw = list[index];
+        if (raw === null || raw === undefined) {
+          continue;
+        }
+
+        let value = `${raw}`.trim();
+        if (!value) {
+          continue;
+        }
+
+        value = value.replace(/\\/g, '/');
+        if (/^https?:\/\//i.test(value)) {
+          continue;
+        }
+
+        value = value.replace(/^\.\/+/, '');
+        value = value.replace(/^\/+/, '');
+
+        const parts = value.split('/');
+        if (parts.length <= 1) {
+          continue;
+        }
+
+        parts.pop();
+        const directory = parts.join('/');
+        if (directory) {
+          return normalizeDirectoryPath(directory);
+        }
+      }
+
+      const fallbackCategory = entry.category ? `${entry.category}`.trim().toLowerCase() : '';
+      if (fallbackCategory) {
+        const derived = deriveCategoryMediaDirectory(fallbackCategory, entry.id);
+        if (derived) {
+          return derived;
+        }
+      }
+
+      return null;
+    }
+
+    function determineProjectMediaDirectory(
+      projectId,
+      category,
+      manifestEntry,
+      explicitDirectory
+    ) {
+      const manifestDirectory = deriveManifestMediaDirectory(manifestEntry);
+      if (manifestDirectory) {
+        return manifestDirectory;
+      }
+
+      if (explicitDirectory) {
+        const normalizedExplicit = normalizeDirectoryPath(explicitDirectory);
+        if (normalizedExplicit) {
+          return normalizedExplicit;
+        }
+      }
+
+      const resolvedCategory = category
+        ? `${category}`.trim().toLowerCase()
+        : manifestEntry && manifestEntry.category
+        ? `${manifestEntry.category}`.trim().toLowerCase()
+        : '';
+
+      const categoryDirectory = deriveCategoryMediaDirectory(resolvedCategory, projectId);
+      if (categoryDirectory) {
+        return categoryDirectory;
+      }
+
+      if (projectId) {
+        return normalizeDirectoryPath(`${projectId}/images`);
+      }
+
+      return null;
+    }
+
+    const MANIFEST_MEDIA_PATTERN = /\.(?:png|gif|jpe?g|webp|mp4|webm|mov)$/i;
+    const PROJECT_MANIFEST_URL = 'pub/project-index.json';
+    const projectManifestCache = new Map();
+    let projectManifestPromise = null;
+
+    const sanitizeManifestEntry = (entry) => {
+      if (!entry) {
+        return null;
+      }
+
+      const rawId = entry.id || entry.project || entry.slug || entry.name;
+      const id = rawId ? `${rawId}`.trim() : '';
+      if (!id) {
+        return null;
+      }
+
+      const detailLink = entry.detail || entry.detailLink || entry.href || entry.page;
+      const category = entry.category ? `${entry.category}`.trim() : '';
+      const mediaDirectory = normalizeDirectoryPath(
+        entry.mediaDirectory || entry.mediaPath || entry.directory || ''
+      );
+
+      const rawMediaList = (() => {
+        if (Array.isArray(entry.media)) {
+          return entry.media;
+        }
+        if (Array.isArray(entry.assets)) {
+          return entry.assets;
+        }
+        if (Array.isArray(entry.files)) {
+          return entry.files;
+        }
+        if (Array.isArray(entry.images)) {
+          return entry.images;
+        }
+        return [];
+      })();
+
+      const manifestMedia = rawMediaList
+        .map((value) => sanitizeFileEntry(value))
+        .filter((value) => value && MANIFEST_MEDIA_PATTERN.test(value));
+
+      const entryTitle = entry.title ? `${entry.title}`.trim() : '';
+      const entryInfo = entry.info ? `${entry.info}`.trim() : '';
+      const entryParagraph = entry.paragraph ? `${entry.paragraph}`.trim() : '';
+      const entryCredits = Array.isArray(entry.credits)
+        ? entry.credits.map((credit) => `${credit}`.trim()).filter(Boolean)
+        : [];
+
+      const entryVimeo = entry.vimeo ? `${entry.vimeo}`.trim() : '';
+
+      const manifestEntry = {
+        id,
+        detail: detailLink ? `${detailLink}`.trim() : `${id}.html`,
+        category,
+      };
+
+      if (mediaDirectory) {
+        manifestEntry.mediaDirectory = mediaDirectory;
+      }
+
+      if (entryTitle) {
+        manifestEntry.title = entryTitle;
+      }
+
+      if (entryInfo) {
+        manifestEntry.info = entryInfo;
+      }
+
+      if (entryParagraph) {
+        manifestEntry.paragraph = entryParagraph;
+      }
+
+      if (entryCredits.length) {
+        manifestEntry.credits = entryCredits;
+      }
+
+      if (entryVimeo) {
+        manifestEntry.vimeo = entryVimeo;
+      }
+
+      if (manifestMedia.length) {
+        manifestEntry.media = manifestMedia;
+      }
+
+      return manifestEntry;
+    };
+
+    const processManifestPayload = (data) => {
+      if (!Array.isArray(data)) {
+        return [];
+      }
+
+      return data.map((entry) => sanitizeManifestEntry(entry)).filter(Boolean);
+    };
+
+    const readInlineManifest = () => {
+      if (Array.isArray(window.__ADELE_PROJECT_MANIFEST__)) {
+        try {
+          const clone = JSON.parse(JSON.stringify(window.__ADELE_PROJECT_MANIFEST__));
+          return processManifestPayload(clone);
+        } catch (error) {
+          return processManifestPayload(window.__ADELE_PROJECT_MANIFEST__);
+        }
+      }
+
+      const manifestScript = document.querySelector('script[data-project-manifest]');
+      if (manifestScript) {
+        try {
+          const parsed = JSON.parse(manifestScript.textContent || '[]');
+          return processManifestPayload(parsed);
+        } catch (error) {
+          return [];
+        }
+      }
+
+      return [];
+    };
+    const fetchManifestFromNetwork = async () => {
+      if (typeof fetch !== 'function') {
+        return [];
+      }
+
+      if (window.location && window.location.protocol === 'file:') {
+        return [];
+      }
+
+      try {
+        const response = await fetch(PROJECT_MANIFEST_URL, { cache: 'no-store' });
+        if (!response || !response.ok) {
+          return [];
+        }
+
+        const data = await response.json();
+        return processManifestPayload(data);
+      } catch (error) {
+        return [];
+      }
+    };
+
+    const fetchProjectManifest = async () => {
+      if (projectManifestPromise) {
+        return projectManifestPromise;
+      }
+
+      projectManifestPromise = (async () => {
+        const networkEntries = await fetchManifestFromNetwork();
+        if (networkEntries.length) {
+          return networkEntries;
+        }
+
+        const inlineEntries = readInlineManifest();
+        if (inlineEntries.length) {
+          return inlineEntries;
+        }
+
+        return [];
+      })();
+
+      projectManifestPromise = projectManifestPromise.then((entries) => {
+        projectManifestCache.clear();
+        entries.forEach((entry) => {
+          if (entry && entry.id) {
+            projectManifestCache.set(entry.id, entry);
+          }
+        });
+        return entries;
+      });
+
+      return projectManifestPromise;
+    };
+
+
+
+    const createProjectSection = (template) => {
+      if (template) {
+        const section = template.cloneNode(true);
+        section.classList.remove('project--clone', 'project--primary', 'is-visible');
+        section.removeAttribute('data-project');
+        section.removeAttribute('data-detail-link');
+        section.removeAttribute('data-category');
+
+        const track = section.querySelector('.media-track');
+        if (track) {
+          track.innerHTML = '';
+          track.removeAttribute('data-media-source');
+        }
+
+        const titleEl = section.querySelector('.project-title');
+        if (titleEl) {
+          titleEl.textContent = 'TITRE DE PROJET';
+        }
+
+        const metaEl = section.querySelector('.project-meta');
+        if (metaEl) {
+          metaEl.textContent = '';
+          metaEl.hidden = true;
+        }
+
+        return section;
+      }
+
+      const section = document.createElement('section');
+      section.className = 'project';
+
+      const mediaStrip = document.createElement('div');
+      mediaStrip.className = 'media-strip';
+      const mediaTrack = document.createElement('div');
+      mediaTrack.className = 'media-track';
+      mediaStrip.appendChild(mediaTrack);
+
+      const heading = document.createElement('div');
+      heading.className = 'project-heading';
+      const title = document.createElement('h2');
+      title.className = 'project-title';
+      title.textContent = 'TITRE DE PROJET';
+      const meta = document.createElement('span');
+      meta.className = 'project-meta';
+      meta.textContent = '';
+      meta.hidden = true;
+      heading.appendChild(title);
+      heading.appendChild(meta);
+
+      section.appendChild(mediaStrip);
+      section.appendChild(heading);
+
+      return section;
+    };
+
+    const ensureProjectSections = async () => {
+      const projectList = document.querySelector('.projects');
+      if (!projectList) {
+        return [];
+      }
+
+      const manifest = await fetchProjectManifest();
+      if (!manifest.length) {
+        return manifest;
+      }
+
+      const primaryProjects = Array.from(
+        projectList.querySelectorAll('.project:not(.project--clone)')
+      );
+      const template = primaryProjects.length ? primaryProjects[0] : null;
+      const manifestIds = new Set();
+      const sectionLookup = new Map();
+
+      manifest.forEach((entry) => {
+        const { id, detail, category } = entry;
+        if (!id) {
+          return;
+        }
+
+        manifestIds.add(id);
+
+        let section = projectList.querySelector(
+          `.project[data-project="${id}"]:not(.project--clone)`
+        );
+        if (!section) {
+          section = createProjectSection(template);
+          projectList.appendChild(section);
+        }
+
+        if (!section) {
+          return;
+        }
+
+        section.setAttribute('data-project', id);
+        section.setAttribute('data-detail-link', detail || `${id}.html`);
+        if (category) {
+          section.setAttribute('data-category', category);
+        } else {
+          section.removeAttribute('data-category');
+        }
+
+        const track = section.querySelector('.media-track');
+        if (track) {
+          const directory = determineProjectMediaDirectory(id, category, entry, null);
+          if (directory) {
+            track.setAttribute('data-media-source', directory);
+          } else {
+            track.removeAttribute('data-media-source');
+          }
+
+          const manifestMedia = Array.isArray(entry.media) ? entry.media : [];
+          if (manifestMedia.length) {
+            const resolvedManifest = manifestMedia
+              .map((item) => resolveMediaPath(directory, item))
+              .filter(Boolean);
+
+            if (resolvedManifest.length) {
+              track.setAttribute('data-media-manifest', JSON.stringify(resolvedManifest));
+            } else {
+              track.removeAttribute('data-media-manifest');
+            }
+          } else {
+            track.removeAttribute('data-media-manifest');
+          }
+        }
+
+        sectionLookup.set(id, section);
+      });
+
+      primaryProjects.forEach((section) => {
+        const projectId = section.getAttribute('data-project');
+        if (projectId && !manifestIds.has(projectId)) {
+          section.remove();
+        }
+      });
+
+      const ordered = document.createDocumentFragment();
+      manifest.forEach((entry) => {
+        const section = sectionLookup.get(entry.id);
+        if (section) {
+          ordered.appendChild(section);
+        }
+      });
+
+      const cloneProjects = Array.from(projectList.querySelectorAll('.project--clone'));
+      cloneProjects.forEach((clone) => clone.remove());
+
+      projectList.appendChild(ordered);
+
+      return manifest;
+    };
 
     const METADATA_KEY_ALIASES = {
       'titre de projet': 'title',
@@ -303,6 +761,199 @@
       return `${value}`.replace(/^\s*[-–—•*·]+\s*/, '').trim();
     };
 
+    const extractYouTubeId = (input) => {
+      if (!input) {
+        return null;
+      }
+
+      const source = `${input}`.trim();
+      if (!source) {
+        return null;
+      }
+
+      const directMatch = source.match(
+        /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/|live\/)|youtu\.be\/)([A-Za-z0-9_-]{6,})/i
+      );
+      if (directMatch && directMatch[1]) {
+        return directMatch[1];
+      }
+
+      const queryMatch = source.match(/[?&]v=([A-Za-z0-9_-]{6,})/i);
+      if (queryMatch && queryMatch[1]) {
+        return queryMatch[1];
+      }
+
+      return null;
+    };
+
+    const parseYouTubeTimeValue = (value) => {
+      if (value === null || value === undefined) {
+        return null;
+      }
+
+      const trimmed = `${value}`.trim();
+      if (!trimmed) {
+        return null;
+      }
+
+      if (/^\d+$/.test(trimmed)) {
+        return parseInt(trimmed, 10);
+      }
+
+      const colonParts = trimmed.split(':');
+      if (colonParts.length > 1 && colonParts.every((part) => /^\d+$/.test(part))) {
+        let seconds = 0;
+        let multiplier = 1;
+        for (let index = colonParts.length - 1; index >= 0; index -= 1) {
+          seconds += parseInt(colonParts[index], 10) * multiplier;
+          multiplier *= 60;
+        }
+        return seconds;
+      }
+
+      const timePattern = /^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/i;
+      const timeMatch = trimmed.match(timePattern);
+      if (timeMatch && (timeMatch[1] || timeMatch[2] || timeMatch[3])) {
+        let seconds = 0;
+        if (timeMatch[1]) {
+          seconds += parseInt(timeMatch[1], 10) * 3600;
+        }
+        if (timeMatch[2]) {
+          seconds += parseInt(timeMatch[2], 10) * 60;
+        }
+        if (timeMatch[3]) {
+          seconds += parseInt(timeMatch[3], 10);
+        }
+        return seconds;
+      }
+
+      return null;
+    };
+
+    const extractYouTubeIdWithParams = (input) => {
+      if (!input) {
+        return null;
+      }
+
+      const source = `${input}`.trim();
+      if (!source) {
+        return null;
+      }
+
+      const base =
+        typeof window !== 'undefined' && window.location && window.location.origin
+          ? window.location.origin
+          : 'https://www.youtube.com';
+
+      try {
+        const parsed = new URL(source, base);
+        const host = parsed.hostname ? parsed.hostname.toLowerCase() : '';
+        if (host.includes('youtube.com') || host.includes('youtu.be')) {
+          let id = null;
+          const pathParts = parsed.pathname.split('/').filter(Boolean);
+
+          if (host.includes('youtu.be')) {
+            if (pathParts.length) {
+              id = pathParts[0];
+            }
+          } else if (pathParts.length) {
+            if (pathParts[0] === 'watch') {
+              id = parsed.searchParams.get('v');
+            } else if (pathParts[0] === 'embed' || pathParts[0] === 'shorts' || pathParts[0] === 'live') {
+              id = pathParts[1] || null;
+            } else if (!parsed.searchParams.has('v')) {
+              id = pathParts[pathParts.length - 1] || null;
+            }
+          }
+
+          if (!id && parsed.searchParams.has('v')) {
+            id = parsed.searchParams.get('v');
+          }
+
+          if (!id) {
+            id = extractYouTubeId(source);
+          }
+
+          if (id) {
+            const params = new URLSearchParams(parsed.searchParams);
+            params.delete('v');
+            return { id, params };
+          }
+        }
+      } catch (error) {
+        /* ignore URL parsing issues */
+      }
+
+      const fallbackId = extractYouTubeId(source);
+      if (fallbackId) {
+        return { id: fallbackId, params: new URLSearchParams() };
+      }
+
+      return null;
+    };
+
+    const buildYouTubeEmbedUrl = (videoId, extraParams) => {
+      if (!videoId) {
+        return null;
+      }
+
+      const params = new URLSearchParams({
+        autoplay: '1',
+        loop: '1',
+        playlist: videoId,
+        controls: '0',
+        modestbranding: '1',
+        showinfo: '0',
+        rel: '0',
+        mute: '0',
+        playsinline: '1',
+      });
+
+      let startSeconds = null;
+      let endSeconds = null;
+
+      if (extraParams && typeof extraParams.forEach === 'function') {
+        extraParams.forEach((value, key) => {
+          if (value === null || value === undefined) {
+            return;
+          }
+
+          const trimmedValue = `${value}`.trim();
+          if (!trimmedValue) {
+            return;
+          }
+
+          const normalizedKey = `${key}`.toLowerCase();
+          if (normalizedKey === 'start' || normalizedKey === 'time_continue') {
+            const parsed = parseYouTubeTimeValue(trimmedValue);
+            if (parsed !== null) {
+              startSeconds = parsed;
+            }
+          } else if (normalizedKey === 't') {
+            const parsed = parseYouTubeTimeValue(trimmedValue);
+            if (parsed !== null) {
+              startSeconds = parsed;
+            }
+          } else if (normalizedKey === 'end') {
+            const parsed = parseYouTubeTimeValue(trimmedValue);
+            if (parsed !== null) {
+              endSeconds = parsed;
+            }
+          }
+        });
+      }
+
+      if (Number.isFinite(startSeconds) && startSeconds >= 0) {
+        params.set('start', `${startSeconds}`);
+      }
+
+      if (Number.isFinite(endSeconds) && endSeconds > 0) {
+        params.set('end', `${endSeconds}`);
+      }
+
+      return `https://www.youtube.com/embed/${videoId}?${params.toString()}`;
+    };
+
     const normalizeVimeoUrl = (value) => {
       if (!value) {
         return null;
@@ -311,6 +962,11 @@
       const raw = `${value}`.trim();
       if (!raw) {
         return null;
+      }
+
+      const youtubeDetails = extractYouTubeIdWithParams(raw);
+      if (youtubeDetails) {
+        return buildYouTubeEmbedUrl(youtubeDetails.id, youtubeDetails.params);
       }
 
       const extractId = (input) => {
@@ -355,17 +1011,32 @@
         return null;
       }
 
+      const directYouTubeDetails = extractYouTubeIdWithParams(url);
+      if (directYouTubeDetails) {
+        return buildYouTubeEmbedUrl(directYouTubeDetails.id, directYouTubeDetails.params);
+      }
+
       try {
         const base = window.location && window.location.origin ? window.location.origin : 'https://example.com';
         const parsed = new URL(url, base);
+        const host = parsed.hostname ? parsed.hostname.toLowerCase() : '';
+
+        if (host.includes('youtube.com') || host.includes('youtu.be')) {
+          const youtubeDetails = extractYouTubeIdWithParams(parsed.href);
+          if (youtubeDetails) {
+            return buildYouTubeEmbedUrl(youtubeDetails.id, youtubeDetails.params);
+          }
+        }
+
         parsed.searchParams.set('autoplay', '1');
         parsed.searchParams.set('muted', '0');
         parsed.searchParams.set('playsinline', '1');
+        parsed.searchParams.set('loop', '1');
         return parsed.toString();
       } catch (error) {
         const hasQuery = url.includes('?');
         const separator = hasQuery ? '&' : '?';
-        return `${url}${separator}autoplay=1&muted=0&playsinline=1`;
+        return `${url}${separator}autoplay=1&muted=0&playsinline=1&loop=1`;
       }
     };
 
@@ -495,16 +1166,68 @@
         return projectMetadataCache.get(projectId);
       }
 
-      for (let index = 0; index < CATEGORY_KEYS.length; index += 1) {
-        const category = CATEGORY_KEYS[index];
-        const categoryRoot = CATEGORY_DIRECTORY_LOOKUP[category] || normalizeDirectoryPath(category);
+      const manifestEntry = projectManifestCache.get(projectId);
+      const manifestCategory = (() => {
+        if (!manifestEntry || !manifestEntry.category) {
+          return null;
+        }
+
+        const normalized = `${manifestEntry.category}`.trim().toLowerCase();
+        return CATEGORY_KEYS.includes(normalized) ? normalized : null;
+      })();
+
+      if (
+        manifestEntry &&
+        (manifestEntry.title ||
+          manifestEntry.info ||
+          manifestEntry.paragraph ||
+          manifestEntry.vimeo ||
+          (Array.isArray(manifestEntry.credits) && manifestEntry.credits.length) ||
+          manifestEntry.mediaDirectory ||
+          (Array.isArray(manifestEntry.media) && manifestEntry.media.length))
+      ) {
+        const resolvedCategory =
+          manifestCategory ||
+          (manifestEntry.category ? `${manifestEntry.category}`.trim().toLowerCase() : null);
+
+        const metadata = {
+          id: projectId,
+          category: resolvedCategory,
+          mediaDirectory: determineProjectMediaDirectory(
+            projectId,
+            resolvedCategory,
+            manifestEntry,
+            null
+          ),
+          title: manifestEntry.title || null,
+          info: manifestEntry.info || null,
+          paragraph: manifestEntry.paragraph || null,
+          credits: Array.isArray(manifestEntry.credits) ? manifestEntry.credits.slice() : [],
+          vimeo: normalizeVimeoUrl(manifestEntry.vimeo),
+        };
+
+        projectMetadataCache.set(projectId, metadata);
+        return metadata;
+      }
+
+      const attemptedCategories = new Set();
+
+      const tryCategory = async (category) => {
+        if (!category || attemptedCategories.has(category)) {
+          return null;
+        }
+
+        attemptedCategories.add(category);
+
+        const categoryRoot =
+          CATEGORY_DIRECTORY_LOOKUP[category] || normalizeDirectoryPath(category);
         const baseDir = normalizeDirectoryPath(`${categoryRoot}${projectId}`);
         const metadataUrl = `${baseDir}project.txt`;
 
         try {
           const response = await fetch(metadataUrl, { cache: 'no-store' });
           if (!response || !response.ok) {
-            continue;
+            return null;
           }
 
           const text = await response.text();
@@ -525,8 +1248,56 @@
           projectMetadataCache.set(projectId, metadata);
           return metadata;
         } catch (error) {
-          /* ignore this attempt and try the next category */
+          return null;
         }
+      };
+
+      const preferredCategories = manifestCategory
+        ? [manifestCategory]
+        : CATEGORY_KEYS.slice();
+
+      for (let index = 0; index < preferredCategories.length; index += 1) {
+        const metadata = await tryCategory(preferredCategories[index]);
+        if (metadata) {
+          return metadata;
+        }
+      }
+
+      if (manifestCategory) {
+        const fallbackCategories = CATEGORY_KEYS.filter(
+          (category) => !attemptedCategories.has(category)
+        );
+
+        for (let index = 0; index < fallbackCategories.length; index += 1) {
+          const metadata = await tryCategory(fallbackCategories[index]);
+          if (metadata) {
+            return metadata;
+          }
+        }
+      }
+
+      if (manifestEntry) {
+        const fallbackCategory = manifestCategory || null;
+        const manifestMediaDirectory = determineProjectMediaDirectory(
+          projectId,
+          fallbackCategory,
+          manifestEntry,
+          null
+        );
+
+        const fallbackMetadata = {
+          id: projectId,
+          category: fallbackCategory,
+          mediaDirectory: manifestMediaDirectory,
+          title: null,
+          info: null,
+          paragraph: null,
+          credits: [],
+          vimeo: null,
+        };
+
+        projectMetadataCache.set(projectId, fallbackMetadata);
+        return fallbackMetadata;
       }
 
       projectMetadataCache.set(projectId, null);
@@ -559,19 +1330,43 @@
           }
 
           const metaEl = section.querySelector('.project-meta');
-          if (metaEl && metadata.info) {
-            metaEl.textContent = metadata.info;
+          if (metaEl) {
+            if (metadata.info) {
+              metaEl.textContent = metadata.info;
+              metaEl.hidden = false;
+              metaEl.removeAttribute('hidden');
+            } else {
+              metaEl.textContent = '';
+              metaEl.hidden = true;
+            }
           }
 
           const track = section.querySelector('.media-track');
           if (track) {
             track.setAttribute('data-media-source', metadata.mediaDirectory);
+
+            const manifestEntry = projectManifestCache.get(projectId);
+            const manifestList =
+              manifestEntry && Array.isArray(manifestEntry.media) ? manifestEntry.media : [];
+            if (manifestList.length) {
+              const resolvedManifest = manifestList
+                .map((item) => resolveMediaPath(metadata.mediaDirectory, item))
+                .filter(Boolean);
+              if (resolvedManifest.length) {
+                track.setAttribute('data-media-manifest', JSON.stringify(resolvedManifest));
+              } else {
+                track.removeAttribute('data-media-manifest');
+              }
+            } else {
+              track.removeAttribute('data-media-manifest');
+            }
           }
         })
       );
     };
 
-    const homeMetadataPromise = hydrateHomeProjects();
+    const ensureProjectSectionsPromise = ensureProjectSections();
+    const homeMetadataPromise = ensureProjectSectionsPromise.then(() => hydrateHomeProjects());
     const hydrateProjectDetailMetadata = async () => {
       const detail = document.querySelector('.project-detail[data-project]');
       if (!detail) {
@@ -595,19 +1390,76 @@
         detail.removeAttribute('data-vimeo');
       }
 
+      const detailManifestEntry = projectManifestCache.get(projectId);
+      const detailManifestList =
+        detailManifestEntry && Array.isArray(detailManifestEntry.media)
+          ? detailManifestEntry.media
+          : [];
+      if (detailManifestList.length) {
+        const resolvedManifest = detailManifestList
+          .map((item) => resolveMediaPath(metadata.mediaDirectory, item))
+          .filter(Boolean);
+        if (resolvedManifest.length) {
+          detail.setAttribute('data-media-manifest', JSON.stringify(resolvedManifest));
+        } else {
+          detail.removeAttribute('data-media-manifest');
+        }
+      } else {
+        detail.removeAttribute('data-media-manifest');
+      }
+
       const titleEl = detail.querySelector('.project-detail__title');
       if (titleEl && metadata.title) {
         titleEl.textContent = metadata.title;
       }
 
+      if (metadata.category) {
+        detail.setAttribute('data-category', metadata.category);
+        reflectActiveCategory(metadata.category);
+      } else {
+        detail.removeAttribute('data-category');
+        reflectActiveCategory(null);
+      }
+
       const metaEl = detail.querySelector('.project-detail__meta');
-      if (metaEl && metadata.info) {
-        metaEl.textContent = metadata.info;
+      if (metaEl) {
+        const infoText =
+          typeof metadata.info === 'string' ? metadata.info.trim() : metadata.info;
+        const hasInfo = typeof infoText === 'string' ? infoText.length > 0 : !!infoText;
+        if (hasInfo) {
+          metaEl.textContent = `${infoText}`;
+          metaEl.hidden = false;
+          metaEl.removeAttribute('hidden');
+        } else {
+          metaEl.textContent = '';
+          metaEl.hidden = true;
+          if (!metaEl.hasAttribute('hidden')) {
+            metaEl.setAttribute('hidden', '');
+          }
+        }
       }
 
       const descriptionEl = detail.querySelector('.project-detail__description');
-      if (descriptionEl && metadata.paragraph) {
-        descriptionEl.textContent = metadata.paragraph;
+      if (descriptionEl) {
+        const descriptionText =
+          typeof metadata.paragraph === 'string'
+            ? metadata.paragraph.trim()
+            : metadata.paragraph;
+        const hasDescription =
+          typeof descriptionText === 'string'
+            ? descriptionText.length > 0
+            : !!descriptionText;
+        if (hasDescription) {
+          descriptionEl.textContent = `${descriptionText}`;
+          descriptionEl.hidden = false;
+          descriptionEl.removeAttribute('hidden');
+        } else {
+          descriptionEl.textContent = '';
+          descriptionEl.hidden = true;
+          if (!descriptionEl.hasAttribute('hidden')) {
+            descriptionEl.setAttribute('hidden', '');
+          }
+        }
       }
 
       const creditsSection = detail.querySelector('.project-detail__credits');
@@ -668,7 +1520,6 @@
       return Math.max(maxHeight - viewportHeight, 0);
     };
 
-    const dimensionCache = new Map();
     const mediaReadyCache = new Map();
 
     const ensureImageReady = (src) => {
@@ -766,78 +1617,6 @@
       return promise;
     };
 
-    const loadImageDimensions = (src) => {
-      if (!src) {
-        return Promise.resolve(null);
-      }
-      if (dimensionCache.has(src)) {
-        return dimensionCache.get(src);
-      }
-
-      const extension = getMediaExtension(src);
-
-      if (extension && VIDEO_EXTENSIONS.has(extension)) {
-        const videoPromise = new Promise((resolve) => {
-          const video = document.createElement('video');
-          const finalize = () => {
-            const width = video.videoWidth || 0;
-            const height = video.videoHeight || 0;
-            if (!width || !height) {
-              resolve(null);
-            } else {
-              resolve({ width, height });
-            }
-          };
-          video.preload = 'metadata';
-          video.addEventListener('loadedmetadata', finalize, { once: true });
-          video.addEventListener('error', () => {
-            resolve(null);
-          });
-          video.src = src;
-          try {
-            video.load();
-          } catch (error) {
-            /* ignore */
-          }
-          if (video.readyState >= 1 && video.videoWidth && video.videoHeight) {
-            finalize();
-          }
-        });
-
-        dimensionCache.set(src, videoPromise);
-        videoPromise.catch(() => {
-          dimensionCache.delete(src);
-        });
-
-        return videoPromise;
-      }
-
-      const promise = new Promise((resolve) => {
-        const image = new Image();
-        image.decoding = 'async';
-        image.onload = () => {
-          const width = image.naturalWidth || image.width || 0;
-          const height = image.naturalHeight || image.height || 0;
-          if (!width || !height) {
-            resolve(null);
-          } else {
-            resolve({ width, height });
-          }
-        };
-        image.onerror = () => {
-          resolve(null);
-        };
-        image.src = src;
-      });
-
-      dimensionCache.set(src, promise);
-      promise.catch(() => {
-        dimensionCache.delete(src);
-      });
-
-      return promise;
-    };
-
     const applyMediaVariables = (element, stillSrc, animatedSrc) => {
       if (!element) {
         return;
@@ -865,13 +1644,67 @@
       }
     };
 
-    const syncPlaceholderVideo = (element, src) => {
+    const scheduleMasonryForElement = (element) => {
+      if (!element || typeof element.closest !== 'function') {
+        return;
+      }
+
+      const gallery = element.closest('.project-detail__gallery');
+      if (!gallery) {
+        return;
+      }
+
+      const scheduler = gallery.__scheduleMasonryLayout;
+      if (typeof scheduler === 'function') {
+        scheduler();
+      }
+    };
+
+    const updateElementAspect = (element, width, height) => {
+      if (!element) {
+        return;
+      }
+
+      const numericWidth = Number(width);
+      const numericHeight = Number(height);
+
+      if (
+        !Number.isFinite(numericWidth) ||
+        !Number.isFinite(numericHeight) ||
+        numericWidth <= 0 ||
+        numericHeight <= 0
+      ) {
+        return;
+      }
+
+      const aspect = numericWidth / numericHeight;
+      if (!Number.isFinite(aspect) || aspect <= 0) {
+        return;
+      }
+
+      const currentAspect = parseFloat(element.getAttribute('data-aspect'));
+      if (Number.isFinite(currentAspect) && Math.abs(currentAspect - aspect) < 0.0001) {
+        return;
+      }
+
+      const aspectString = `${aspect}`;
+      element.setAttribute('data-aspect', aspectString);
+      element.style.setProperty('--item-aspect', aspectString);
+      scheduleMasonryForElement(element);
+    };
+
+    const syncPlaceholderVideo = (element, src, options = {}) => {
       if (!element) {
         return;
       }
 
       const videoSrc = src ? src.trim() : '';
       let videoElement = element.querySelector('video.placeholder__video');
+      const {
+        muted = true,
+        controls = false,
+        playsInline = true,
+      } = options;
 
       if (!videoSrc) {
         if (videoElement) {
@@ -888,13 +1721,28 @@
       if (!videoElement) {
         videoElement = document.createElement('video');
         videoElement.className = 'placeholder__video';
-        videoElement.muted = true;
         videoElement.loop = true;
         videoElement.autoplay = true;
-        videoElement.playsInline = true;
         videoElement.preload = 'metadata';
         videoElement.setAttribute('aria-hidden', 'true');
         element.appendChild(videoElement);
+      }
+
+      const applyVideoAspect = () => {
+        if (!videoElement) {
+          return;
+        }
+
+        const { videoWidth, videoHeight } = videoElement;
+        if (videoWidth > 0 && videoHeight > 0) {
+          updateElementAspect(element, videoWidth, videoHeight);
+        }
+      };
+
+      if (!videoElement.__aspectListenerBound) {
+        videoElement.__aspectListenerBound = true;
+        videoElement.addEventListener('loadedmetadata', applyVideoAspect);
+        videoElement.addEventListener('resize', applyVideoAspect);
       }
 
       if (videoElement.getAttribute('data-src') !== videoSrc) {
@@ -905,6 +1753,22 @@
         } catch (error) {
           /* ignore */
         }
+      }
+
+      videoElement.muted = muted;
+      videoElement.volume = muted ? 0 : 1;
+      videoElement.playsInline = playsInline;
+
+      if (controls) {
+        videoElement.setAttribute('controls', '');
+        videoElement.removeAttribute('aria-hidden');
+      } else {
+        videoElement.removeAttribute('controls');
+        videoElement.setAttribute('aria-hidden', 'true');
+      }
+
+      if (videoElement.readyState >= 1) {
+        applyVideoAspect();
       }
 
       videoElement.play().catch(() => {
@@ -921,11 +1785,94 @@
       const animated = readStringAttribute(element, 'data-animated');
       const video = readStringAttribute(element, 'data-video');
       const aspectAttr = parseNumeric(element.getAttribute('data-aspect'));
+      const isLightboxMedia = element.classList.contains('lightbox__media');
+      const isProjectGalleryItem = element.classList.contains('project-detail__item');
+
+      const ensureLightboxImage = (source) => {
+        const imageSource = source ? source.trim() : '';
+        let imageElement = element.querySelector('img.lightbox__image');
+
+        if (!imageSource) {
+          if (imageElement) {
+            imageElement.remove();
+          }
+          return;
+        }
+
+        if (!imageElement) {
+          imageElement = document.createElement('img');
+          imageElement.className = 'lightbox__image';
+          imageElement.alt = '';
+          imageElement.setAttribute('aria-hidden', 'true');
+          imageElement.decoding = 'async';
+          imageElement.loading = 'eager';
+          element.appendChild(imageElement);
+        }
+
+        if (imageElement.getAttribute('src') !== imageSource) {
+          imageElement.src = imageSource;
+        }
+      };
+
+      const ensureGalleryImage = (source) => {
+        const imageSource = source ? source.trim() : '';
+        let imageElement = element.querySelector('img.placeholder__image');
+
+        if (!imageSource) {
+          if (imageElement) {
+            imageElement.remove();
+          }
+          return;
+        }
+
+        if (!imageElement) {
+          imageElement = document.createElement('img');
+          imageElement.className = 'placeholder__image';
+          imageElement.alt = '';
+          imageElement.setAttribute('aria-hidden', 'true');
+          imageElement.decoding = 'async';
+          imageElement.loading = 'lazy';
+          imageElement.draggable = false;
+          element.appendChild(imageElement);
+        }
+
+        const applyImageAspect = () => {
+          if (!imageElement) {
+            return;
+          }
+
+          const { naturalWidth, naturalHeight } = imageElement;
+          if (naturalWidth > 0 && naturalHeight > 0) {
+            updateElementAspect(element, naturalWidth, naturalHeight);
+          }
+        };
+
+        if (!imageElement.__aspectListenerBound) {
+          imageElement.__aspectListenerBound = true;
+          imageElement.addEventListener('load', applyImageAspect);
+        }
+
+        if (imageElement.getAttribute('src') !== imageSource) {
+          imageElement.src = imageSource;
+        }
+
+        if (imageElement.complete) {
+          applyImageAspect();
+        }
+      };
 
       const updateVideoClass = () => {
         const currentStill = readStringAttribute(element, 'data-still');
         const currentAnimated = readStringAttribute(element, 'data-animated');
         const currentVideo = readStringAttribute(element, 'data-video');
+        if (isLightboxMedia) {
+          if (currentVideo) {
+            element.classList.add('placeholder--video');
+          } else {
+            element.classList.remove('placeholder--video');
+          }
+          return;
+        }
         if (currentVideo && !currentStill && !currentAnimated) {
           element.classList.add('placeholder--video');
         } else {
@@ -939,6 +1886,44 @@
         const currentVideo = readStringAttribute(element, 'data-video');
         const stillSource = currentStill || currentAnimated || '';
         const animatedSource = currentAnimated || currentStill || '';
+        if (isLightboxMedia) {
+          const imageSource = currentVideo ? '' : animatedSource || stillSource;
+          if (currentVideo) {
+            ensureLightboxImage(null);
+            syncPlaceholderVideo(element, currentVideo, {
+              muted: false,
+              controls: false,
+              playsInline: true,
+            });
+          } else {
+            syncPlaceholderVideo(element, null);
+            ensureLightboxImage(imageSource);
+          }
+          element.style.removeProperty(MEDIA_IMAGE_VAR);
+          element.style.removeProperty(MEDIA_ANIMATED_VAR);
+          updateVideoClass();
+          return;
+        }
+
+        if (isProjectGalleryItem) {
+          const imageSource = currentVideo ? '' : animatedSource || stillSource;
+          if (currentVideo) {
+            ensureGalleryImage(null);
+            syncPlaceholderVideo(element, currentVideo, {
+              muted: true,
+              controls: false,
+              playsInline: true,
+            });
+          } else {
+            syncPlaceholderVideo(element, null);
+            ensureGalleryImage(imageSource);
+          }
+          element.style.removeProperty(MEDIA_IMAGE_VAR);
+          element.style.removeProperty(MEDIA_ANIMATED_VAR);
+          updateVideoClass();
+          return;
+        }
+
         applyMediaVariables(element, stillSource, animatedSource);
         syncPlaceholderVideo(element, currentVideo);
         updateVideoClass();
@@ -946,8 +1931,10 @@
 
       applyCurrentMedia();
 
-      if (Number.isFinite(aspectAttr) && aspectAttr > 0) {
+      if (Number.isFinite(aspectAttr) && aspectAttr > 0 && !isLightboxMedia) {
         element.style.setProperty('--item-aspect', `${aspectAttr}`);
+      } else if (isLightboxMedia) {
+        element.style.removeProperty('--item-aspect');
       }
 
       const primarySource = still || animated || video || null;
@@ -988,6 +1975,10 @@
           /* ignore */
         });
       }
+
+      if (isProjectGalleryItem) {
+        scheduleMasonryForElement(element);
+      }
     };
 
     const LIGHTBOX_TRANSITION_MS = 360;
@@ -1008,6 +1999,27 @@
       media.style.removeProperty(MEDIA_IMAGE_VAR);
       media.style.removeProperty(MEDIA_ANIMATED_VAR);
       media.classList.remove('placeholder--video');
+      const existingImage = media.querySelector('img.lightbox__image');
+      if (existingImage) {
+        existingImage.remove();
+      }
+      const existingVideo = media.querySelector('video.placeholder__video');
+      if (existingVideo) {
+        try {
+          existingVideo.pause();
+        } catch (error) {
+          /* ignore */
+        }
+        existingVideo.muted = true;
+        existingVideo.removeAttribute('data-src');
+        existingVideo.removeAttribute('src');
+        try {
+          existingVideo.load();
+        } catch (error) {
+          /* ignore */
+        }
+        existingVideo.remove();
+      }
       syncPlaceholderVideo(media, null);
     };
 
@@ -1376,7 +2388,7 @@
       return normalized;
     }
 
-    const sanitizeFileEntry = (entry) => {
+    function sanitizeFileEntry(entry) {
       if (entry === null || entry === undefined) {
         return null;
       }
@@ -1391,9 +2403,9 @@
       value = value.replace(/^\.\/+/, '');
       value = value.replace(/^\/+/, '');
       return value;
-    };
+    }
 
-    const resolveMediaPath = (directory, file) => {
+    function resolveMediaPath(directory, file) {
       const sanitizedFile = sanitizeFileEntry(file);
       if (!sanitizedFile) {
         return null;
@@ -1411,7 +2423,7 @@
       }
       relative = relative.replace(/^\/+/, '');
       return `${dir}${relative}`;
-    };
+    }
 
     const extractFileCandidate = (value) => {
       if (typeof value === 'string') {
@@ -1478,7 +2490,7 @@
         return [];
       }
 
-      const jsonCandidates = ['index.json', 'manifest.json', '_images.json', '_list.json'];
+      const jsonCandidates = ['_list.json', 'index.json', 'manifest.json', '_images.json'];
       for (let index = 0; index < jsonCandidates.length; index += 1) {
         const candidate = jsonCandidates[index];
         try {
@@ -1538,6 +2550,19 @@
       }
 
       const inlineList = [];
+
+      const manifestAttr = readStringAttribute(container, 'data-media-manifest');
+      if (manifestAttr) {
+        try {
+          const parsed = JSON.parse(manifestAttr);
+          const fromAttribute = parseListFromData(parsed);
+          fromAttribute.forEach((entry) => {
+            inlineList.push(entry);
+          });
+        } catch (error) {
+          /* ignore malformed attribute */
+        }
+      }
 
       const manifestScript = container.querySelector('script[data-media-manifest]');
       if (manifestScript) {
@@ -1629,29 +2654,12 @@
       });
 
       const ordered = Array.from(groups.values()).sort((a, b) => a.order - b.order);
-      const results = await Promise.all(
-        ordered.map(async (entry) => {
-          let aspect = null;
-          const sizeSource = entry.still || entry.animated || entry.video;
-          if (sizeSource) {
-            try {
-              const dimensions = await loadImageDimensions(sizeSource);
-              if (dimensions && dimensions.width && dimensions.height) {
-                aspect = dimensions.width / dimensions.height;
-              }
-            } catch (error) {
-              aspect = null;
-            }
-          }
-
-          return {
-            still: entry.still,
-            animated: entry.animated,
-            video: entry.video,
-            aspect,
-          };
-        })
-      );
+      const results = ordered.map((entry) => ({
+        still: entry.still,
+        animated: entry.animated,
+        video: entry.video,
+        aspect: null,
+      }));
 
       return results.filter(
         (item) => item && (item.still || item.animated || item.video)
@@ -1666,8 +2674,10 @@
         return projectMediaCache.get(key);
       }
 
+      const fallbackList = Array.isArray(inlineList) ? inlineList : [];
       let remoteList = [];
-      if (directory) {
+
+      if (directory && !fallbackList.length) {
         try {
           remoteList = await fetchDirectoryFileNames(directory);
         } catch (error) {
@@ -1675,7 +2685,6 @@
         }
       }
 
-      const fallbackList = Array.isArray(inlineList) ? inlineList : [];
       const rawList = remoteList.length ? remoteList : fallbackList;
       const entries = await assembleMediaEntries(directory, rawList);
 
@@ -1687,25 +2696,121 @@
     };
 
     const initializeProjectMedia = async () => {
-      const tasks = [];
-      const mediaReadyPromises = [];
 
       const projectSections = Array.from(document.querySelectorAll('.project[data-project]'));
-      projectSections.forEach((section) => {
+
+      const projectsParent = (() => {
+        const list = document.querySelector('.projects');
+        if (!list || !list.parentElement) {
+          return null;
+        }
+        return list.parentElement;
+      })();
+
+      const startProjectsLoadingIndicator = () => {
+        if (!projectsParent || !projectSections.length) {
+          return () => {};
+        }
+
+        let indicator = projectsParent.querySelector('.projects__loading');
+        if (!indicator) {
+          indicator = document.createElement('div');
+          indicator.className = 'projects__loading';
+          indicator.setAttribute('role', 'status');
+          indicator.setAttribute('aria-live', 'polite');
+          const text = document.createElement('span');
+          text.className = 'projects__loading-text';
+          indicator.appendChild(text);
+          const projectsList = projectsParent.querySelector('.projects');
+          projectsParent.insertBefore(indicator, projectsList);
+        }
+
+        const textTarget = indicator.querySelector('.projects__loading-text') || indicator;
+        const baseText = indicator.getAttribute('data-loading-label') || 'Loading';
+        indicator.classList.remove('is-hidden');
+
+        let step = 0;
+        const updateText = () => {
+          step = (step + 1) % 4;
+          const dots = step === 0 ? '...' : '.'.repeat(step);
+          textTarget.textContent = `${baseText}${dots}`;
+        };
+
+        updateText();
+        const intervalId = window.setInterval(updateText, 420);
+
+        return () => {
+          window.clearInterval(intervalId);
+          textTarget.textContent = `${baseText}...`;
+          indicator.classList.add('is-hidden');
+          window.setTimeout(() => {
+            if (indicator && indicator.parentNode) {
+              indicator.parentNode.removeChild(indicator);
+            }
+          }, 520);
+        };
+      };
+
+      const stopLoadingIndicator = startProjectsLoadingIndicator();
+
+      const processProjectSection = async (section) => {
         const track = section.querySelector('.media-track');
         if (!track) {
-          return;
+          return [];
         }
 
         const projectId = readStringAttribute(section, 'data-project');
         const directoryAttr = readStringAttribute(track, 'data-media-source');
-        const directory = directoryAttr || (projectId ? `${projectId}/images/` : null);
+        const categoryAttr = readStringAttribute(section, 'data-category');
+        const manifestEntry = projectManifestCache.get(projectId);
+        const directory = determineProjectMediaDirectory(
+          projectId,
+          categoryAttr,
+          manifestEntry,
+          directoryAttr
+        );
         const detailLink =
           readStringAttribute(track, 'data-detail-link') ||
           readStringAttribute(section, 'data-detail-link') ||
           (projectId ? `${projectId}.html` : '#');
 
         const inlineList = collectInlineMediaList(track);
+        const manifestList =
+          manifestEntry && Array.isArray(manifestEntry.media) ? manifestEntry.media : [];
+        const fallbackList = (() => {
+          if (!manifestList.length) {
+            return inlineList;
+          }
+
+          const combined = [];
+          const seen = new Set();
+
+          inlineList.forEach((item) => {
+            if (!item) {
+              return;
+            }
+            const key = `${item}`.trim();
+            if (!key || seen.has(key)) {
+              return;
+            }
+            seen.add(key);
+            combined.push(item);
+          });
+
+          manifestList.forEach((item) => {
+            if (!item) {
+              return;
+            }
+            const key = `${item}`.trim();
+            if (!key || seen.has(key)) {
+              return;
+            }
+            seen.add(key);
+            combined.push(item);
+          });
+
+          return combined.length ? combined : inlineList;
+        })();
 
         const label = (() => {
           const titleEl = section.querySelector('.project-title');
@@ -1721,71 +2826,122 @@
           return "Découvrir le projet";
         })();
 
-        const task = loadProjectMediaEntries(projectId, directory, inlineList)
-          .then((entries) => {
-            if (!track) {
-              return [];
+        let entries = [];
+        try {
+          entries = await loadProjectMediaEntries(projectId, directory, fallbackList);
+        } catch (error) {
+          entries = [];
+        }
+
+        track.innerHTML = '';
+
+        if (!entries || !entries.length) {
+          return [];
+        }
+
+        const normaliseSliderVideo = (videoSrc) => {
+          if (!videoSrc) {
+            return null;
+          }
+
+          const trimmed = `${videoSrc}`.trim();
+          if (!trimmed) {
+            return null;
+          }
+
+          const queryIndex = trimmed.indexOf('?');
+          const withoutQuery = queryIndex >= 0 ? trimmed.slice(0, queryIndex) : trimmed;
+          const fileName = withoutQuery.split('/').pop() || '';
+
+          if (fileName.toLowerCase() === 'full.mp4') {
+            return null;
+          }
+
+          return trimmed;
+        };
+
+        const sliderEntries = entries
+          .map((entry) => {
+            if (!entry) {
+              return null;
             }
 
-            track.innerHTML = '';
+            const stillImage = isImageSource(entry.still) ? entry.still : null;
+            const animatedImage = isImageSource(entry.animated) ? entry.animated : null;
+            const videoSource = normaliseSliderVideo(
+              isVideoSource(entry.video) ? entry.video : null
+            );
 
-            if (!entries || !entries.length) {
-              return [];
+            if (!stillImage && !animatedImage && !videoSource) {
+              return null;
             }
 
-            const sliderEntries = entries
-              .map((entry) => {
-                if (!entry) {
-                  return null;
-                }
-
-                const stillImage = isImageSource(entry.still) ? entry.still : null;
-                const animatedImage = isImageSource(entry.animated)
-                  ? entry.animated
-                  : null;
-
-                if (!stillImage && !animatedImage) {
-                  return null;
-                }
-
-                return {
-                  still: stillImage,
-                  animated: animatedImage,
-                  aspect: entry.aspect,
-                };
-              })
-              .filter(Boolean);
-
-            sliderEntries.forEach((entry) => {
-              const placeholder = document.createElement('a');
-              placeholder.className = 'placeholder';
-              placeholder.href = detailLink || '#';
-              if (projectId) {
-                placeholder.dataset.project = projectId;
-              }
-              placeholder.setAttribute('aria-label', label);
-
-              if (entry.still) {
-                placeholder.setAttribute('data-still', entry.still);
-                mediaReadyPromises.push(ensureImageReady(entry.still));
-              }
-              if (entry.animated) {
-                placeholder.setAttribute('data-animated', entry.animated);
-                mediaReadyPromises.push(ensureImageReady(entry.animated));
-              }
-              if (Number.isFinite(entry.aspect) && entry.aspect > 0) {
-                placeholder.setAttribute('data-aspect', `${entry.aspect}`);
-              }
-
-              track.appendChild(placeholder);
-            });
-
-            return entries;
+            return {
+              still: stillImage,
+              animated: animatedImage,
+              video: videoSource,
+              aspect: entry.aspect,
+            };
           })
-          .catch(() => []);
+          .filter(Boolean);
 
-        tasks.push(task);
-      });
+        sliderEntries.forEach((entry) => {
+          const placeholder = document.createElement('a');
+          placeholder.className = 'placeholder';
+          placeholder.href = detailLink || '#';
+          if (projectId) {
+            placeholder.dataset.project = projectId;
+          }
+          placeholder.setAttribute('aria-label', label);
+
+          if (entry.still) {
+            placeholder.setAttribute('data-still', entry.still);
+          }
+          if (entry.animated) {
+            placeholder.setAttribute('data-animated', entry.animated);
+          }
+          if (entry.video) {
+            placeholder.setAttribute('data-video', entry.video);
+            ensureImageReady(entry.video).catch(() => {});
+          }
+
+          if (Number.isFinite(entry.aspect) && entry.aspect > 0) {
+            placeholder.setAttribute('data-aspect', `${entry.aspect}`);
+          }
+
+          track.appendChild(placeholder);
+          initializeMediaElement(placeholder);
+        });
+
+        return entries;
+      };
+
+      try {
+        for (let index = 0; index < projectSections.length; index += 1) {
+          const section = projectSections[index];
+          if (!section) {
+            continue;
+          }
+
+          section.classList.add('project--loading');
+          try {
+            await processProjectSection(section);
+          } catch (error) {
+            /* ignore project loading errors */
+          } finally {
+            section.classList.remove('project--loading');
+            section.classList.add('project--hydrated');
+          }
+
+          await new Promise((resolve) => {
+            window.requestAnimationFrame(() => {
+              resolve();
+            });
+          });
+        }
+      } finally {
+        stopLoadingIndicator();
+      }
 
       const detail = document.querySelector('.project-detail[data-project]');
       if (detail) {
@@ -1793,6 +2949,43 @@
         const directoryAttr = readStringAttribute(detail, 'data-media-source');
         const directory = directoryAttr || (projectId ? `${projectId}/images/` : null);
         const inlineList = collectInlineMediaList(detail);
+        const manifestEntry = projectManifestCache.get(projectId);
+        const manifestList =
+          manifestEntry && Array.isArray(manifestEntry.media) ? manifestEntry.media : [];
+        const fallbackList = (() => {
+          if (!manifestList.length) {
+            return inlineList;
+          }
+
+          const combined = [];
+          const seen = new Set();
+
+          inlineList.forEach((item) => {
+            if (!item) {
+              return;
+            }
+            const key = `${item}`.trim();
+            if (!key || seen.has(key)) {
+              return;
+            }
+            seen.add(key);
+            combined.push(item);
+          });
+
+          manifestList.forEach((item) => {
+            if (!item) {
+              return;
+            }
+            const key = `${item}`.trim();
+            if (!key || seen.has(key)) {
+              return;
+            }
+            seen.add(key);
+            combined.push(item);
+          });
+
+          return combined.length ? combined : inlineList;
+        })();
         const hero = detail.querySelector('.project-hero__media');
         const gallery = detail.querySelector('.project-detail__gallery');
 
@@ -1801,14 +2994,104 @@
           ? detailTitleElement.textContent.trim()
           : '';
 
+        if (detailTitleElement) {
+          const MIN_TITLE_FONT_PX = 18;
+          const MAX_ADJUSTMENT_STEPS = 8;
+          const wrapQuery = window.matchMedia('(max-width: 640px)');
+
+          const resizeTitleForViewport = () => {
+            if (wrapQuery.matches) {
+              detailTitleElement.style.removeProperty('font-size');
+              return;
+            }
+
+            const computed = window.getComputedStyle(detailTitleElement);
+            let currentSize = parseFloat(computed.fontSize) || 0;
+            if (!currentSize) {
+              return;
+            }
+
+            let steps = 0;
+            let adjusted = false;
+            while (
+              steps < MAX_ADJUSTMENT_STEPS &&
+              detailTitleElement.scrollWidth > detailTitleElement.clientWidth + 1 &&
+              currentSize > MIN_TITLE_FONT_PX
+            ) {
+              currentSize = Math.max(MIN_TITLE_FONT_PX, currentSize * 0.94);
+              detailTitleElement.style.fontSize = `${currentSize}px`;
+              steps += 1;
+              adjusted = true;
+            }
+
+            if (!adjusted) {
+              detailTitleElement.style.removeProperty('font-size');
+            }
+          };
+
+          const resetAndResizeTitle = () => {
+            detailTitleElement.style.removeProperty('font-size');
+            resizeTitleForViewport();
+          };
+
+          resetAndResizeTitle();
+
+          let resizeFrame = null;
+          const handleResize = () => {
+            if (resizeFrame !== null) {
+              cancelAnimationFrame(resizeFrame);
+            }
+            resizeFrame = requestAnimationFrame(() => {
+              resizeFrame = null;
+              resetAndResizeTitle();
+            });
+          };
+
+          window.addEventListener('resize', handleResize);
+          if (typeof wrapQuery.addEventListener === 'function') {
+            wrapQuery.addEventListener('change', handleResize);
+          } else if (typeof wrapQuery.addListener === 'function') {
+            wrapQuery.addListener(handleResize);
+          }
+
+          if (fontsReadyPromise && typeof fontsReadyPromise.then === 'function') {
+            fontsReadyPromise
+              .then(() => {
+                resetAndResizeTitle();
+              })
+              .catch(() => {
+                resetAndResizeTitle();
+              });
+          }
+        }
+
         const lightboxLabel = detailTitleText
           ? `Agrandir ${detailTitleText}`
           : 'Agrandir le visuel du projet';
 
-        const detailTask = loadProjectMediaEntries(projectId, directory, inlineList)
-          .then((entries) => {
-            if (hero) {
-              if (entries && entries.length) {
+        const handleGalleryLightbox = (target) => {
+          if (!target || !target.classList) {
+            return;
+          }
+          openLightboxFromElement(target);
+        };
+
+          let entries = [];
+          try {
+            const loadedEntries = await loadProjectMediaEntries(
+              projectId,
+              directory,
+              fallbackList,
+            );
+            if (Array.isArray(loadedEntries)) {
+              entries = loadedEntries;
+            }
+          } catch (error) {
+            console.error('Adele portfolio: failed to load project media', error);
+          }
+
+          if (hero) {
+            if (entries && entries.length) {
                 const heroEntry =
                   entries.find((entry) => entry && (entry.still || entry.animated)) ||
                   entries[0];
@@ -1830,7 +3113,7 @@
                 if (defaultStill) {
                   hero.setAttribute('data-default-still', defaultStill);
                   hero.setAttribute('data-still', defaultStill);
-                  mediaReadyPromises.push(ensureImageReady(defaultStill));
+                  ensureImageReady(defaultStill).catch(() => {});
                 } else {
                   hero.removeAttribute('data-default-still');
                   hero.removeAttribute('data-still');
@@ -1840,7 +3123,7 @@
                   hero.setAttribute('data-default-animated', defaultAnimated);
                   hero.setAttribute('data-animated', defaultAnimated);
                   if (defaultAnimated !== defaultStill) {
-                    mediaReadyPromises.push(ensureImageReady(defaultAnimated));
+                    ensureImageReady(defaultAnimated).catch(() => {});
                   }
                 } else {
                   hero.removeAttribute('data-default-animated');
@@ -1850,7 +3133,7 @@
                 if (defaultVideo) {
                   hero.setAttribute('data-default-video', defaultVideo);
                   hero.setAttribute('data-video', defaultVideo);
-                  mediaReadyPromises.push(ensureImageReady(defaultVideo));
+                  ensureImageReady(defaultVideo).catch(() => {});
                 } else {
                   hero.removeAttribute('data-default-video');
                   hero.removeAttribute('data-video');
@@ -1897,10 +3180,6 @@
                     return;
                   }
 
-                  const stillMatchesHero =
-                    !!(entry.still && heroCandidates.has(entry.still));
-                  const animatedMatchesHero =
-                    !!(entry.animated && heroCandidates.has(entry.animated));
                   const videoMatchesHero =
                     !!(entry.video && heroCandidates.has(entry.video));
 
@@ -1917,30 +3196,42 @@
                     item.setAttribute('aria-label', lightboxLabel);
                     if (still) {
                       item.setAttribute('data-still', still);
-                      mediaReadyPromises.push(ensureImageReady(still));
+                      ensureImageReady(still).catch(() => {});
                     }
                     if (animated) {
                       item.setAttribute('data-animated', animated);
-                      mediaReadyPromises.push(ensureImageReady(animated));
+                      ensureImageReady(animated).catch(() => {});
                     }
                     if (video) {
                       item.setAttribute('data-video', video);
-                      mediaReadyPromises.push(ensureImageReady(video));
+                      ensureImageReady(video).catch(() => {});
                     }
                     if (Number.isFinite(aspect) && aspect > 0) {
                       item.setAttribute('data-aspect', `${aspect}`);
                     }
                     gallery.appendChild(item);
+                    initializeMediaElement(item);
+                    item.addEventListener('click', (event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      handleGalleryLightbox(item);
+                    });
+                    item.addEventListener('keydown', (event) => {
+                      if (!ACTION_KEYS.has(event.key)) {
+                        return;
+                      }
+                      event.preventDefault();
+                      event.stopPropagation();
+                      handleGalleryLightbox(item);
+                    });
                   };
 
-                  const includeImage =
-                    (!!entry.still && !stillMatchesHero) ||
-                    (!!entry.animated && !animatedMatchesHero);
+                  const includeImage = !!(entry.still || entry.animated);
 
                   if (includeImage) {
                     createGalleryItem({
-                      still: !stillMatchesHero ? entry.still : null,
-                      animated: !animatedMatchesHero ? entry.animated : null,
+                      still: entry.still || null,
+                      animated: entry.animated || null,
                       video: null,
                       aspect: entry.aspect,
                     });
@@ -1957,18 +3248,9 @@
                 });
               }
             }
+          }
 
-            return entries;
-          })
-          .catch(() => []);
-
-        tasks.push(detailTask);
-      }
-
-      await Promise.all(tasks);
-      if (mediaReadyPromises.length) {
-        await Promise.allSettled(mediaReadyPromises);
-      }
+      /* media preloads fire asynchronously */
     };
 
     await Promise.all([detailMetadataPromise, homeMetadataPromise]);
@@ -2240,17 +3522,34 @@
       passive: true,
     });
     const resolveInitialCategory = () => {
+      if (initialCategorySelection && CATEGORY_KEYS.includes(initialCategorySelection)) {
+        return initialCategorySelection;
+      }
+
       if (initialHashCategory && CATEGORY_KEYS.includes(initialHashCategory)) {
-        return initialHashCategory;
+        initialCategorySelection = initialHashCategory;
+        return initialCategorySelection;
       }
 
       const storedCategory = readStoredCategory();
       if (storedCategory && CATEGORY_KEYS.includes(storedCategory)) {
-        return storedCategory;
+        initialCategorySelection = storedCategory;
+        return initialCategorySelection;
       }
 
-      return CATEGORY_KEYS[0];
+      initialCategorySelection = CATEGORY_KEYS[0];
+      return initialCategorySelection;
     };
+
+    const primeInitialCategory = () => {
+      const category = resolveInitialCategory();
+      if (category) {
+        reflectActiveCategory(category);
+      }
+      return category;
+    };
+
+    primeInitialCategory();
 
     const handleCategoryButtonClick = (event) => {
       const button = event.currentTarget;
@@ -2283,7 +3582,11 @@
 
     const projectList = document.querySelector('.projects');
     if (projectList) {
-      await homeMetadataPromise;
+      try {
+        await homeMetadataPromise;
+      } catch (error) {
+        console.error('Adele portfolio: failed to hydrate project metadata', error);
+      }
 
       const baseProjects = Array.from(projectList.children);
       if (baseProjects.length) {
@@ -2313,23 +3616,7 @@
           track.dataset.baseDuration = duration.toString();
         });
 
-        const loopFragment = document.createDocumentFragment();
-        baseProjects.forEach((project) => {
-          const clone = project.cloneNode(true);
-          clone.classList.remove('project--primary');
-          clone.classList.add('project--clone');
-          Array.from(clone.querySelectorAll('.placeholder')).forEach((element) => {
-            initializeMediaElement(element);
-          });
-          loopFragment.appendChild(clone);
-        });
-        projectList.appendChild(loopFragment);
-
-        const allProjects = Array.from(projectList.querySelectorAll('.project'));
         const primaryProjects = baseProjects;
-        const cloneProjects = allProjects.filter((project) =>
-          project.classList.contains('project--clone')
-        );
 
         let activeCategory = null;
         let isCategoryAnimating = false;
@@ -2365,13 +3652,7 @@
           const previouslyVisible = primaryProjects.filter((project) =>
             project.classList.contains('is-visible')
           );
-          const clonesVisible = cloneProjects.filter((project) =>
-            project.classList.contains('is-visible')
-          );
           const newPrimary = primaryProjects.filter(
-            (project) => project.getAttribute('data-category') === category
-          );
-          const newClones = cloneProjects.filter(
             (project) => project.getAttribute('data-category') === category
           );
 
@@ -2388,7 +3669,6 @@
 
             if (shouldReduceMotion) {
               newPrimary.forEach((project) => project.classList.add('is-visible'));
-              newClones.forEach((project) => project.classList.add('is-visible'));
               scheduleResizeTasks();
               window.setTimeout(() => {
                 scheduleResizeTasks();
@@ -2399,7 +3679,6 @@
             }
 
             newPrimary.forEach((project) => project.classList.remove('is-visible'));
-            newClones.forEach((project) => project.classList.remove('is-visible'));
 
             newPrimary.forEach((project, index) => {
               window.setTimeout(() => {
@@ -2409,7 +3688,6 @@
 
             const totalDelay = newPrimary.length * 160 + 420;
             window.setTimeout(() => {
-              newClones.forEach((project) => project.classList.add('is-visible'));
               scheduleResizeTasks();
               isCategoryAnimating = false;
               dequeueNextCategory();
@@ -2418,28 +3696,24 @@
 
           const fadeOutPrevious = (callback) => {
             if (!previouslyVisible.length) {
-              clonesVisible.forEach((project) => project.classList.remove('is-visible'));
               callback();
               return;
             }
 
             if (shouldReduceMotion) {
               previouslyVisible.forEach((project) => project.classList.remove('is-visible'));
-              clonesVisible.forEach((project) => project.classList.remove('is-visible'));
               callback();
               return;
             }
 
-            previouslyVisible
-              .slice()
-              .reverse()
-              .forEach((project, index) => {
-                window.setTimeout(() => {
-                  project.classList.remove('is-visible');
-                }, index * 120);
-              });
-
-            clonesVisible.forEach((project) => project.classList.remove('is-visible'));
+              previouslyVisible
+                .slice()
+                .reverse()
+                .forEach((project, index) => {
+                  window.setTimeout(() => {
+                    project.classList.remove('is-visible');
+                  }, index * 120);
+                });
 
             const totalFade = previouslyVisible.length * 120 + 360;
             window.setTimeout(callback, totalFade);
@@ -2502,7 +3776,7 @@
             baseSpeedAbs: 0,
             fastSpeedAbs: 0,
             speed: 0,
-            mode: 'base',
+            mode: 'manual',
             baseDirection,
             initialized: false,
           };
@@ -2596,8 +3870,14 @@
             return;
           }
 
+          if (mode === 'manual') {
+            state.mode = 'manual';
+            state.speed = 0;
+            return;
+          }
+
           if (shouldReduceMotion) {
-            state.mode = 'base';
+            state.mode = 'manual';
             state.speed = 0;
             return;
           }
@@ -2861,9 +4141,17 @@
         bindPlaceholderNavigation();
 
         const setupControls = (strip) => {
-          if (!strip || strip.dataset.controlsReady === 'true') {
+          if (!strip) {
             return;
           }
+
+          const prefersTouch =
+            (typeof window.matchMedia === 'function' &&
+              (window.matchMedia('(hover: none) and (pointer: coarse)').matches ||
+                window.matchMedia('(pointer: coarse)').matches)) ||
+            window.innerWidth <= 768;
+
+          const previousMode = strip.getAttribute('data-controls-mode');
 
           const track = strip.querySelector('.media-track');
           if (!track) {
@@ -2875,6 +4163,143 @@
             return;
           }
 
+          const ensureTouchSwipe = () => {
+            if (track.dataset.swipeBound === 'true') {
+              return;
+            }
+
+            let activePointerId = null;
+            let startX = 0;
+            let startY = 0;
+            let startOffset = 0;
+            let isDragging = false;
+            let verticalLock = false;
+
+            const releasePointerCapture = () => {
+              if (
+                typeof activePointerId === 'number' &&
+                typeof track.releasePointerCapture === 'function' &&
+                typeof track.hasPointerCapture === 'function' &&
+                track.hasPointerCapture(activePointerId)
+              ) {
+                try {
+                  track.releasePointerCapture(activePointerId);
+                } catch (error) {
+                  /* no-op */
+                }
+              }
+            };
+
+            const resetGesture = () => {
+              releasePointerCapture();
+              activePointerId = null;
+              isDragging = false;
+              verticalLock = false;
+            };
+
+            const pointerMatches = (event) => {
+              if (activePointerId === null) {
+                return false;
+              }
+              if (event.pointerId === undefined) {
+                return activePointerId === 'touch';
+              }
+              if (typeof activePointerId === 'number') {
+                return event.pointerId === activePointerId;
+              }
+              return false;
+            };
+
+            const handlePointerDown = (event) => {
+              const pointerType = event.pointerType || 'mouse';
+              if (pointerType !== 'touch' && pointerType !== 'pen') {
+                return;
+              }
+
+              const pointerId = event.pointerId !== undefined ? event.pointerId : null;
+              activePointerId = pointerId !== null ? pointerId : 'touch';
+              startX = Number.isFinite(event.clientX) ? event.clientX : 0;
+              startY = Number.isFinite(event.clientY) ? event.clientY : 0;
+              startOffset = state.offset || 0;
+              isDragging = false;
+              verticalLock = false;
+
+              if (pointerId !== null && typeof track.setPointerCapture === 'function') {
+                try {
+                  track.setPointerCapture(pointerId);
+                } catch (error) {
+                  /* no-op */
+                }
+              }
+            };
+
+            const handlePointerMove = (event) => {
+              if (!pointerMatches(event)) {
+                return;
+              }
+
+              const currentX = Number.isFinite(event.clientX) ? event.clientX : 0;
+              const currentY = Number.isFinite(event.clientY) ? event.clientY : 0;
+              const deltaX = currentX - startX;
+              const deltaY = currentY - startY;
+
+              if (!isDragging && !verticalLock) {
+                const absDeltaX = Math.abs(deltaX);
+                const absDeltaY = Math.abs(deltaY);
+
+                if (absDeltaX > 6 && absDeltaX >= absDeltaY) {
+                  isDragging = true;
+                  applyMode(state, 'manual');
+                } else if (absDeltaY > absDeltaX && absDeltaY > 6) {
+                  verticalLock = true;
+                  resetGesture();
+                  return;
+                } else {
+                  return;
+                }
+              }
+
+              if (!isDragging) {
+                return;
+              }
+
+              event.preventDefault();
+              state.offset = startOffset + deltaX;
+              wrapOffset(state);
+              state.track.style.transform = `translateX(${state.offset}px)`;
+            };
+
+            const handlePointerEnd = (event) => {
+              if (!pointerMatches(event)) {
+                return;
+              }
+
+              if (isDragging) {
+                event.preventDefault();
+              }
+
+              resetGesture();
+            };
+
+            track.addEventListener('pointerdown', handlePointerDown, {
+              passive: true,
+            });
+            track.addEventListener('pointermove', handlePointerMove, {
+              passive: false,
+            });
+            track.addEventListener('pointerup', handlePointerEnd, {
+              passive: true,
+            });
+            track.addEventListener('pointercancel', handlePointerEnd, {
+              passive: true,
+            });
+            track.addEventListener('pointerleave', handlePointerEnd, {
+              passive: true,
+            });
+
+            track.dataset.swipeBound = 'true';
+          };
+
           const updateEdgeMode = (mode) => {
             if (state.mode === mode) {
               return;
@@ -2884,226 +4309,100 @@
 
           let edgePointerActive = false;
 
-          const handleEdgePointerMove = (event) => {
-            if (shouldReduceMotion) {
-              if (edgePointerActive) {
-                edgePointerActive = false;
-                updateEdgeMode('base');
-              }
+          const ensurePointerHover = () => {
+            if (strip.dataset.pointerBound === 'true') {
               return;
             }
 
-            const pointerType = event.pointerType || 'mouse';
-            if (pointerType === 'touch') {
-              if (edgePointerActive) {
-                edgePointerActive = false;
-                updateEdgeMode('base');
+            const handleEdgePointerMove = (event) => {
+              if (shouldReduceMotion) {
+                if (edgePointerActive) {
+                  edgePointerActive = false;
+                  updateEdgeMode('manual');
+                }
+                return;
               }
-              return;
-            }
 
-            const rect = strip.getBoundingClientRect();
-            if (!rect || rect.width === 0) {
-              return;
-            }
-
-            const edgeWidth = Math.min(
-              Math.max(rect.width * EDGE_ZONE_RATIO, EDGE_ZONE_MIN),
-              EDGE_ZONE_MAX
-            );
-            const x = event.clientX;
-
-            if (Number.isFinite(x)) {
-              edgePointerActive = true;
-              if (x <= rect.left + edgeWidth) {
-                updateEdgeMode('fast-right');
-              } else if (x >= rect.right - edgeWidth) {
-                updateEdgeMode('fast-left');
-              } else if (state.mode !== 'base') {
-                updateEdgeMode('base');
+              const pointerType = event.pointerType || 'mouse';
+              if (pointerType === 'touch') {
+                if (edgePointerActive) {
+                  edgePointerActive = false;
+                  updateEdgeMode('manual');
+                }
+                return;
               }
-            }
-          };
 
-          const resetEdgeHover = () => {
-            if (!edgePointerActive) {
-              return;
-            }
-            edgePointerActive = false;
-            updateEdgeMode('base');
-          };
-
-          strip.addEventListener('pointerenter', handleEdgePointerMove);
-          strip.addEventListener('pointermove', handleEdgePointerMove);
-          strip.addEventListener('pointerleave', resetEdgeHover);
-          strip.addEventListener('pointercancel', resetEdgeHover);
-
-          const createControl = (direction) => {
-            const control = document.createElement('button');
-            control.type = 'button';
-            control.className = `media-strip__control media-strip__control--${direction}`;
-            const label =
-              direction === 'left'
-                ? 'Faire défiler les médias vers la droite'
-                : 'Faire défiler les médias vers la gauche';
-            control.setAttribute('aria-label', label);
-            control.innerHTML =
-              direction === 'left'
-                ? '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><polyline points="14 6 8 12 14 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'
-                : '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><polyline points="10 6 16 12 10 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-            return control;
-          };
-
-          const leftControl = createControl('left');
-          const rightControl = createControl('right');
-
-          const beginFastMode = (mode, control, pointerId) => {
-            applyMode(state, mode);
-            control.classList.add('is-active');
-            if (
-              typeof control.setPointerCapture === 'function' &&
-              pointerId !== undefined
-            ) {
-              try {
-                control.setPointerCapture(pointerId);
-              } catch (error) {
-                // no-op
+              const rect = strip.getBoundingClientRect();
+              if (!rect || rect.width === 0) {
+                return;
               }
-            }
-          };
 
-          const endFastMode = (control, pointerId) => {
-            control.classList.remove('is-active');
-            applyMode(state, 'base');
-            if (
-              pointerId !== undefined &&
-              typeof control.releasePointerCapture === 'function' &&
-              typeof control.hasPointerCapture === 'function' &&
-              control.hasPointerCapture(pointerId)
-            ) {
-              control.releasePointerCapture(pointerId);
-            }
-          };
+              const edgeWidth = Math.min(
+                Math.max(rect.width * EDGE_ZONE_RATIO, EDGE_ZONE_MIN),
+                EDGE_ZONE_MAX
+              );
+              const x = event.clientX;
 
-          const attachControlHandlers = (control, mode) => {
-            control.addEventListener('pointerdown', (event) => {
-              event.preventDefault();
-              beginFastMode(mode, control, event.pointerId);
-            });
-
-            const reset = (event) => {
-              endFastMode(control, event ? event.pointerId : undefined);
+              if (Number.isFinite(x)) {
+                edgePointerActive = true;
+                if (x <= rect.left + edgeWidth) {
+                  updateEdgeMode('fast-right');
+                } else if (x >= rect.right - edgeWidth) {
+                  updateEdgeMode('fast-left');
+                } else if (state.mode !== 'base') {
+                  updateEdgeMode('base');
+                }
+              }
             };
 
-            control.addEventListener('pointerup', reset);
-            control.addEventListener('pointercancel', reset);
-            control.addEventListener('lostpointercapture', () => {
-              control.classList.remove('is-active');
-              applyMode(state, 'base');
-            });
-            control.addEventListener('pointerleave', (event) => {
-              if (event.pointerType === 'mouse') {
-                control.classList.remove('is-active');
-                applyMode(state, 'base');
+            const resetEdgeHover = () => {
+              if (edgePointerActive) {
+                edgePointerActive = false;
               }
-            });
+              applyMode(state, 'manual');
+            };
 
-            control.addEventListener('keydown', (event) => {
-              if (!ACTION_KEYS.has(event.key)) {
-                return;
-              }
-              event.preventDefault();
-              if (!control.classList.contains('is-active')) {
-                control.classList.add('is-active');
-                applyMode(state, mode);
-              }
-            });
+            strip.addEventListener('pointerenter', handleEdgePointerMove);
+            strip.addEventListener('pointermove', handleEdgePointerMove);
+            strip.addEventListener('pointerleave', resetEdgeHover);
+            strip.addEventListener('pointercancel', resetEdgeHover);
 
-            control.addEventListener('keyup', (event) => {
-              if (!ACTION_KEYS.has(event.key)) {
-                return;
-              }
-              event.preventDefault();
-              control.classList.remove('is-active');
-              applyMode(state, 'base');
-            });
-
-            control.addEventListener('blur', () => {
-              control.classList.remove('is-active');
-              applyMode(state, 'base');
-            });
+            strip.dataset.pointerBound = 'true';
           };
 
-          attachControlHandlers(leftControl, 'fast-right');
-          attachControlHandlers(rightControl, 'fast-left');
+          if (!prefersTouch) {
+            ensurePointerHover();
+            strip.classList.remove('media-strip--touch');
+            strip.setAttribute('data-controls-mode', 'pointer');
+            strip.dataset.controlsReady = 'pointer';
+            strip
+              .querySelectorAll('.media-strip__control')
+              .forEach((control) => control.remove());
+            return;
+          }
 
-          strip.append(leftControl, rightControl);
-          strip.dataset.controlsReady = 'true';
+          strip.classList.add('media-strip--touch');
+          strip
+            .querySelectorAll('.media-strip__control')
+            .forEach((control) => control.remove());
+          ensureTouchSwipe();
+          strip.dataset.controlsReady = 'swipe';
+          strip.setAttribute('data-controls-mode', 'touch-swipe');
+          strip.removeAttribute('data-controls-skipped');
         };
 
         const strips = Array.from(projectList.querySelectorAll('.media-strip'));
         strips.forEach((strip) => setupControls(strip));
 
-        let loopHeight = 0;
-        let isLoopAdjusting = false;
-        let lastKnownScrollY = window.scrollY || window.pageYOffset || 0;
-
-        const updateLoopHeight = () => {
-          const totalHeight = projectList.scrollHeight;
-          loopHeight = totalHeight / 2;
-        };
-
-        const adjustLoopScroll = (targetY) => {
-          isLoopAdjusting = true;
-          window.scrollTo(0, targetY);
-          lastKnownScrollY = targetY;
-          window.requestAnimationFrame(() => {
-            isLoopAdjusting = false;
-          });
-        };
-
-        const handleLoopScroll = () => {
-          if (isLoopAdjusting) {
-            return;
-          }
-
-          if (loopHeight <= 0) {
-            lastKnownScrollY = window.scrollY || window.pageYOffset || 0;
-            return;
-          }
-
-          const currentY = window.scrollY || window.pageYOffset || 0;
-
-          if (currentY > lastKnownScrollY && currentY >= loopHeight) {
-            let normalized = currentY % loopHeight;
-            if (!Number.isFinite(normalized)) {
-              normalized = 0;
-            }
-            if (typeof animateLoopResetProgress === 'function') {
-              animateLoopResetProgress(currentY, normalized);
-            }
-            adjustLoopScroll(normalized);
-            return;
-          }
-
-          lastKnownScrollY = currentY;
-        };
-
-        window.addEventListener('scroll', handleLoopScroll, { passive: true });
-
         const runResizeTasks = () => {
+          strips.forEach((strip) => setupControls(strip));
           computeTrackMetrics();
-          updateLoopHeight();
           if (pendingReturnScroll !== null) {
             const viewportHeight =
               window.innerHeight || document.documentElement.clientHeight || 0;
             const maxScroll = Math.max(projectList.scrollHeight - viewportHeight, 0);
-            let target = Math.max(Math.min(pendingReturnScroll, maxScroll), 0);
-            if (loopHeight > 0 && target >= loopHeight) {
-              const normalized = target % loopHeight;
-              target = Number.isFinite(normalized) ? normalized : 0;
-            }
-            adjustLoopScroll(target);
+            const target = Math.max(Math.min(pendingReturnScroll, maxScroll), 0);
+            window.scrollTo({ top: target });
             pendingReturnScroll = null;
             returnScrollReady = true;
             clearStoredScrollPosition();
@@ -3113,20 +4412,6 @@
               /* no-op */
             }
             return;
-          }
-          const currentY = window.scrollY || window.pageYOffset || 0;
-          if (loopHeight > 0 && currentY >= loopHeight) {
-            let normalized = currentY % loopHeight;
-            if (!Number.isFinite(normalized)) {
-              normalized = 0;
-            }
-            if (!isLoopAdjusting && Math.abs(normalized - currentY) > 1) {
-              adjustLoopScroll(normalized);
-              return;
-            }
-            lastKnownScrollY = normalized;
-          } else {
-            lastKnownScrollY = currentY;
           }
         };
 
@@ -3225,7 +4510,7 @@
       }
     }
 
-    const startInitialCategory = () => {
+    const startInitialCategory = (options = {}) => {
       if (!isHomePage) {
         return;
       }
@@ -3235,21 +4520,63 @@
         return;
       }
 
+      if (initialCategoryStarted && !options.force) {
+        return;
+      }
+
+      initialCategoryStarted = true;
       requestCategoryActivation(targetCategory, { initial: true, force: true });
     };
 
+    startInitialCategory();
+
     if (isHomePage) {
       if (fontsReadyPromise && typeof fontsReadyPromise.then === 'function') {
-        fontsReadyPromise.then(startInitialCategory).catch(startInitialCategory);
+        const triggerInitialCategory = () => startInitialCategory({ force: true });
+        fontsReadyPromise.then(triggerInitialCategory).catch(triggerInitialCategory);
       } else if (document.readyState === 'complete') {
-        startInitialCategory();
+        startInitialCategory({ force: true });
       } else {
-        window.addEventListener('load', startInitialCategory, { once: true });
+        window.addEventListener('load', () => startInitialCategory({ force: true }), {
+          once: true,
+        });
       }
     }
 
     const projectDetail = document.querySelector('.project-detail');
     if (projectDetail) {
+      const headingMetaInitial = projectDetail.querySelector('.project-detail__meta');
+      if (headingMetaInitial) {
+        const initialMetaText = (headingMetaInitial.textContent || '').trim();
+        if (initialMetaText) {
+          headingMetaInitial.hidden = false;
+          headingMetaInitial.removeAttribute('hidden');
+        } else {
+          headingMetaInitial.textContent = '';
+          headingMetaInitial.hidden = true;
+          if (!headingMetaInitial.hasAttribute('hidden')) {
+            headingMetaInitial.setAttribute('hidden', '');
+          }
+        }
+      }
+
+      const descriptionInitial = projectDetail.querySelector(
+        '.project-detail__description'
+      );
+      if (descriptionInitial) {
+        const initialDescription = (descriptionInitial.textContent || '').trim();
+        if (initialDescription) {
+          descriptionInitial.hidden = false;
+          descriptionInitial.removeAttribute('hidden');
+        } else {
+          descriptionInitial.textContent = '';
+          descriptionInitial.hidden = true;
+          if (!descriptionInitial.hasAttribute('hidden')) {
+            descriptionInitial.setAttribute('hidden', '');
+          }
+        }
+      }
+
       const backLink = projectDetail.querySelector('.project-detail__back');
       if (backLink) {
         backLink.addEventListener('click', (event) => {
@@ -3380,6 +4707,22 @@
         updateVideoAvailability(null);
       }
 
+      const applyVideoIframeAttributes = (iframe) => {
+        if (!iframe) {
+          return;
+        }
+
+        iframe.setAttribute(
+          'allow',
+          'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share'
+        );
+        iframe.setAttribute('allowfullscreen', '');
+        iframe.setAttribute('frameborder', '0');
+        iframe.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
+        iframe.setAttribute('width', '100%');
+        iframe.setAttribute('height', '100%');
+      };
+
       const ensureVideoIframe = () => {
         if (!heroVideoContainer || !heroVimeoUrl) {
           return null;
@@ -3390,14 +4733,15 @@
 
         if (!iframe) {
           iframe = document.createElement('iframe');
-          iframe.setAttribute('allow', 'autoplay; fullscreen; picture-in-picture');
-          iframe.setAttribute('allowfullscreen', '');
           iframe.setAttribute('title', 'Lecture vidéo du projet');
           iframe.src = autoplayUrl || heroVimeoUrl;
+          applyVideoIframeAttributes(iframe);
           heroVideoContainer.appendChild(iframe);
         } else if (autoplayUrl && iframe.src !== autoplayUrl) {
           iframe.src = autoplayUrl;
         }
+
+        applyVideoIframeAttributes(iframe);
 
         heroVideoContainer.removeAttribute('hidden');
         return iframe;
@@ -3440,19 +4784,6 @@
           heroSources.add(heroAnimated);
         }
 
-        if (heroSources.size) {
-          Array.from(gallery.querySelectorAll('.project-detail__item')).forEach((item) => {
-            const stillAttr = readStringAttribute(item, 'data-still');
-            const animatedAttr = readStringAttribute(item, 'data-animated');
-            if (
-              (stillAttr && heroSources.has(stillAttr)) ||
-              (animatedAttr && heroSources.has(animatedAttr))
-            ) {
-              item.remove();
-            }
-          });
-        }
-
         const defaultSources = new Set();
         if (heroDefaults.still) {
           defaultSources.add(heroDefaults.still);
@@ -3491,6 +4822,10 @@
               }
               fallbackItem.className = fallbackClasses.join(' ');
 
+              fallbackItem.tabIndex = 0;
+              fallbackItem.setAttribute('role', 'button');
+              fallbackItem.setAttribute('aria-label', lightboxLabel);
+
               if (heroDefaults.still) {
                 fallbackItem.setAttribute('data-still', heroDefaults.still);
                 ensureImageReady(heroDefaults.still).catch(() => {});
@@ -3517,184 +4852,197 @@
                 fallbackItem.setAttribute('data-aspect', `${heroDefaults.aspect}`);
               }
 
-              fallbackItem.tabIndex = 0;
-              fallbackItem.setAttribute('role', 'button');
-              fallbackItem.setAttribute('aria-label', lightboxLabel);
-
               gallery.insertBefore(fallbackItem, gallery.firstChild);
               initializeMediaElement(fallbackItem);
             }
           }
         }
 
-        const parseAspectValue = (raw) => {
-          if (raw === null || raw === undefined) {
-            return null;
-          }
-          const value = `${raw}`.trim();
-          if (!value) {
-            return null;
-          }
-          const parsed = parseFloat(value);
-          return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
-        };
+        if (!gallery.hasAttribute('data-masonry')) {
+          gallery.setAttribute('data-masonry', '');
+        }
 
-        const readAspectRatio = (item) => {
-          if (!item) {
-            return 1;
-          }
+        const shouldUseMasonry = gallery.hasAttribute('data-masonry');
 
-          const dataAttr = parseAspectValue(item.getAttribute('data-aspect'));
-          if (dataAttr) {
-            return dataAttr;
-          }
-
-          const inlineValue = parseAspectValue(item.style.getPropertyValue('--item-aspect'));
-          if (inlineValue) {
-            return inlineValue;
-          }
-
-          if (window.getComputedStyle) {
-            const computedValue = parseAspectValue(
-              window.getComputedStyle(item).getPropertyValue('--item-aspect')
-            );
-            if (computedValue) {
-              return computedValue;
+        if (shouldUseMasonry) {
+          const parseAspectValue = (raw) => {
+            if (raw === null || raw === undefined) {
+              return null;
             }
-          }
-
-          return 1;
-        };
-
-        const applyMasonryLayout = () => {
-          const items = Array.from(gallery.querySelectorAll('.project-detail__item'));
-          gallery.classList.add('is-masonry');
-          gallery.classList.remove('is-ready');
-
-          if (!items.length) {
-            gallery.style.height = '0px';
-            return;
-          }
-
-          const containerWidth = gallery.clientWidth;
-          if (!Number.isFinite(containerWidth) || containerWidth <= 0) {
-            return;
-          }
-
-          const gap = MASONRY_GAP;
-          const tentativeColumns = Math.max(
-            1,
-            Math.floor((containerWidth + gap) / (MASONRY_MIN_COLUMN_WIDTH + gap))
-          );
-          let columnCount = Math.min(tentativeColumns, items.length);
-          columnCount = Math.max(columnCount, 1);
-
-          let columnWidth =
-            (containerWidth - gap * (columnCount - 1)) / Math.max(columnCount, 1);
-
-          if (columnWidth > MASONRY_MAX_COLUMN_WIDTH && items.length > columnCount) {
-            const adjustedColumns = Math.min(
-              items.length,
-              Math.max(
-                columnCount,
-                Math.floor((containerWidth + gap) / (MASONRY_MAX_COLUMN_WIDTH + gap))
-              )
-            );
-            if (adjustedColumns > columnCount) {
-              columnCount = adjustedColumns;
-              columnWidth =
-                (containerWidth - gap * (columnCount - 1)) / Math.max(columnCount, 1);
+            const value = `${raw}`.trim();
+            if (!value) {
+              return null;
             }
-          }
+            const parsed = parseFloat(value);
+            return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+          };
 
-          if (!Number.isFinite(columnWidth) || columnWidth <= 0) {
-            columnWidth = containerWidth;
-            columnCount = 1;
-          }
+          const readAspectRatio = (item) => {
+            if (!item) {
+              return 1;
+            }
 
-          const columnHeights = new Array(columnCount).fill(0);
+            const dataAttr = parseAspectValue(item.getAttribute('data-aspect'));
+            if (dataAttr) {
+              return dataAttr;
+            }
 
-          items.forEach((item) => {
-            const aspectRatio = readAspectRatio(item);
-            const itemHeight = columnWidth / (aspectRatio > 0 ? aspectRatio : 1);
+            const inlineValue = parseAspectValue(item.style.getPropertyValue('--item-aspect'));
+            if (inlineValue) {
+              return inlineValue;
+            }
 
-            let targetColumn = 0;
-            for (let index = 1; index < columnCount; index += 1) {
-              if (columnHeights[index] < columnHeights[targetColumn]) {
-                targetColumn = index;
+            if (window.getComputedStyle) {
+              const computedValue = parseAspectValue(
+                window.getComputedStyle(item).getPropertyValue('--item-aspect')
+              );
+              if (computedValue) {
+                return computedValue;
               }
             }
 
-            const x = targetColumn * (columnWidth + gap);
-            const y = columnHeights[targetColumn];
+            return 1;
+          };
 
-            item.style.width = `${columnWidth}px`;
-            item.style.height = `${itemHeight}px`;
-            item.style.transform = `translate3d(${x}px, ${y}px, 0)`;
-            item.style.opacity = '1';
+          const applyMasonryLayout = () => {
+            const items = Array.from(gallery.querySelectorAll('.project-detail__item'));
+            gallery.classList.add('is-masonry');
+            gallery.classList.remove('is-ready');
 
-            columnHeights[targetColumn] = y + itemHeight + gap;
-          });
+            if (!items.length) {
+              gallery.style.height = '0px';
+              return;
+            }
 
-          const maxHeight = columnHeights.reduce(
-            (currentMax, height) => (height > currentMax ? height : currentMax),
-            0
-          );
-          const finalHeight = maxHeight > 0 ? maxHeight - gap : 0;
-          gallery.style.height = `${finalHeight > 0 ? finalHeight : 0}px`;
-          gallery.classList.add('is-ready');
-        };
+            const containerWidth = gallery.clientWidth;
+            if (!Number.isFinite(containerWidth) || containerWidth <= 0) {
+              return;
+            }
 
-        let masonryFrame = null;
-        const scheduleMasonryLayout = () => {
-          if (masonryFrame !== null) {
-            cancelAnimationFrame(masonryFrame);
-          }
-          masonryFrame = requestAnimationFrame(() => {
-            masonryFrame = null;
-            applyMasonryLayout();
-          });
-        };
+            let gap = MASONRY_FALLBACK_GAP;
+            if (window.getComputedStyle) {
+              const computedGap = window
+                .getComputedStyle(gallery)
+                .getPropertyValue('--gallery-gap');
+              const parsedGap = parseFloat(computedGap);
+              if (Number.isFinite(parsedGap) && parsedGap >= 0) {
+                gap = parsedGap;
+              }
+            }
 
-        scheduleMasonryLayout();
+            let columnCount = items.length <= 1 ? items.length : 0;
+            if (items.length > 1) {
+              const availableColumns = Math.max(
+                1,
+                Math.floor((containerWidth + gap) / (MASONRY_MIN_COLUMN_WIDTH + gap))
+              );
 
-        if (typeof window.ResizeObserver === 'function') {
-          if (
-            gallery.__masonryObserver &&
-            typeof gallery.__masonryObserver.disconnect === 'function'
-          ) {
-            gallery.__masonryObserver.disconnect();
-          }
+              columnCount = Math.max(
+                Math.min(availableColumns, MASONRY_MAX_COLUMNS, items.length),
+                Math.min(items.length, MASONRY_MIN_COLUMNS)
+              );
 
-          const resizeObserver = new ResizeObserver(() => {
-            scheduleMasonryLayout();
-          });
-          resizeObserver.observe(gallery);
-          gallery.__masonryObserver = resizeObserver;
-        }
+              if (containerWidth >= MASONRY_THREE_COLUMN_THRESHOLD && items.length >= 3) {
+                columnCount = Math.min(Math.max(columnCount, 3), MASONRY_MAX_COLUMNS);
+              }
+            }
 
-        window.addEventListener('resize', scheduleMasonryLayout);
+            if (!Number.isFinite(columnCount) || columnCount <= 0) {
+              columnCount = 1;
+            }
 
-        if (fontsReadyPromise && typeof fontsReadyPromise.then === 'function') {
-          fontsReadyPromise
-            .then(() => {
-              scheduleMasonryLayout();
-            })
-            .catch(() => {
+            let columnWidth =
+              (containerWidth - gap * (columnCount - 1)) / Math.max(columnCount, 1);
+
+            if (!Number.isFinite(columnWidth) || columnWidth <= 0) {
+              columnWidth = containerWidth;
+              columnCount = 1;
+            }
+
+            const columnHeights = new Array(columnCount).fill(0);
+
+            items.forEach((item) => {
+              const aspectRatio = readAspectRatio(item);
+              const itemHeight = columnWidth / (aspectRatio > 0 ? aspectRatio : 1);
+
+              let targetColumn = 0;
+              for (let index = 1; index < columnCount; index += 1) {
+                if (columnHeights[index] < columnHeights[targetColumn]) {
+                  targetColumn = index;
+                }
+              }
+
+              const x = targetColumn * (columnWidth + gap);
+              const y = columnHeights[targetColumn];
+
+              item.style.width = `${columnWidth}px`;
+              item.style.height = `${itemHeight}px`;
+              item.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+              item.style.opacity = '1';
+
+              columnHeights[targetColumn] = y + itemHeight + gap;
+            });
+
+            const maxHeight = columnHeights.reduce(
+              (currentMax, height) => (height > currentMax ? height : currentMax),
+              0
+            );
+            const finalHeight = maxHeight > 0 ? maxHeight - gap : 0;
+            gallery.style.height = `${finalHeight > 0 ? finalHeight : 0}px`;
+            gallery.classList.add('is-ready');
+          };
+
+          let masonryFrame = null;
+          const scheduleMasonryLayout = () => {
+            if (masonryFrame !== null) {
+              cancelAnimationFrame(masonryFrame);
+            }
+            masonryFrame = requestAnimationFrame(() => {
+              masonryFrame = null;
+              applyMasonryLayout();
+            });
+          };
+
+          gallery.__scheduleMasonryLayout = scheduleMasonryLayout;
+
+          scheduleMasonryLayout();
+
+          if (typeof window.ResizeObserver === 'function') {
+            if (
+              gallery.__masonryObserver &&
+              typeof gallery.__masonryObserver.disconnect === 'function'
+            ) {
+              gallery.__masonryObserver.disconnect();
+            }
+
+            const resizeObserver = new ResizeObserver(() => {
               scheduleMasonryLayout();
             });
-        }
-
-        window.addEventListener('load', () => {
-          scheduleMasonryLayout();
-        });
-
-        const handleGalleryLightbox = (target) => {
-          if (!target || !target.classList) {
-            return;
+            resizeObserver.observe(gallery);
+            gallery.__masonryObserver = resizeObserver;
           }
-          openLightboxFromElement(target);
-        };
+
+          window.addEventListener('resize', scheduleMasonryLayout);
+
+          if (fontsReadyPromise && typeof fontsReadyPromise.then === 'function') {
+            fontsReadyPromise
+              .then(() => {
+                scheduleMasonryLayout();
+              })
+              .catch(() => {
+                scheduleMasonryLayout();
+              });
+          }
+
+          window.addEventListener('load', () => {
+            scheduleMasonryLayout();
+          });
+        } else {
+          gallery.classList.remove('is-masonry');
+          gallery.classList.remove('is-ready');
+          gallery.style.removeProperty('height');
+          gallery.__scheduleMasonryLayout = null;
+        }
 
         gallery.addEventListener('click', (event) => {
           const target = event.target.closest('.project-detail__item');
