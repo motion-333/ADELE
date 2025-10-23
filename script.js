@@ -1750,14 +1750,14 @@
         const animatedSource = currentAnimated || currentStill || '';
         if (isLightboxMedia) {
           const imageSource = currentVideo ? '' : animatedSource || stillSource;
-          if (currentVideo) {
-            ensureLightboxImage(null);
-            syncPlaceholderVideo(element, currentVideo, {
-              muted: false,
-              controls: true,
-              playsInline: true,
-            });
-          } else {
+            if (currentVideo) {
+              ensureLightboxImage(null);
+              syncPlaceholderVideo(element, currentVideo, {
+                muted: false,
+                controls: false,
+                playsInline: true,
+              });
+            } else {
             syncPlaceholderVideo(element, null);
             ensureLightboxImage(imageSource);
           }
@@ -2678,6 +2678,27 @@
           return [];
         }
 
+        const normaliseSliderVideo = (videoSrc) => {
+          if (!videoSrc) {
+            return null;
+          }
+
+          const trimmed = `${videoSrc}`.trim();
+          if (!trimmed) {
+            return null;
+          }
+
+          const queryIndex = trimmed.indexOf('?');
+          const withoutQuery = queryIndex >= 0 ? trimmed.slice(0, queryIndex) : trimmed;
+          const fileName = withoutQuery.split('/').pop() || '';
+
+          if (fileName.toLowerCase() === 'full.mp4') {
+            return null;
+          }
+
+          return trimmed;
+        };
+
         const sliderEntries = entries
           .map((entry) => {
             if (!entry) {
@@ -2686,14 +2707,18 @@
 
             const stillImage = isImageSource(entry.still) ? entry.still : null;
             const animatedImage = isImageSource(entry.animated) ? entry.animated : null;
+            const videoSource = normaliseSliderVideo(
+              isVideoSource(entry.video) ? entry.video : null
+            );
 
-            if (!stillImage && !animatedImage) {
+            if (!stillImage && !animatedImage && !videoSource) {
               return null;
             }
 
             return {
               still: stillImage,
               animated: animatedImage,
+              video: videoSource,
               aspect: entry.aspect,
             };
           })
@@ -2714,6 +2739,11 @@
           if (entry.animated) {
             placeholder.setAttribute('data-animated', entry.animated);
           }
+          if (entry.video) {
+            placeholder.setAttribute('data-video', entry.video);
+            ensureImageReady(entry.video).catch(() => {});
+          }
+
           if (Number.isFinite(entry.aspect) && entry.aspect > 0) {
             placeholder.setAttribute('data-aspect', `${entry.aspect}`);
           }
@@ -2989,10 +3019,6 @@
                     return;
                   }
 
-                  const stillMatchesHero =
-                    !!(entry.still && heroCandidates.has(entry.still));
-                  const animatedMatchesHero =
-                    !!(entry.animated && heroCandidates.has(entry.animated));
                   const videoMatchesHero =
                     !!(entry.video && heroCandidates.has(entry.video));
 
@@ -3039,14 +3065,12 @@
                     });
                   };
 
-                  const includeImage =
-                    (!!entry.still && !stillMatchesHero) ||
-                    (!!entry.animated && !animatedMatchesHero);
+                  const includeImage = !!(entry.still || entry.animated);
 
                   if (includeImage) {
                     createGalleryItem({
-                      still: !stillMatchesHero ? entry.still : null,
-                      animated: !animatedMatchesHero ? entry.animated : null,
+                      still: entry.still || null,
+                      animated: entry.animated || null,
                       video: null,
                       aspect: entry.aspect,
                     });
@@ -4360,6 +4384,20 @@
 
     const projectDetail = document.querySelector('.project-detail');
     if (projectDetail) {
+      const headingMetaInitial = projectDetail.querySelector('.project-detail__meta');
+      if (headingMetaInitial) {
+        headingMetaInitial.textContent = '';
+        headingMetaInitial.hidden = true;
+      }
+
+      const descriptionInitial = projectDetail.querySelector(
+        '.project-detail__description'
+      );
+      if (descriptionInitial) {
+        descriptionInitial.textContent = '';
+        descriptionInitial.hidden = true;
+      }
+
       const backLink = projectDetail.querySelector('.project-detail__back');
       if (backLink) {
         backLink.addEventListener('click', (event) => {
@@ -4565,19 +4603,6 @@
         }
         if (heroAnimated) {
           heroSources.add(heroAnimated);
-        }
-
-        if (heroSources.size) {
-          Array.from(gallery.querySelectorAll('.project-detail__item')).forEach((item) => {
-            const stillAttr = readStringAttribute(item, 'data-still');
-            const animatedAttr = readStringAttribute(item, 'data-animated');
-            if (
-              (stillAttr && heroSources.has(stillAttr)) ||
-              (animatedAttr && heroSources.has(animatedAttr))
-            ) {
-              item.remove();
-            }
-          });
         }
 
         const defaultSources = new Set();

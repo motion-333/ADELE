@@ -631,30 +631,72 @@ body.category-evenementiel .project[data-category='evenementiel'] {
   background-position: top center;
 }
 
-body.category-film .project[data-category="film"] .placeholder[data-still$=".png" i]:not(.placeholder--video),
-body.category-film .project-detail[data-category="film"] .placeholder[data-still$=".png" i]:not(.placeholder--video) {
+body.category-film
+  .project[data-category="film"]
+  .placeholder:not(.placeholder--video):is(
+    [data-still$=".png" i],
+    [data-still$=".jpg" i],
+    [data-still$=".jpeg" i],
+    [data-animated$=".png" i],
+    [data-animated$=".jpg" i],
+    [data-animated$=".jpeg" i]
+  ),
+body.category-film
+  .project-detail[data-category="film"]
+  .placeholder:not(.placeholder--video):is(
+    [data-still$=".png" i],
+    [data-still$=".jpg" i],
+    [data-still$=".jpeg" i],
+    [data-animated$=".png" i],
+    [data-animated$=".jpg" i],
+    [data-animated$=".jpeg" i]
+  ) {
   background-position: center center;
 }
 
-body.category-photo .project[data-category="photo"] .placeholder[data-still$=".png" i]:not(.placeholder--video),
-body.category-photo .project-detail[data-category="photo"] .placeholder[data-still$=".png" i]:not(.placeholder--video) {
+body.category-photo
+  .project[data-category="photo"]
+  .placeholder:not(.placeholder--video):is(
+    [data-still$=".png" i],
+    [data-still$=".jpg" i],
+    [data-still$=".jpeg" i],
+    [data-animated$=".png" i],
+    [data-animated$=".jpg" i],
+    [data-animated$=".jpeg" i]
+  ),
+body.category-photo
+  .project-detail[data-category="photo"]
+  .placeholder:not(.placeholder--video):is(
+    [data-still$=".png" i],
+    [data-still$=".jpg" i],
+    [data-still$=".jpeg" i],
+    [data-animated$=".png" i],
+    [data-animated$=".jpg" i],
+    [data-animated$=".jpeg" i]
+  ) {
   background-position: top center;
 }
 
-body.category-evenementiel .project[data-category="evenementiel"] .placeholder[data-still$=".png" i]:not(.placeholder--video),
-body.category-evenementiel .project-detail[data-category="evenementiel"] .placeholder[data-still$=".png" i]:not(.placeholder--video) {
-  background-position: center center;
-}
-
-body.category-film .project-detail[data-category="film"] .project-hero__media.placeholder[data-still$=".png" i] {
-  background-position: center center;
-}
-
-body.category-photo .project-detail[data-category="photo"] .project-hero__media.placeholder[data-still$=".png" i] {
-  background-position: top center;
-}
-
-body.category-evenementiel .project-detail[data-category="evenementiel"] .project-hero__media.placeholder[data-still$=".png" i] {
+body.category-evenementiel
+  .project[data-category="evenementiel"]
+  .placeholder:not(.placeholder--video):is(
+    [data-still$=".png" i],
+    [data-still$=".jpg" i],
+    [data-still$=".jpeg" i],
+    [data-animated$=".png" i],
+    [data-animated$=".jpg" i],
+    [data-animated$=".jpeg" i]
+  ),
+body.category-evenementiel
+  .project-detail[data-category="evenementiel"]
+  .placeholder:not(.placeholder--video):is(
+    [data-still$=".png" i],
+    [data-still$=".jpg" i],
+    [data-still$=".jpeg" i],
+    [data-animated$=".png" i],
+    [data-animated$=".jpg" i],
+    [data-animated$=".jpeg" i]
+  ) {
   background-position: center center;
 }
 
