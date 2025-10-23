@@ -1420,25 +1420,42 @@
 
       const metaEl = detail.querySelector('.project-detail__meta');
       if (metaEl) {
-        if (metadata.info) {
-          metaEl.textContent = metadata.info;
+        const infoText =
+          typeof metadata.info === 'string' ? metadata.info.trim() : metadata.info;
+        const hasInfo = typeof infoText === 'string' ? infoText.length > 0 : !!infoText;
+        if (hasInfo) {
+          metaEl.textContent = `${infoText}`;
           metaEl.hidden = false;
           metaEl.removeAttribute('hidden');
         } else {
           metaEl.textContent = '';
           metaEl.hidden = true;
+          if (!metaEl.hasAttribute('hidden')) {
+            metaEl.setAttribute('hidden', '');
+          }
         }
       }
 
       const descriptionEl = detail.querySelector('.project-detail__description');
       if (descriptionEl) {
-        if (metadata.paragraph) {
-          descriptionEl.textContent = metadata.paragraph;
+        const descriptionText =
+          typeof metadata.paragraph === 'string'
+            ? metadata.paragraph.trim()
+            : metadata.paragraph;
+        const hasDescription =
+          typeof descriptionText === 'string'
+            ? descriptionText.length > 0
+            : !!descriptionText;
+        if (hasDescription) {
+          descriptionEl.textContent = `${descriptionText}`;
           descriptionEl.hidden = false;
           descriptionEl.removeAttribute('hidden');
         } else {
           descriptionEl.textContent = '';
           descriptionEl.hidden = true;
+          if (!descriptionEl.hasAttribute('hidden')) {
+            descriptionEl.setAttribute('hidden', '');
+          }
         }
       }
 

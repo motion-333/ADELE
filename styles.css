@@ -477,15 +477,6 @@ body.theme-light .icon--theme__moon {
   gap: clamp(2.5rem, 7vw, 4rem);
 }
 
-.site-credit {
-  margin: clamp(2rem, 6vw, 3.5rem) auto 2.5rem;
-  text-align: center;
-  font-size: clamp(0.82rem, 1.5vw, 0.95rem);
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
-}
-
 .project {
   position: relative;
   display: none;
@@ -625,20 +616,20 @@ body.category-evenementiel .project[data-category='evenementiel'] {
 }
 
 .project-detail__item .placeholder__image {
-  position: absolute;
-  inset: 0;
+  position: relative;
+  inset: auto;
   width: 100%;
-  height: 100%;
+  height: auto;
   display: block;
   object-fit: contain;
   object-position: center;
 }
 
 .project-detail__item .placeholder__video {
-  position: absolute;
-  inset: 0;
+  position: relative;
+  inset: auto;
   width: 100%;
-  height: 100%;
+  height: auto;
   object-fit: contain;
   object-position: center;
   pointer-events: none;
@@ -689,6 +680,53 @@ body.category-film
   background-position: center center;
 }
 
+body.category-film
+  .project[data-category="film"]
+  .placeholder:not(.placeholder--video):is(
+    [data-still$=".png" i],
+    [data-still$=".jpg" i],
+    [data-still$=".jpeg" i],
+    [data-animated$=".png" i],
+    [data-animated$=".jpg" i],
+    [data-animated$=".jpeg" i]
+  )
+  .placeholder__image,
+body.category-film
+  .project[data-category="film"]
+  .placeholder:not(.placeholder--video):is(
+    [data-still$=".png" i],
+    [data-still$=".jpg" i],
+    [data-still$=".jpeg" i],
+    [data-animated$=".png" i],
+    [data-animated$=".jpg" i],
+    [data-animated$=".jpeg" i]
+  )
+  .placeholder__video,
+body.category-film
+  .project-detail[data-category="film"]
+  .placeholder:not(.placeholder--video):is(
+    [data-still$=".png" i],
+    [data-still$=".jpg" i],
+    [data-still$=".jpeg" i],
+    [data-animated$=".png" i],
+    [data-animated$=".jpg" i],
+    [data-animated$=".jpeg" i]
+  )
+  .placeholder__image,
+body.category-film
+  .project-detail[data-category="film"]
+  .placeholder:not(.placeholder--video):is(
+    [data-still$=".png" i],
+    [data-still$=".jpg" i],
+    [data-still$=".jpeg" i],
+    [data-animated$=".png" i],
+    [data-animated$=".jpg" i],
+    [data-animated$=".jpeg" i]
+  )
+  .placeholder__video {
+  object-position: center center;
+}
+
 body.category-photo
   .project[data-category="photo"]
   .placeholder:not(.placeholder--video):is(
@@ -712,6 +750,53 @@ body.category-photo
   background-position: top center;
 }
 
+body.category-photo
+  .project[data-category="photo"]
+  .placeholder:not(.placeholder--video):is(
+    [data-still$=".png" i],
+    [data-still$=".jpg" i],
+    [data-still$=".jpeg" i],
+    [data-animated$=".png" i],
+    [data-animated$=".jpg" i],
+    [data-animated$=".jpeg" i]
+  )
+  .placeholder__image,
+body.category-photo
+  .project[data-category="photo"]
+  .placeholder:not(.placeholder--video):is(
+    [data-still$=".png" i],
+    [data-still$=".jpg" i],
+    [data-still$=".jpeg" i],
+    [data-animated$=".png" i],
+    [data-animated$=".jpg" i],
+    [data-animated$=".jpeg" i]
+  )
+  .placeholder__video,
+body.category-photo
+  .project-detail[data-category="photo"]
+  .placeholder:not(.placeholder--video):is(
+    [data-still$=".png" i],
+    [data-still$=".jpg" i],
+    [data-still$=".jpeg" i],
+    [data-animated$=".png" i],
+    [data-animated$=".jpg" i],
+    [data-animated$=".jpeg" i]
+  )
+  .placeholder__image,
+body.category-photo
+  .project-detail[data-category="photo"]
+  .placeholder:not(.placeholder--video):is(
+    [data-still$=".png" i],
+    [data-still$=".jpg" i],
+    [data-still$=".jpeg" i],
+    [data-animated$=".png" i],
+    [data-animated$=".jpg" i],
+    [data-animated$=".jpeg" i]
+  )
+  .placeholder__video {
+  object-position: top center;
+}
+
 body.category-evenementiel
   .project[data-category="evenementiel"]
   .placeholder:not(.placeholder--video):is(
@@ -733,6 +818,53 @@ body.category-evenementiel
     [data-animated$=".jpeg" i]
   ) {
   background-position: center center;
+}
+
+body.category-evenementiel
+  .project[data-category="evenementiel"]
+  .placeholder:not(.placeholder--video):is(
+    [data-still$=".png" i],
+    [data-still$=".jpg" i],
+    [data-still$=".jpeg" i],
+    [data-animated$=".png" i],
+    [data-animated$=".jpg" i],
+    [data-animated$=".jpeg" i]
+  )
+  .placeholder__image,
+body.category-evenementiel
+  .project[data-category="evenementiel"]
+  .placeholder:not(.placeholder--video):is(
+    [data-still$=".png" i],
+    [data-still$=".jpg" i],
+    [data-still$=".jpeg" i],
+    [data-animated$=".png" i],
+    [data-animated$=".jpg" i],
+    [data-animated$=".jpeg" i]
+  )
+  .placeholder__video,
+body.category-evenementiel
+  .project-detail[data-category="evenementiel"]
+  .placeholder:not(.placeholder--video):is(
+    [data-still$=".png" i],
+    [data-still$=".jpg" i],
+    [data-still$=".jpeg" i],
+    [data-animated$=".png" i],
+    [data-animated$=".jpg" i],
+    [data-animated$=".jpeg" i]
+  )
+  .placeholder__image,
+body.category-evenementiel
+  .project-detail[data-category="evenementiel"]
+  .placeholder:not(.placeholder--video):is(
+    [data-still$=".png" i],
+    [data-still$=".jpg" i],
+    [data-still$=".jpeg" i],
+    [data-animated$=".png" i],
+    [data-animated$=".jpg" i],
+    [data-animated$=".jpeg" i]
+  )
+  .placeholder__video {
+  object-position: center center;
 }
 
 .placeholder:is(:hover, :focus-visible) {
@@ -827,9 +959,10 @@ body.is-transitioning {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  width: min(92vw, 1080px);
   max-width: 100%;
-  width: auto;
-  height: min(82vh, 900px);
+  height: auto;
+  max-height: min(82vh, 900px);
   background: none;
   border-radius: 0;
   box-shadow: none;
@@ -842,8 +975,8 @@ body.is-transitioning {
 .lightbox__media .placeholder__video {
   position: relative;
   inset: auto;
-  width: auto;
-  height: 100%;
+  width: 100%;
+  height: auto;
   object-fit: contain;
   background: transparent;
   pointer-events: auto;
@@ -857,10 +990,12 @@ body.is-transitioning {
 .lightbox__media img,
 .lightbox__media video {
   display: block;
-  height: 100%;
-  width: auto;
+  width: 100%;
+  height: auto;
   max-width: min(92vw, 1080px);
+  max-height: min(82vh, 900px);
   object-fit: contain;
+  margin: 0 auto;
 }
 
 .lightbox__close {
@@ -938,6 +1073,23 @@ body.is-transitioning {
 .lightbox__close:hover .lightbox__close-icon::after,
 .lightbox__close:focus-visible .lightbox__close-icon::after {
   transform: translateY(-50%) scaleX(1.05) rotate(-45deg);
+}
+
+@media (max-width: 640px) {
+  .lightbox__content {
+    grid-template-columns: minmax(0, 1fr);
+    gap: clamp(0.6rem, 4vw, 1.4rem);
+  }
+
+  .lightbox__close {
+    grid-column: 1;
+    justify-self: flex-end;
+  }
+
+  .lightbox__media {
+    grid-column: 1;
+    justify-self: center;
+  }
 }
 
 .media-strip__control {
@@ -1258,14 +1410,17 @@ body.is-transitioning {
 }
 
 .project-detail__gallery {
-  width: min(95vw, 1100px);
+  width: min(96vw, 1100px);
   margin: 0 auto;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: clamp(8px, 2.4vw, 18px);
+  display: grid;
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(clamp(220px, 28vw, 340px), 1fr)
+  );
+  gap: clamp(8px, 2vw, 16px);
   position: relative;
-  align-items: stretch;
+  justify-content: center;
+  align-items: start;
 }
 
 .project-detail__credits {
@@ -1310,28 +1465,20 @@ body.is-transitioning {
 
 .project-detail__item {
   position: relative;
-  flex: 1 1 clamp(260px, 26vw, 320px);
-  min-width: clamp(240px, 24vw, 300px);
-  max-width: clamp(260px, 32vw, 360px);
   width: 100%;
-  aspect-ratio: var(--item-aspect, 1.35);
   box-shadow: 0 20px 40px var(--color-shadow);
   transition: transform 0.45s cubic-bezier(0.2, 0, 0.2, 1),
     opacity 0.35s ease;
   margin: 0;
   will-change: transform, opacity;
   cursor: pointer;
+  min-height: 0;
 }
 
 @media (max-width: 600px) {
   .project-detail__gallery {
-    gap: clamp(6px, 2.4vw, 12px);
-  }
-
-  .project-detail__item {
-    flex: 1 1 calc(50% - clamp(6px, 2.4vw, 12px));
-    min-width: calc(50% - clamp(6px, 2.4vw, 12px));
-    max-width: calc(50% - clamp(6px, 2.4vw, 12px));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: clamp(6px, 3.5vw, 12px);
   }
 }
 
@@ -1545,6 +1692,10 @@ body.is-transitioning {
   color: var(--color-text-muted);
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.portfolio > .site-footer {
+  padding: 1.5rem 20px 1.9rem;
 }
 
 .site-footer a {
